@@ -1,0 +1,3 @@
+<launch>
+	<node name="python_charuco_detector" pkg="test" type="charuco_detect_pub.py"/>
+</launch>
