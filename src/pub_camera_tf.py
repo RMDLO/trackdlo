@@ -26,8 +26,12 @@ if __name__=='__main__':
     static_transformStamped_5.header.frame_id = "base_link"
     static_transformStamped_5.child_frame_id = "camera_color_optical_frame"
 
-    trans_5 = [0.3896823283235443, 0.029188116670232758, 0.5939140580877977]
-    quat_5 = [-0.70648457533942, 0.7076580094674259, 0.0033731917459113568, -0.009397234780796244]
+    # trans_5 = [0.3896823283235443, 0.029188116670232758, 0.5939140580877977]
+    # quat_5 = [-0.70648457533942, 0.7076580094674259, 0.0033731917459113568, -0.009397234780796244]
+
+    # at a lower position
+    trans_5 = [0.3900409039632846, 0.02906734207082602, 0.46468886792534864] 
+    quat_5 = [-0.7063963994171865, 0.7077821791622537, 0.0008145501444001014, -0.0069173881508045815]
 
     static_transformStamped_5.transform.translation.x = trans_5[0]
     static_transformStamped_5.transform.translation.y = trans_5[1]

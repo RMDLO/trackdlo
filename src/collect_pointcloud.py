@@ -30,6 +30,7 @@ def update_cur_pcl(data):
 	global cur_pcl
 	pcl_arr = ros_numpy.point_cloud2.pointcloud2_to_array(data)
 	cur_pcl = ros_numpy.point_cloud2.get_xyz_points(pcl_arr)
+	cur_pcl = cur_pcl.reshape((720, 1280, 3))
 
 def update_pose(data):
 	global cur_joint_states
@@ -42,7 +43,7 @@ def update_img(data):
 
 # helpfer function, write to csv file
 def tf2csv(trans, quat, data_folder, sample_id, sample_type):
-	rot_matrix = R.from_quat(quat).as_dcm()
+	rot_matrix = R.from_quat(quat).as_matrix()
 
 	ret = []
 	for i in range(0, 3):
@@ -89,7 +90,7 @@ def record(main_dir, start=0, save_image=False, save_joint_states=False, load_ex
 		print("======================================================================")
 		print("Press enter to collect and save point cloud and camera pose data")
 		print("Press q + enter to exit the program")
-		key_pressed = raw_input("sample_id = " + sample_id + "\n")
+		key_pressed = input("sample_id = " + sample_id + "\n")
 
 		if key_pressed == 'q':
 			if save_joint_states:
@@ -129,10 +130,30 @@ def record(main_dir, start=0, save_image=False, save_joint_states=False, load_ex
 				print("Could not capture point cloud, please try again! \n")
 				continue
 
-			trans, quat = listener.lookupTransform('base_link', 'camera_depth_optical_frame', rospy.Time())
+			trans, quat = listener.lookupTransform('base_link', 'camera_color_optical_frame', rospy.Time())
+
+			# color thresholding
+			hsv_image = cv2.cvtColor(cur_image_arr.copy(), cv2.COLOR_BGR2HSV)
+			lower = (90, 100, 80)
+			upper = (120, 255, 255)
+			mask = cv2.inRange(hsv_image, lower, upper)
+			mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
+
+			# publish mask
+			mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
+			mask_img_pub.publish(mask_img_msg)
+
+			mask = (mask/255).astype(int)
+
+			filtered_pc = cur_pcl*mask
+			filtered_pc = filtered_pc[((filtered_pc[:, :, 0] != 0) | (filtered_pc[:, :, 1] != 0) | (filtered_pc[:, :, 2] != 0))]
+			if len(filtered_pc) == 0:
+				print(" ")
+				print("Could not filter point cloud, please try again! \n")
+				continue
 
 			f = open(main_dir + sample_id + "_pcl.json", "wb")
-			pkl.dump(cur_pcl, f)
+			pkl.dump(filtered_pc, f)
 			f.close()
 
 			if save_joint_states:
@@ -160,25 +181,27 @@ def record(main_dir, start=0, save_image=False, save_joint_states=False, load_ex
 
 			tf2csv(trans, quat, main_dir, sample_id, "cam_pose")
 
-			trans, quat = listener.lookupTransform('base_link', 'tool0', rospy.Time())
-			tf2csv(trans, quat, main_dir, sample_id, "tool0_pose")
+			# trans, quat = listener.lookupTransform('base_link', 'tool0', rospy.Time())
+			# tf2csv(trans, quat, main_dir, sample_id, "tool0_pose")
 
 			print("Data saved successfully! \n")
 			i += 1
 
 if __name__ == '__main__':
 	rospy.init_node('record_pcl', anonymous=True)
-	main_dir = "/home/jingyixiang/test/recorded_pcl/7_6_22_pcl_print/loop_wire/"
+	username = 'ablcts18'
+	main_dir = '/home/' + username + '/Research/tracking/recorded_pcl/7_27_22_multi_wire/'
+	mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
 	# try:
 	os.listdir(main_dir)
-	os.listdir(main_dir + 'params/')
+	# os.listdir(main_dir + 'params/')
 	print("######################################################################")
 	print("Collected data will be saved at the following directory:")
 	print(main_dir)
 	print("###################################################################### \n")
 
-	record(main_dir, start=0, save_image=True, save_joint_states=True, load_existing_pkl=False)
+	record(main_dir, start=1, save_image=True, save_joint_states=False, load_existing_pkl=False)
 	# except:
 	# 	print("Invalid directory!")
 	# 	rospy.signal_shutdown('')
