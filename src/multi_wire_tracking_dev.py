@@ -20,8 +20,8 @@ from sklearn.neighbors import NearestNeighbors
 import open3d as o3d
 
 # temp
-intersection = 18
-# intersection = 15
+nodes_per_wire = 15
+num_of_wires = 3
 
 def pt2pt_dis_sq(pt1, pt2):
     return np.sum(np.square(pt1 - pt2))
@@ -89,43 +89,31 @@ def register(pts, M, mu=0, max_iter=10):
 # for now, assume each wire has the same number of nodes
 # k -- going left for k indices, going right for k indices. a total of 2k neighbors.
 def get_nearest_indices (k, Y, idx):
-    if idx < intersection:
-        if idx - k < 0:
-            # use more neighbors from the other side?
-            # indices_arr = np.append(np.arange(0, idx, 1), np.arange(idx+1, idx+k+1+np.abs(idx-k)))
-            indices_arr = np.append(np.arange(0, idx, 1), np.arange(idx+1, idx+k+1))
-            return indices_arr
-        elif idx + k >= intersection:
-            last_index = intersection - 1
-            # use more neighbots from the other side?
-            # indices_arr = np.append(np.arange(idx-k-(idx+k-last_index), idx, 1), np.arange(idx+1, last_index+1, 1))
-            indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, last_index+1, 1))
-            return indices_arr
-        else:
-            indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, idx+k+1, 1))
-            return indices_arr
+    if idx - k < 0:
+        # use more neighbors from the other side?
+        indices_arr = np.append(np.arange(0, idx, 1), np.arange(idx+1, idx+k+1+np.abs(idx-k)))
+        # indices_arr = np.append(np.arange(0, idx, 1), np.arange(idx+1, idx+k+1))
+        return indices_arr
+    elif idx + k >= len(Y):
+        last_index = len(Y) - 1
+        # use more neighbots from the other side?
+        indices_arr = np.append(np.arange(idx-k-(idx+k-last_index), idx, 1), np.arange(idx+1, last_index+1, 1))
+        # indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, last_index+1, 1))
+        return indices_arr
     else:
-        if idx - k < intersection:
-            # use more neighbors from the other side?
-            # indices_arr = np.append(np.arange(intersection, idx, 1), np.arange(idx+1, idx+k+1+np.abs(idx-k-intersection)))
-            indices_arr = np.append(np.arange(intersection, idx, 1), np.arange(idx+1, idx+k+1))
-            return indices_arr
-        elif idx + k >= len(Y):
-            last_index = len(Y) - 1
-            # use more neighbors from the other side?
-            # indices_arr = np.append(np.arange(idx-k-(idx+k-last_index), idx, 1), np.arange(idx+1, last_index+1, 1))
-            indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, last_index+1, 1))
-            return indices_arr
-        else:
-            indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, idx+k+1, 1))
-            return indices_arr
+        indices_arr = np.append(np.arange(idx-k, idx, 1), np.arange(idx+1, idx+k+1, 1))
+        return indices_arr
 
 def calc_LLE_weights (k, X):
     W = np.zeros((len(X), len(X)))
     for i in range (0, len(X)):
-        indices = get_nearest_indices(int(k/2), X, i)
 
-        # # test
+        wire_index = int(i/nodes_per_wire)
+        offset = wire_index * nodes_per_wire
+
+        indices = get_nearest_indices(int(k/2), X[offset : offset+nodes_per_wire], i-offset)
+        indices += offset
+
         # print(i, indices)
 
         xi, Xi = X[i], X[indices, :]
@@ -149,22 +137,6 @@ def indices_array(n):
     out[:,:,1] = r
     return out
 
-# test
-# trying to give less penalty to nodes far away (index wise)
-total_num_of_nodes = 31
-coeff = indices_array(total_num_of_nodes)
-coeff = np.abs(coeff[:, :, 0] - coeff[:, :, 1])
-
-# normalize coeff
-min_coeff = 1
-# max_coeff = 1.0003
-max_coeff = 1.0003**3
-coeff = np.full(np.shape(coeff), min_coeff) + coeff / np.amax(coeff) * (max_coeff - min_coeff)
-
-# different wires should never interfere
-coeff[0:intersection, intersection:total_num_of_nodes] = 50
-coeff[intersection:total_num_of_nodes, 0:intersection] = 50
-# print(coeff)
 
 def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
 # def cpd_lle (X, Y_0, beta, alpha, H, gamma, mu, max_iter, tol):
@@ -179,14 +151,15 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
     diff = Y_0[:, None, :] - Y_0[None, :,  :]
     diff = np.square(diff)
     diff = np.sum(diff, 2)
-    G = np.exp(-diff / (2 * beta**2))
+    G_orig = np.exp(-diff / (2 * beta**2))
 
-    # G[0:intersection, intersection:M] = 0
-    # G[intersection:M, 0:intersection] = 0
-
-    # test
-    # G = G / coeff # * or / ?
-    # G = np.exp(-diff / (2 * beta**2 * coeff**(1/3)))
+    # nodes on different wires should never interfere
+    G = np.zeros((M, M))
+    for i in range (0, num_of_wires):
+        # copy information from the G matrix over
+        start = i * nodes_per_wire
+        end = (i + 1) * nodes_per_wire
+        G[start:end, start:end] = G_orig[start:end, start:end] 
     
     Y = Y_0.copy()
 
@@ -432,35 +405,18 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        # try two wires
-        wire1_pc = filtered_pc[filtered_pc[:, 0] > 0]
-        wire2_pc = filtered_pc[filtered_pc[:, 0] < 0]
+        # try four wires
+        wire1_pc = filtered_pc[filtered_pc[:, 0] > 0.12]
+        wire2_pc = filtered_pc[(0.12 > filtered_pc[:, 0]) & (filtered_pc[:, 0] > 0)]
+        wire3_pc = filtered_pc[(-0.15 < filtered_pc[:, 0]) & (filtered_pc[:, 0] < 0)]
+        # wire4_pc = filtered_pc[filtered_pc[:, 0] < -0.15]
 
         print('filtered wire 1 shape = ', np.shape(wire1_pc))
         print('filtered wire 2 shape = ', np.shape(wire2_pc))
 
-        # # get nodes for wire 1
-        # init_nodes_1, _ = register(wire1_pc, 15, mu=0, max_iter=50)
-        init_nodes_1 = np.array([[-1.27009724e-01,  4.14825357e-04,  4.52871539e-01],
-                                [-1.54898246e-01, -1.99959384e-02,  4.51123124e-01],
-                                [-1.72412218e-01, -3.41579425e-02,  4.50719521e-01],
-                                [-1.62303231e-01, -2.63667164e-02,  4.49721778e-01],
-                                [-1.39986265e-01, -7.90766445e-03,  4.52218090e-01],
-                                [-1.16063114e-01,  7.30732350e-03,  4.56451478e-01],
-                                [-1.03287281e-01,  1.64191108e-02,  4.57034100e-01],
-                                [-8.76353685e-02,  2.77012005e-02,  4.54915663e-01],
-                                [-7.21464421e-02,  3.47317274e-02,  4.54974480e-01],
-                                [-5.59613760e-02,  4.36247728e-02,  4.58797092e-01],
-                                [-3.80835279e-02,  5.13719688e-02,  4.60949620e-01],
-                                [-1.46462847e-02,  6.01458400e-02,  4.59085010e-01],
-                                [ 1.53298123e-02,  7.06612495e-02,  4.60718526e-01],
-                                [ 4.59158222e-02,  8.51427749e-02,  4.61482631e-01],
-                                [ 7.29576712e-02,  1.03318306e-01,  4.63495959e-01],
-                                [ 9.27155833e-02,  1.26644998e-01,  4.63692264e-01],
-                                [ 1.03272507e-01,  1.53314484e-01,  4.63873842e-01],
-                                [ 1.07863333e-01,  1.75858068e-01,  4.64742587e-01]])
+        # get nodes for wire 1
+        init_nodes_1, _ = register(wire1_pc, 15, mu=0, max_iter=50)
         init_nodes_1 = np.array(sort_pts(init_nodes_1.tolist()))
-
         # add color
         init_nodes_1_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
         init_nodes_1_rgba_arr = np.full((len(init_nodes_1), 1), init_nodes_1_rgba)
@@ -470,23 +426,9 @@ def callback (rgb, depth, pc):
         converted_nodes_1 = pcl2.create_cloud(header, fields, init_nodes_1_colored)
         init_nodes_1_pub.publish(converted_nodes_1)
 
-        # # get nodes for wire 2
-        # init_nodes_2, _ = register(wire2_pc, 15, mu=0, max_iter=50)
-        init_nodes_2 = np.array([[-0.04978539, -0.08826958,  0.45399044],
-                                [-0.05717473, -0.0760752 ,  0.45591002],
-                                [-0.06246264, -0.05427032,  0.45739881],
-                                [-0.06930357, -0.03164733,  0.45798269],
-                                [-0.07532243, -0.01169516,  0.45983623],
-                                [-0.0812431 ,  0.00803333,  0.458365  ],
-                                [-0.09329984,  0.05316729,  0.45860219],
-                                [-0.09728898,  0.07534121,  0.4570974 ],
-                                [-0.10369568,  0.12654829,  0.46100685],
-                                [-0.11005815,  0.17377957,  0.46193915],
-                                [-0.1065393 ,  0.15161074,  0.462138  ],
-                                [-0.10014007,  0.10297371,  0.45662362],
-                                [-0.08763537,  0.0277012 ,  0.45891566]])
+        # get nodes for wire 2
+        init_nodes_2, _ = register(wire2_pc, 15, mu=0, max_iter=50)
         init_nodes_2 = np.array(sort_pts(init_nodes_2.tolist()))
-
         # add color
         init_nodes_2_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
         init_nodes_2_rgba_arr = np.full((len(init_nodes_2), 1), init_nodes_2_rgba)
@@ -496,7 +438,31 @@ def callback (rgb, depth, pc):
         converted_nodes_2 = pcl2.create_cloud(header, fields, init_nodes_2_colored)
         init_nodes_2_pub.publish(converted_nodes_2)
 
-        init_nodes = np.vstack((init_nodes_1, init_nodes_2))
+        # get nodes for wire 3
+        init_nodes_3, _ = register(wire3_pc, 15, mu=0, max_iter=50)
+        init_nodes_3 = np.array(sort_pts(init_nodes_3.tolist()))
+        # add color
+        init_nodes_3_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
+        init_nodes_3_rgba_arr = np.full((len(init_nodes_3), 1), init_nodes_3_rgba)
+        init_nodes_3_colored = np.hstack((init_nodes_3, init_nodes_3_rgba_arr)).astype('O')
+        init_nodes_3_colored[:, 3] = init_nodes_3_colored[:, 3].astype(int)
+        header.stamp = rospy.Time.now()
+        converted_nodes_3 = pcl2.create_cloud(header, fields, init_nodes_3_colored)
+        init_nodes_3_pub.publish(converted_nodes_3)
+
+        # # get nodes for wire 4
+        # init_nodes_4, _ = register(wire4_pc, 15, mu=0, max_iter=50)
+        # init_nodes_4 = np.array(sort_pts(init_nodes_4.tolist()))
+        # # add color
+        # init_nodes_4_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
+        # init_nodes_4_rgba_arr = np.full((len(init_nodes_4), 1), init_nodes_4_rgba)
+        # init_nodes_4_colored = np.hstack((init_nodes_4, init_nodes_4_rgba_arr)).astype('O')
+        # init_nodes_4_colored[:, 3] = init_nodes_4_colored[:, 3].astype(int)
+        # header.stamp = rospy.Time.now()
+        # converted_nodes_4 = pcl2.create_cloud(header, fields, init_nodes_4_colored)
+        # init_nodes_4_pub.publish(converted_nodes_4)
+
+        init_nodes = np.vstack((init_nodes_1, init_nodes_2, init_nodes_3))
 
         # # get the LLE matrix
         # L = calc_LLE_weights(2, init_nodes)
@@ -508,13 +474,14 @@ def callback (rgb, depth, pc):
 
     # cpd
     if initialized:
-        nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=1, alpha=1, k=6, gamma=3, mu=0.05, max_iter=30, tol=0.00001)
+        nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=2, alpha=1, k=6, gamma=3, mu=0.05, max_iter=30, tol=0.00001)
         # nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=1, alpha=1, H=H, gamma=2, mu=0.05, max_iter=30, tol=0.00001)
         init_nodes = nodes
-        # print("finished reg")
 
-        nodes_1 = nodes[0:intersection]
-        nodes_2 = nodes[intersection:len(nodes)]
+        nodes_1 = nodes[0 : nodes_per_wire]
+        nodes_2 = nodes[nodes_per_wire : (2*nodes_per_wire)]
+        nodes_3 = nodes[(2*nodes_per_wire) : (3*nodes_per_wire)]
+        # nodes_4 = nodes[(3*nodes_per_wire) : len(nodes)]
 
         # add color
         nodes_1_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
@@ -532,9 +499,22 @@ def callback (rgb, depth, pc):
         header.stamp = rospy.Time.now()
         converted_nodes_2 = pcl2.create_cloud(header, fields, nodes_2_colored)
         nodes_2_pub.publish(converted_nodes_2)
-
-        # test
-        print(nodes_1[-1], nodes_2[0])
+        # add color
+        nodes_3_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 255, 255))[0]
+        nodes_3_rgba_arr = np.full((len(nodes_3), 1), nodes_3_rgba)
+        nodes_3_colored = np.hstack((nodes_3, nodes_3_rgba_arr)).astype('O')
+        nodes_3_colored[:, 3] = nodes_3_colored[:, 3].astype(int)
+        header.stamp = rospy.Time.now()
+        converted_nodes_3 = pcl2.create_cloud(header, fields, nodes_3_colored)
+        nodes_3_pub.publish(converted_nodes_3)
+        # # add color
+        # nodes_4_rgba = struct.unpack('I', struct.pack('BBBB', 0, 255, 0, 255))[0]
+        # nodes_4_rgba_arr = np.full((len(nodes_4), 1), nodes_4_rgba)
+        # nodes_4_colored = np.hstack((nodes_4, nodes_4_rgba_arr)).astype('O')
+        # nodes_4_colored[:, 3] = nodes_4_colored[:, 3].astype(int)
+        # header.stamp = rospy.Time.now()
+        # converted_nodes_4 = pcl2.create_cloud(header, fields, nodes_4_colored)
+        # nodes_4_pub.publish(converted_nodes_4)
 
         # project and pub image
         nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
@@ -544,22 +524,27 @@ def callback (rgb, depth, pc):
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
         tracking_img = cur_image.copy()
-        for i in range (0, intersection):
-            # draw circle
-            uv = (us[i], vs[i])
-            cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
+        # print('nodes shape = ', np.shape(nodes))
+        
+        for i in range (0, num_of_wires):
+            # color
+            node_color = (0, 0, 0)
+            if i == 1:
+                node_color = (255, 255, 255)
+            elif i == 2:
+                node_color = (255, 0, 0)
+            elif i == 3:
+                node_color = (0, 255, 0)
+            
+            for index in range (i*nodes_per_wire, (i+1)*nodes_per_wire):
+                # draw circle
+                uv = (us[index], vs[index])
+                cv2.circle(tracking_img, uv, 5, node_color, -1)
 
-            # draw line
-            if i != (intersection-1):
-                cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
-        for i in range (intersection, len(nodes)):
-            # draw circle
-            uv = (us[i], vs[i])
-            cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
-
-            # draw line
-            if i != len(image_coords)-1:
-                cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
+                # draw line
+                # print(index, (i+1)*nodes_per_wire-1)
+                if index != (i+1)*nodes_per_wire-1:
+                    cv2.line(tracking_img, uv, (us[index+1], vs[index+1]), node_color, 2)
         
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
@@ -586,9 +571,13 @@ if __name__=='__main__':
 
     init_nodes_1_pub = rospy.Publisher ('/init_nodes_1', PointCloud2, queue_size=10)
     init_nodes_2_pub = rospy.Publisher ('/init_nodes_2', PointCloud2, queue_size=10)
+    init_nodes_3_pub = rospy.Publisher ('/init_nodes_3', PointCloud2, queue_size=10)
+    # init_nodes_4_pub = rospy.Publisher ('/init_nodes_4', PointCloud2, queue_size=10)
 
     nodes_1_pub = rospy.Publisher ('/nodes_1', PointCloud2, queue_size=10)
     nodes_2_pub = rospy.Publisher ('/nodes_2', PointCloud2, queue_size=10)
+    nodes_3_pub = rospy.Publisher ('/nodes_3', PointCloud2, queue_size=10)
+    # nodes_4_pub = rospy.Publisher ('/nodes_4', PointCloud2, queue_size=10)
 
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
