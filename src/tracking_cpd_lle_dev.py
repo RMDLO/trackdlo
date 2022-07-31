@@ -136,8 +136,7 @@ coeff_min = 1
 # coeff = np.ones((total_num_of_nodes, total_num_of_nodes)) / (coeff_min + (coeff_max - coeff_min) * coeff)
 coeff = coeff_min + (coeff_max - coeff_min) * coeff / total_num_of_nodes  # coeff larger output larfer
 
-def cpd_lle_modified_g (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
-# def cpd_lle (X, Y_0, beta, alpha, H, gamma, mu, max_iter, tol):
+def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True, use_decoupling=False, use_prev_sigma2=False, sigma2_0=None, occluded_nodes=[]):
 
     # define params
     M = len(Y_0)
@@ -150,25 +149,22 @@ def cpd_lle_modified_g (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
     diff = np.square(diff)
     diff = np.sum(diff, 2)
 
-    # original G computation
-    # G = np.exp(-diff / (2 * beta**2))
-
-    # method 1
-    # G = np.exp(-diff * coeff / (2 * beta**2))
-    G = np.exp(-diff / (2 * beta**2)) / coeff  # this worked better
-
-    # method 2 G computation: complete replace yi and yj with i and j
-    # beta needs to be scaled down in this case
-    # G = np.exp(-(1/2) * (coeff/(beta))**2)
+    if not use_decoupling:
+        G = np.exp(-diff / (2 * beta**2))
+    else:
+        G = np.exp(-diff / (2 * beta**2)) / coeff
     
     Y = Y_0.copy()
 
     # initialize sigma2
-    (N, D) = X.shape
-    (M, _) = Y.shape
-    diff = X[None, :, :] - Y[:, None, :]
-    err = diff ** 2
-    sigma2 = np.sum(err) / (D * M * N)
+    if not use_prev_sigma2:
+        (N, D) = X.shape
+        (M, _) = Y.shape
+        diff = X[None, :, :] - Y[:, None, :]
+        err = diff ** 2
+        sigma2 = np.sum(err) / (D * M * N)
+    else:
+        sigma2 = sigma2_0
 
     # get the LLE matrix
     L = calc_LLE_weights(k, Y_0)
@@ -191,17 +187,25 @@ def cpd_lle_modified_g (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
         den += c
 
         P = np.divide(P, den)
+        # turn off all occluded nodes
+        if len(occluded_nodes) != 0:
+            P[occluded_nodes] = np.zeros(N,)
+
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
         Np = np.sum(P1)
         PX = np.matmul(P, X)
     
         # M step
-        A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G)
-        B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0)
+        if include_lle:
+            A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G)
+            B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0)
+        else:
+            A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M)
+            B_matrix = PX - np.matmul(np.diag(P1), Y_0)
+
         W = np.linalg.solve(A_matrix, B_matrix)
 
-        # update sigma2
         T = Y_0 + np.matmul(G, W)
         trXtdPt1X = np.trace(np.matmul(np.matmul(X.T, np.diag(Pt1)), X))
         trPXtT = np.trace(np.matmul(PX.T, T))
@@ -215,80 +219,8 @@ def cpd_lle_modified_g (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
             break
         else:
             Y = Y_0 + np.matmul(G, W)
-
-    return Y
-
-def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
-# def cpd_lle (X, Y_0, beta, alpha, H, gamma, mu, max_iter, tol):
-
-    # define params
-    M = len(Y_0)
-    N = len(X)
-    D = len(X[0])
-
-    # initialization
-    # faster G calculation
-    diff = Y_0[:, None, :] - Y_0[None, :,  :]
-    diff = np.square(diff)
-    diff = np.sum(diff, 2)
-    G = np.exp(-diff / (2 * beta**2))
     
-    Y = Y_0.copy()
-
-    # initialize sigma2
-    (N, D) = X.shape
-    (M, _) = Y.shape
-    diff = X[None, :, :] - Y[:, None, :]
-    err = diff ** 2
-    sigma2 = np.sum(err) / (D * M * N)
-
-    # get the LLE matrix
-    L = calc_LLE_weights(k, Y_0)
-    H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
-    
-    # loop until convergence or max_iter reached
-    for it in range (0, max_iter):
-
-        # faster P computation
-        P = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
-
-        c = (2 * np.pi * sigma2) ** (D / 2)
-        c = c * mu / (1 - mu)
-        c = c * M / N
-
-        P = np.exp(-P / (2 * sigma2))
-        den = np.sum(P, axis=0)
-        den = np.tile(den, (M, 1))
-        den[den == 0] = np.finfo(float).eps
-        den += c
-
-        P = np.divide(P, den)
-        Pt1 = np.sum(P, axis=0)
-        P1 = np.sum(P, axis=1)
-        Np = np.sum(P1)
-        PX = np.matmul(P, X)
-    
-        # M step
-        A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G)
-        B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0)
-        W = np.linalg.solve(A_matrix, B_matrix)
-
-        # update sigma2
-        T = Y_0 + np.matmul(G, W)
-        trXtdPt1X = np.trace(np.matmul(np.matmul(X.T, np.diag(Pt1)), X))
-        trPXtT = np.trace(np.matmul(PX.T, T))
-        trTtdP1T = np.trace(np.matmul(np.matmul(T.T, np.diag(P1)), T))
-
-        sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D)
-
-        # update Y
-        if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
-            Y = Y_0 + np.matmul(G, W)
-            break
-        else:
-            Y = Y_0 + np.matmul(G, W)
-
-    return Y
+    return Y, sigma2
 
 def find_closest (pt, arr):
     closest = arr[0].copy()
@@ -392,14 +324,14 @@ saved = False
 initialized = False
 init_nodes = []
 nodes = []
-# H = []
+sigma2 = 0
 cur_time = time.time()
 def callback (rgb, depth, pc):
     global saved
     global initialized
     global init_nodes
     global nodes
-    # global H
+    global sigma2
     global cur_time
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
@@ -428,6 +360,7 @@ def callback (rgb, depth, pc):
     lower = (90, 100, 80)
     upper = (120, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
+    bmask = mask.copy() # for checking visibility
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
     # print('mask shape = ', np.shape(mask))
 
@@ -474,12 +407,9 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, _ = register(filtered_pc, 35, mu=0, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 35, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
-        print('ini nodes shape = ', np.shape(init_nodes))
-        # # get the LLE matrix
-        # L = calc_LLE_weights(2, init_nodes)
-        # H = np.matmul((np.identity(len(init_nodes)) - L).T, np.identity(len(init_nodes)) - L)
+        print('init nodes shape = ', np.shape(init_nodes))
         initialized = True
         # header.stamp = rospy.Time.now()
         # converted_init_nodes = pcl2.create_cloud(header, fields, init_nodes)
@@ -487,12 +417,34 @@ def callback (rgb, depth, pc):
 
     # cpd
     if initialized:
-        nodes = cpd_lle_modified_g(X=filtered_pc, Y_0=init_nodes, beta=1, alpha=1, k=6, gamma=3, mu=0.05, max_iter=30, tol=0.00001)
-        # nodes = cpd_lle(X=filtered_pc, Y_0=init_nodes, beta=1, alpha=1, k=6, gamma=3, mu=0.05, max_iter=30, tol=0.00001)
+        # determined which nodes are occluded from mask information
+        # projection
+        init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
+        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
+        image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
+        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+        uvs = np.vstack((vs, us)).T
+        print(np.shape(uvs))
+        uvs_t = tuple(map(tuple, uvs.T))
+        vis = bmask[uvs_t]
+        occluded_nodes = np.where(vis == 0)[0]
 
-        # nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=1, alpha=1, H=H, gamma=2, mu=0.05, max_iter=30, tol=0.00001)
+        nodes, sigma2 = cpd_lle(X = filtered_pc, 
+                                Y_0 = init_nodes, 
+                                beta = 1, 
+                                alpha = 1, 
+                                k = 6, 
+                                gamma = 3, 
+                                mu = 0.05, 
+                                max_iter = 50, 
+                                tol = 0.00001, 
+                                use_decoupling = True, 
+                                use_prev_sigma2 = True, 
+                                sigma2_0 = sigma2,
+                                occluded_nodes = occluded_nodes)
+
         init_nodes = nodes
-        print("finished reg")
 
         # add color
         nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
