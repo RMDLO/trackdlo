@@ -187,9 +187,9 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
         den += c
 
         P = np.divide(P, den)
-        # turn off all occluded nodes
-        if len(occluded_nodes) != 0:
-            P[occluded_nodes] = np.zeros(N,)
+        # # turn off all occluded nodes
+        # if len(occluded_nodes) != 0:
+        #     P[occluded_nodes] = np.zeros(N,)
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)

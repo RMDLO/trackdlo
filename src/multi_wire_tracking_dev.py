@@ -138,7 +138,7 @@ def indices_array(n):
     return out
 
 
-def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
+def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, use_decoupling=False, use_prev_sigma2=False, sigma2_0=None):
 # def cpd_lle (X, Y_0, beta, alpha, H, gamma, mu, max_iter, tol):
 
     # define params
@@ -155,20 +155,26 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
 
     # nodes on different wires should never interfere
     G = np.zeros((M, M))
-    for i in range (0, num_of_wires):
-        # copy information from the G matrix over
-        start = i * nodes_per_wire
-        end = (i + 1) * nodes_per_wire
-        G[start:end, start:end] = G_orig[start:end, start:end] 
-    
+    if use_decoupling:
+        for i in range (0, num_of_wires):
+            # copy information from the G matrix over
+            start = i * nodes_per_wire
+            end = (i + 1) * nodes_per_wire
+            G[start:end, start:end] = G_orig[start:end, start:end] 
+    else:
+        G = G_orig.copy()
+        
     Y = Y_0.copy()
 
     # initialize sigma2
-    (N, D) = X.shape
-    (M, _) = Y.shape
-    diff = X[None, :, :] - Y[:, None, :]
-    err = diff ** 2
-    sigma2 = np.sum(err) / (D * M * N)
+    if not use_prev_sigma2 or sigma2_0 == 0:
+        (N, D) = X.shape
+        (M, _) = Y.shape
+        diff = X[None, :, :] - Y[:, None, :]
+        err = diff ** 2
+        sigma2 = np.sum(err) / (D * M * N)
+    else:
+        sigma2 = sigma2_0
 
     # get the LLE matrix
     L = calc_LLE_weights(k, Y_0)
@@ -216,7 +222,7 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol):
         else:
             Y = Y_0 + np.matmul(G, W)
 
-    return Y
+    return Y, sigma2
 
 def find_closest (pt, arr):
     closest = arr[0].copy()
@@ -320,15 +326,15 @@ saved = False
 initialized = False
 init_nodes = []
 nodes = []
-# H = []
 cur_time = time.time()
+sigma2 = 0
 def callback (rgb, depth, pc):
     global saved
     global initialized
     global init_nodes
     global nodes
-    # global H
     global cur_time
+    global sigma2
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -406,16 +412,17 @@ def callback (rgb, depth, pc):
     # register nodes
     if not initialized:
         # try four wires
-        wire1_pc = filtered_pc[filtered_pc[:, 0] > 0.12]
-        wire2_pc = filtered_pc[(0.12 > filtered_pc[:, 0]) & (filtered_pc[:, 0] > 0)]
-        wire3_pc = filtered_pc[(-0.15 < filtered_pc[:, 0]) & (filtered_pc[:, 0] < 0)]
+        wire1_pc = filtered_pc[filtered_pc[:, 0] > 0.08]
+        wire2_pc = filtered_pc[(0.08 > filtered_pc[:, 0]) & (filtered_pc[:, 0] > -0.08)]
+        wire3_pc = filtered_pc[filtered_pc[:, 0] < -0.08]
+        # wire3_pc = filtered_pc[(-0.15 < filtered_pc[:, 0]) & (filtered_pc[:, 0] < 0)]
         # wire4_pc = filtered_pc[filtered_pc[:, 0] < -0.15]
 
         print('filtered wire 1 shape = ', np.shape(wire1_pc))
         print('filtered wire 2 shape = ', np.shape(wire2_pc))
 
         # get nodes for wire 1
-        init_nodes_1, _ = register(wire1_pc, 15, mu=0, max_iter=50)
+        init_nodes_1, sigma2 = register(wire1_pc, nodes_per_wire, mu=0, max_iter=50)
         init_nodes_1 = np.array(sort_pts(init_nodes_1.tolist()))
         # add color
         init_nodes_1_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
@@ -427,7 +434,7 @@ def callback (rgb, depth, pc):
         init_nodes_1_pub.publish(converted_nodes_1)
 
         # get nodes for wire 2
-        init_nodes_2, _ = register(wire2_pc, 15, mu=0, max_iter=50)
+        init_nodes_2, _ = register(wire2_pc, nodes_per_wire, mu=0, max_iter=50)
         init_nodes_2 = np.array(sort_pts(init_nodes_2.tolist()))
         # add color
         init_nodes_2_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
@@ -439,7 +446,7 @@ def callback (rgb, depth, pc):
         init_nodes_2_pub.publish(converted_nodes_2)
 
         # get nodes for wire 3
-        init_nodes_3, _ = register(wire3_pc, 15, mu=0, max_iter=50)
+        init_nodes_3, _ = register(wire3_pc, nodes_per_wire, mu=0, max_iter=50)
         init_nodes_3 = np.array(sort_pts(init_nodes_3.tolist()))
         # add color
         init_nodes_3_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
@@ -474,7 +481,18 @@ def callback (rgb, depth, pc):
 
     # cpd
     if initialized:
-        nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=2, alpha=1, k=6, gamma=3, mu=0.05, max_iter=30, tol=0.00001)
+        nodes, sigma2 = cpd_lle(X=filtered_pc, 
+                        Y_0 = init_nodes, 
+                        beta=2, 
+                        alpha=1, 
+                        k=6, 
+                        gamma=3, 
+                        mu=0.05, 
+                        max_iter=30, 
+                        tol=0.00001, 
+                        use_decoupling = True, 
+                        use_prev_sigma2 = True, 
+                        sigma2_0 = sigma2)
         # nodes = cpd_lle(X=filtered_pc, Y_0 = init_nodes, beta=1, alpha=1, H=H, gamma=2, mu=0.05, max_iter=30, tol=0.00001)
         init_nodes = nodes
 
@@ -484,7 +502,7 @@ def callback (rgb, depth, pc):
         # nodes_4 = nodes[(3*nodes_per_wire) : len(nodes)]
 
         # add color
-        nodes_1_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
+        nodes_1_rgba = struct.unpack('I', struct.pack('BBBB', 0, 255, 0, 255))[0]
         nodes_1_rgba_arr = np.full((len(nodes_1), 1), nodes_1_rgba)
         nodes_1_colored = np.hstack((nodes_1, nodes_1_rgba_arr)).astype('O')
         nodes_1_colored[:, 3] = nodes_1_colored[:, 3].astype(int)
@@ -528,13 +546,13 @@ def callback (rgb, depth, pc):
         
         for i in range (0, num_of_wires):
             # color
-            node_color = (0, 0, 0)
+            node_color = (0, 255, 0)
             if i == 1:
                 node_color = (255, 255, 255)
             elif i == 2:
                 node_color = (255, 0, 0)
             elif i == 3:
-                node_color = (0, 255, 0)
+                node_color = (0, 0, 0)
             
             for index in range (i*nodes_per_wire, (i+1)*nodes_per_wire):
                 # draw circle
@@ -542,7 +560,7 @@ def callback (rgb, depth, pc):
                 cv2.circle(tracking_img, uv, 5, node_color, -1)
 
                 # draw line
-                # print(index, (i+1)*nodes_per_wire-1)
+                print(index, (i+1)*nodes_per_wire-1)
                 if index != (i+1)*nodes_per_wire-1:
                     cv2.line(tracking_img, uv, (us[index+1], vs[index+1]), node_color, 2)
         
