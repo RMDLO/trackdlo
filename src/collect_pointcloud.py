@@ -190,7 +190,7 @@ def record(main_dir, start=0, save_image=False, save_joint_states=False, load_ex
 if __name__ == '__main__':
 	rospy.init_node('record_pcl', anonymous=True)
 	username = 'ablcts18'
-	main_dir = '/home/' + username + '/Research/tracking/recorded_pcl/7_27_22_multi_wire/'
+	main_dir = '/home/ablcts18/Research/data/recorded_pcl/8_2_22_single_wire/'
 	mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
 	# try:
@@ -201,7 +201,7 @@ if __name__ == '__main__':
 	print(main_dir)
 	print("###################################################################### \n")
 
-	record(main_dir, start=1, save_image=True, save_joint_states=False, load_existing_pkl=False)
+	record(main_dir, start=0, save_image=True, save_joint_states=False, load_existing_pkl=False)
 	# except:
 	# 	print("Invalid directory!")
 	# 	rospy.signal_shutdown('')
