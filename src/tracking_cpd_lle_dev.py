@@ -124,19 +124,7 @@ def indices_array(n):
     out[:,:,1] = r
     return out
 
-# method 1: non constant beta
-# trying to give less penalty to nodes far away (index wise)
-total_num_of_nodes = 35
-coeff = indices_array(total_num_of_nodes)
-coeff = np.abs(coeff[:, :, 0] - coeff[:, :, 1])
-# regulate coeff
-# coeff_max = 1.00001
-coeff_max = 1.000015
-coeff_min = 1
-# coeff = np.ones((total_num_of_nodes, total_num_of_nodes)) / (coeff_min + (coeff_max - coeff_min) * coeff)
-coeff = coeff_min + (coeff_max - coeff_min) * coeff / total_num_of_nodes  # coeff larger output larfer
-
-def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True, use_decoupling=False, use_prev_sigma2=False, sigma2_0=None, occluded_nodes=[]):
+def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True, use_decoupling=False, coeff=None, use_prev_sigma2=False, sigma2_0=None, use_ecpd=False, omega=None):
 
     # define params
     M = len(Y_0)
@@ -152,7 +140,7 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
     if not use_decoupling:
         G = np.exp(-diff / (2 * beta**2))
     else:
-        G = np.exp(-diff / (2 * beta**2)) / coeff
+        G = np.exp(-coeff / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -167,8 +155,10 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
         sigma2 = sigma2_0
 
     # get the LLE matrix
+    cur_time = time.time()
     L = calc_LLE_weights(k, Y_0)
     H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
+    print('time taken = ', time.time() - cur_time)
     
     # loop until convergence or max_iter reached
     for it in range (0, max_iter):
@@ -187,22 +177,58 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
         den += c
 
         P = np.divide(P, den)
-        # # turn off all occluded nodes
-        # if len(occluded_nodes) != 0:
-        #     P[occluded_nodes] = np.zeros(N,)
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
         Np = np.sum(P1)
         PX = np.matmul(P, X)
+
+        G_diff = G[0:M-1] - G[1:M]
+        derivative_signs = np.sign(np.sum(np.square(Y[0:M-1] - Y[1:M]), 1) - np.sum(np.square(Y_0[0:M-1] - Y_0[1:M]), 1))  # 1*(M-1)
+        derivative_signs = np.swapaxes(np.full((M, M-1), derivative_signs), 0, 1)
+        G_diff = derivative_signs * G_diff
     
         # M step
         if include_lle:
-            A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G)
-            B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0)
+            if use_ecpd:
+                P_tilde = np.zeros((M, N))
+                pt_node_correspondence = np.argmax(P, axis=0)
+                
+                for node_num in range (0, M):
+                    node_num_pts_indices = np.where(pt_node_correspondence == node_num)
+                    if len(node_num_pts_indices) != 0:
+                        P_tilde[node_num, node_num_pts_indices] = 1
+                    else:
+                        continue
+
+                P_tilde_1 = np.sum(P_tilde, axis=1)
+                P_tilde_X = np.matmul(P_tilde, X)
+
+                A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G) + sigma2 / omega * np.matmul(np.diag(P_tilde_1), G)
+                B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0) + sigma2 / omega * (P_tilde_X - np.matmul(np.diag(P_tilde_1) + sigma2*gamma*H, Y_0))
+            else:
+                A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 * gamma * np.matmul(H, G)
+                B_matrix = PX - np.matmul(np.diag(P1) + sigma2*gamma*H, Y_0)
         else:
-            A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M)
-            B_matrix = PX - np.matmul(np.diag(P1), Y_0)
+            if use_ecpd:
+                P_tilde = np.zeros((M, N))
+                pt_node_correspondence = np.argmax(P, axis=0)
+                
+                for node_num in range (0, M):
+                    node_num_pts_indices = np.where(pt_node_correspondence == node_num)
+                    if len(node_num_pts_indices) != 0:
+                        P_tilde[node_num, node_num_pts_indices] = 1
+                    else:
+                        continue
+
+                P_tilde_1 = np.sum(P_tilde, axis=1)
+                P_tilde_X = np.matmul(P_tilde, X)
+
+                A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M) + sigma2 / omega * np.matmul(np.diag(P_tilde_1), G)
+                B_matrix = PX - np.matmul(np.diag(P1), Y_0) + sigma2 / omega * (P_tilde_X - np.matmul(np.diag(P_tilde_1), Y_0))
+            else:
+                A_matrix = np.matmul(np.diag(P1), G) + alpha * sigma2 * np.identity(M)
+                B_matrix = PX - np.matmul(np.diag(P1), Y_0)
 
         W = np.linalg.solve(A_matrix, B_matrix)
 
@@ -212,6 +238,8 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
         trTtdP1T = np.trace(np.matmul(np.matmul(T.T, np.diag(P1)), T))
 
         sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D)
+        sigma2 = sigma2_0
+        print(sigma2)
 
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
@@ -219,6 +247,8 @@ def cpd_lle (X, Y_0, beta, alpha, k, gamma, mu, max_iter, tol, include_lle=True,
             break
         else:
             Y = Y_0 + np.matmul(G, W)
+        
+        print(it)
     
     return Y, sigma2
 
@@ -249,8 +279,8 @@ def find_opposite_closest (pt, arr, direction_pt):
         vec1 = np.array(cur_closest) - np.array(pt)
         vec2 = np.array(direction_pt) - np.array(pt)
 
-        # threshold: 0.05m
-        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.05**2):
+        # threshold: 0.07m
+        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
             opposite_closest_found = True
             opposite_closest = cur_closest.copy()
             break
@@ -417,34 +447,58 @@ def callback (rgb, depth, pc):
 
     # cpd
     if initialized:
-        # determined which nodes are occluded from mask information
-        # projection
-        init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
-        uvs = np.vstack((vs, us)).T
-        print(np.shape(uvs))
-        uvs_t = tuple(map(tuple, uvs.T))
-        vis = bmask[uvs_t]
-        occluded_nodes = np.where(vis == 0)[0]
+        # # determined which nodes are occluded from mask information
+        # # projection
+        # init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
+        # # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
+        # image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
+        # us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+        # vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+        # uvs = np.vstack((vs, us)).T
+        # print(np.shape(uvs))
+        # uvs_t = tuple(map(tuple, uvs.T))
+        # vis = bmask[uvs_t]
+        # occluded_nodes = np.where(vis == 0)[0]
 
-        nodes, sigma2 = cpd_lle(X = filtered_pc, 
-                                Y_0 = init_nodes, 
-                                beta = 1, 
-                                alpha = 1, 
-                                k = 6, 
-                                gamma = 3, 
-                                mu = 0.05, 
-                                max_iter = 50, 
-                                tol = 0.00001, 
-                                use_decoupling = True, 
-                                use_prev_sigma2 = True, 
-                                sigma2_0 = sigma2,
-                                occluded_nodes = occluded_nodes)
+        # params
+        coeff = indices_array(len(init_nodes))
+        coeff = np.abs(coeff[:, :, 0] - coeff[:, :, 1]).astype(float)
+        # coeff = np.square(coeff * 0.02)
+        coeff = coeff * 0.02
 
-        init_nodes = nodes
+        beta = 5000
+        # beta = 5
+        alpha = 1
+        k = 6
+        gamma = 1
+        mu = 0.05
+        max_iter = 30
+        tol = 0.00001
+
+        include_lle = True
+        use_decoupling = True
+        use_prev_sigma2 = True
+        use_ecpd = True
+        omega = 0.0000001
+
+        nodes, _ = cpd_lle(X = filtered_pc, 
+                            Y_0 = init_nodes, 
+                            beta = beta,       # beta   : a constant representing the strength of interaction between points
+                            alpha = alpha,     # alpha  : a constant regulating the strength of smoothing
+                            k = k,
+                            gamma = gamma,     # gamma  : a constant regulating the strength of LLE
+                            mu = mu,           # mu     : a constant representing how noisy the input is (0 - 1)
+                            max_iter = max_iter, 
+                            tol = tol, 
+                            include_lle = include_lle, 
+                            use_decoupling = use_decoupling, 
+                            coeff = coeff,
+                            use_prev_sigma2 = use_prev_sigma2, 
+                            sigma2_0 = sigma2,
+                            use_ecpd = use_ecpd,
+                            omega = omega)
+
+        init_nodes = nodes.copy()
 
         # add color
         nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
