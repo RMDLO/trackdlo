@@ -172,11 +172,15 @@ def cpd_lle (X,
 
         # TEST
         if threshold is not None:
-            dis_transform_coeff = 3
+            dis_transform_coeff = 1
             converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
 
-        # G = np.exp(converted_node_dis / (2 * beta**2))
-        G = np.exp(-converted_node_dis_sq / (2 * beta**2))
+        # # G = np.exp(converted_node_dis / (2 * beta**2))
+        # G = np.exp(-np.square(converted_node_dis) / np.sqrt(converted_node_dis) / (2 * beta**2))
+
+        # temp = np.power(converted_node_dis + np.identity(M), 1.2) - np.identity(M)
+        temp = converted_node_dis
+        G = np.exp(-temp / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -311,8 +315,6 @@ def cpd_lle (X,
         trTtdP1T = np.trace(np.matmul(np.matmul(T.T, np.diag(P1)), T))
 
         sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D)
-        sigma2 = sigma2_0
-        print(sigma2)
 
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
@@ -320,9 +322,8 @@ def cpd_lle (X,
             break
         else:
             Y = Y_0 + np.matmul(G, W)
-        
-        print(it)
     
+    print('sigma2 after reg = ', sigma2)
     return Y, sigma2
 
 def find_closest (pt, arr):
@@ -423,13 +424,39 @@ def sort_pts (pts_orig):
 
     return sorted_pts
 
+cur_image = []
+cur_image_arr = []
+def update_rgb (data):
+    global cur_image
+    global cur_image_arr
+    temp = ros_numpy.numpify(data)
+    if len(cur_image_arr) <= 3:
+        cur_image_arr.append(temp)
+        cur_image = cur_image_arr[0]
+    else:
+        cur_image_arr.append(temp)
+        cur_image = cur_image_arr[0]
+        cur_image_arr.pop(0)
+
+bmask = []
+mask = []
+def update_mask (data):
+    global bmask
+    global mask
+    mask = ros_numpy.numpify(data)
+    bmask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+
 saved = False
 initialized = False
 init_nodes = []
 nodes = []
 sigma2 = 0
 cur_time = time.time()
-def callback (rgb, depth, pc):
+def callback (pc):
+    global cur_image
+    global bmask
+    global mask
+
     global saved
     global initialized
     global init_nodes
@@ -441,71 +468,10 @@ def callback (rgb, depth, pc):
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                             [             0.0,              0.0,               1.0, 0.0]])
 
-    # process rgb image
-    cur_image = ros_numpy.numpify(rgb)
-    # cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
-    hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
-
-    # # test
-    # cv2.imshow('img', cur_image)
-    # cv2.waitKey(0) 
-    # cv2.destroyAllWindows()
-
-    # process depth image
-    cur_depth = ros_numpy.numpify(depth)
-
     # process point cloud
     pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)
-    cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
-    cur_pc = cur_pc.reshape((720, 1280, 3))
-
-    # color thresholding
-    lower = (80, 80, 80)
-    upper = (120, 255, 255)
-    mask = cv2.inRange(hsv_image, lower, upper)
-    bmask = mask.copy() # for checking visibility, max = 255
-    mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
-    # print('mask shape = ', np.shape(mask))
-
-    # publish mask
-    mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
-    mask_img_pub.publish(mask_img_msg)
-
-    mask = (mask/255).astype(int)
-
-    filtered_pc = cur_pc*mask
-    filtered_pc = filtered_pc[((filtered_pc[:, :, 0] != 0) | (filtered_pc[:, :, 1] != 0) | (filtered_pc[:, :, 2] != 0))]
-    filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.605]
-    filtered_pc = filtered_pc[filtered_pc[:, 2] > 0.4]
-
-    # # save points
-    # if not saved:
-    #     username = 'ablcts18'
-    #     folder = 'tracking/'
-    #     f = open("/home/" + username + "/Research/" + folder + "ros_pc.json", 'wb')
-    #     pkl.dump(filtered_pc, f)
-    #     f.close()
-    #     saved = True
-
-    # downsample to 2.5%
-    # filtered_pc = filtered_pc[::int(1/0.1)]
-
-    # downsample with open3d
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(filtered_pc)
-    downpcd = pcd.voxel_down_sample(voxel_size=0.007)
-    filtered_pc = np.asarray(downpcd.points)
-
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
-
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
+    filtered_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
+    # filtered_pc = filtered_pc.reshape((720, 1280, 3))
 
     # register nodes
     if not initialized:
@@ -519,13 +485,18 @@ def callback (rgb, depth, pc):
     # cpd
     if initialized:
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 50
+        mask_dis_threshold = 20
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
         image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+
+        # temp
+        us = np.where(us >= 1280, 1279, us)
+        vs = np.where(vs >= 720, 719, vs)
+
         uvs = np.vstack((vs, us)).T
         uvs_t = tuple(map(tuple, uvs.T))
 
@@ -535,10 +506,8 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        print(occluded_nodes)
-
-        beta = 1200000 # 120
-        # beta = 5000
+        # beta = 3
+        beta = 3500
         alpha = 1
         gamma = 1
         mu = 0.05
@@ -550,11 +519,11 @@ def callback (rgb, depth, pc):
         use_prev_sigma2 = True
         use_ecpd = True
         omega = 0.0000001
-        threshold = 0.005
+        threshold = None
         consider_pvis = False
 
         cur_time = time.time()
-        nodes, _ = cpd_lle(X = filtered_pc, 
+        nodes, sigma2 = cpd_lle(X = filtered_pc, 
                             Y_0 = init_nodes, 
                             beta = beta,       # beta   : a constant representing the strength of interaction between points
                             alpha = alpha,     # alpha  : a constant regulating the strength of smoothing
@@ -591,20 +560,24 @@ def callback (rgb, depth, pc):
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
         tracking_img = cur_image.copy()
+        # tracking_img = mask.copy()
         for i in range (len(image_coords)):
-            # draw circle
-            uv = (us[i], vs[i])
-            if vis[i] < mask_dis_threshold:
-                cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
-            else:
-                cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
-
-            # draw line
-            if i != len(image_coords)-1:
+            try:
+                # draw circle
+                uv = (us[i], vs[i])
                 if vis[i] < mask_dis_threshold:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
                 else:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
+                    cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
+
+                # draw line
+                if i != len(image_coords)-1:
+                    if vis[i] < mask_dis_threshold:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    else:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
+            except:
+                print('image coordinate out of range!')
         
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
@@ -616,9 +589,9 @@ def callback (rgb, depth, pc):
 if __name__=='__main__':
     rospy.init_node('test', anonymous=True)
 
-    rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
-    pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
+    rospy.Subscriber('/camera/color/image_raw', Image, update_rgb)
+    rospy.Subscriber('/mask', Image, update_mask)
+    filtered_pc_sub = message_filters.Subscriber('/pts', PointCloud2)
 
     # header
     header = std_msgs.msg.Header()
@@ -628,13 +601,11 @@ if __name__=='__main__':
                 PointField('y', 4, PointField.FLOAT32, 1),
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
-    pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     init_nodes_pub = rospy.Publisher ('/init_nodes', PointCloud2, queue_size=10)
     nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
-    mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
-    ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
+    ts = message_filters.TimeSynchronizer([filtered_pc_sub], 10)
     ts.registerCallback(callback)
 
     rospy.spin()
