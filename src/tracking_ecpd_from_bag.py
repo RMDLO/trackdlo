@@ -170,17 +170,17 @@ def cpd_lle (X,
         converted_node_dis = np.abs(converted_node_coord[None, :] - converted_node_coord[:, None])
         converted_node_dis_sq = np.square(converted_node_dis)
 
-        # TEST
-        if threshold is not None:
-            dis_transform_coeff = 1
-            converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
+        # # TEST
+        # if threshold is not None:
+        #     dis_transform_coeff = 1
+        #     converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
 
-        # # G = np.exp(converted_node_dis / (2 * beta**2))
+        G = np.exp(-converted_node_dis_sq / (2 * beta**2))
         # G = np.exp(-np.square(converted_node_dis) / np.sqrt(converted_node_dis) / (2 * beta**2))
 
         # temp = np.power(converted_node_dis + np.identity(M), 1.2) - np.identity(M)
-        temp = converted_node_dis
-        G = np.exp(-temp / (2 * beta**2))
+        # temp = converted_node_dis
+        # G = np.exp(-temp / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -506,8 +506,8 @@ def callback (pc):
         vis = bmask_transformed[uvs_t]
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        # beta = 3
-        beta = 3500
+        beta = 1
+        # beta = 3500
         alpha = 1
         gamma = 1
         mu = 0.05

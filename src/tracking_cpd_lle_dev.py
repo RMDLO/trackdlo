@@ -172,11 +172,15 @@ def cpd_lle (X,
 
         # TEST
         if threshold is not None:
-            dis_transform_coeff = 3
+            dis_transform_coeff = 1
             converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
 
-        # G = np.exp(converted_node_dis / (2 * beta**2))
-        G = np.exp(-converted_node_dis_sq / (2 * beta**2))
+        # # G = np.exp(converted_node_dis / (2 * beta**2))
+        # G = np.exp(-np.square(converted_node_dis) / np.sqrt(converted_node_dis) / (2 * beta**2))
+
+        # temp = np.power(converted_node_dis + np.identity(M), 1.2) - np.identity(M)
+        temp = converted_node_dis
+        G = np.exp(-temp / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -311,8 +315,6 @@ def cpd_lle (X,
         trTtdP1T = np.trace(np.matmul(np.matmul(T.T, np.diag(P1)), T))
 
         sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D)
-        sigma2 = sigma2_0
-        print(sigma2)
 
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
@@ -320,9 +322,8 @@ def cpd_lle (X,
             break
         else:
             Y = Y_0 + np.matmul(G, W)
-        
-        print(it)
     
+    print('sigma2 after reg = ', sigma2)
     return Y, sigma2
 
 def find_closest (pt, arr):
@@ -519,13 +520,18 @@ def callback (rgb, depth, pc):
     # cpd
     if initialized:
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 50
+        mask_dis_threshold = 30
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
         image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+
+        # temp
+        us = np.where(us >= 1280, 1279, us)
+        vs = np.where(vs >= 720, 719, vs)
+
         uvs = np.vstack((vs, us)).T
         uvs_t = tuple(map(tuple, uvs.T))
 
@@ -535,10 +541,8 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        print(occluded_nodes)
-
-        beta = 1200000 # 120
-        # beta = 5000
+        # beta = 3
+        beta = 3500
         alpha = 1
         gamma = 1
         mu = 0.05
@@ -550,11 +554,11 @@ def callback (rgb, depth, pc):
         use_prev_sigma2 = True
         use_ecpd = True
         omega = 0.0000001
-        threshold = 0.005
+        threshold = None
         consider_pvis = False
 
         cur_time = time.time()
-        nodes, _ = cpd_lle(X = filtered_pc, 
+        nodes, sigma2 = cpd_lle(X = filtered_pc, 
                             Y_0 = init_nodes, 
                             beta = beta,       # beta   : a constant representing the strength of interaction between points
                             alpha = alpha,     # alpha  : a constant regulating the strength of smoothing
