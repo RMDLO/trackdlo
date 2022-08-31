@@ -177,7 +177,9 @@ def cpd_lle (X,
 
         # G = np.exp(-converted_node_dis / (2 * beta**2))
         # G = -1/beta**2 * np.exp(-converted_node_dis / np.sqrt(beta)) * (np.sqrt(beta) + np.exp(converted_node_dis/np.sqrt(beta)) * converted_node_dis)
-        G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
+        # G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
+
+        G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
 
         # G = np.exp(-converted_node_dis_sq / (2 * beta**2))
         # G = -(np.pi*converted_node_dis*scipy.special.erf(converted_node_dis/beta) + beta*np.sqrt(np.pi)*np.exp(-converted_node_dis_sq/beta**2))
@@ -518,7 +520,7 @@ def callback (pc):
         # occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
         # beta = 1000
-        beta = 300 # 80
+        beta = 300 # 80 for 4th power coeff
         # beta = 50
         alpha = 1
         gamma = 1

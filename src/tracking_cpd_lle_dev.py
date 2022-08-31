@@ -140,8 +140,7 @@ def cpd_lle (X,
              use_ecpd=False, 
              omega=None, 
              threshold=None,
-             consider_pvis=False,
-             occluded_nodes=None):
+             consider_pvis=False):
 
     # define params
     M = len(Y_0)
@@ -170,17 +169,25 @@ def cpd_lle (X,
         converted_node_dis = np.abs(converted_node_coord[None, :] - converted_node_coord[:, None])
         converted_node_dis_sq = np.square(converted_node_dis)
 
-        # TEST
-        if threshold is not None:
-            dis_transform_coeff = 1
-            converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
+        # # TEST
+        # if threshold is not None:
+        #     dis_transform_coeff = 1
+        #     converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
 
-        # # G = np.exp(converted_node_dis / (2 * beta**2))
+        # G = np.exp(-converted_node_dis / (2 * beta**2))
+        # G = -1/beta**2 * np.exp(-converted_node_dis / np.sqrt(beta)) * (np.sqrt(beta) + np.exp(converted_node_dis/np.sqrt(beta)) * converted_node_dis)
+        # G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
+
+        G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
+
+        # G = np.exp(-converted_node_dis_sq / (2 * beta**2))
+        # G = -(np.pi*converted_node_dis*scipy.special.erf(converted_node_dis/beta) + beta*np.sqrt(np.pi)*np.exp(-converted_node_dis_sq/beta**2))
+
         # G = np.exp(-np.square(converted_node_dis) / np.sqrt(converted_node_dis) / (2 * beta**2))
 
         # temp = np.power(converted_node_dis + np.identity(M), 1.2) - np.identity(M)
-        temp = converted_node_dis
-        G = np.exp(-temp / (2 * beta**2))
+        # temp = converted_node_dis
+        # G = np.exp(-temp / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -218,11 +225,16 @@ def cpd_lle (X,
 
         P = np.divide(P, den)
 
-        if consider_pvis:
-            P[occluded_nodes] = 0
-
         if use_decoupling:
             max_p_nodes = np.argmax(P, axis=0)
+
+            # determine occluded nodes
+            occluded_nodes = []
+            for node_idx in range(0, M):
+                if np.count_nonzero(max_p_nodes == node_idx) == 0:
+                    occluded_nodes.append(node_idx)
+            occluded_nodes = np.array(occluded_nodes)
+
             potential_2nd_max_p_nodes_1 = max_p_nodes - 1
             potential_2nd_max_p_nodes_2 = max_p_nodes + 1
             potential_2nd_max_p_nodes_1 = np.where(potential_2nd_max_p_nodes_1 < 0, 1, potential_2nd_max_p_nodes_1)
@@ -260,6 +272,9 @@ def cpd_lle (X,
 
             P = np.divide(P, den)
 
+            if len(occluded_nodes) != 0:
+                P[occluded_nodes] = 0
+
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
         Np = np.sum(P1)
@@ -275,7 +290,7 @@ def cpd_lle (X,
                     node_num_pts_indices = np.where(pt_node_correspondence == node_num)
                     P_tilde[node_num, node_num_pts_indices] = 1
                 
-                if consider_pvis:
+                if len(occluded_nodes) != 0:
                     P_tilde[occluded_nodes] = 0
 
                 P_tilde_1 = np.sum(P_tilde, axis=1)
@@ -294,9 +309,6 @@ def cpd_lle (X,
                 for node_num in range (0, M):
                     node_num_pts_indices = np.where(pt_node_correspondence == node_num)
                     P_tilde[node_num, node_num_pts_indices] = 1
-                
-                if consider_pvis:
-                    P_tilde[occluded_nodes] = 0
 
                 P_tilde_1 = np.sum(P_tilde, axis=1)
                 P_tilde_X = np.matmul(P_tilde, X)
@@ -363,7 +375,7 @@ def find_opposite_closest (pt, arr, direction_pt):
 
 def sort_pts (pts_orig):
 
-    start_idx = 15
+    start_idx = 5
 
     pts = pts_orig.copy()
     starting_pt = pts[start_idx].copy()
@@ -476,7 +488,7 @@ def callback (rgb, depth, pc):
 
     filtered_pc = cur_pc*mask
     filtered_pc = filtered_pc[((filtered_pc[:, :, 0] != 0) | (filtered_pc[:, :, 1] != 0) | (filtered_pc[:, :, 2] != 0))]
-    filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.605]
+    filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.705]
     filtered_pc = filtered_pc[filtered_pc[:, 2] > 0.4]
 
     # # save points
@@ -494,7 +506,7 @@ def callback (rgb, depth, pc):
     # downsample with open3d
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(filtered_pc)
-    downpcd = pcd.voxel_down_sample(voxel_size=0.007)
+    downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
     # add color
@@ -510,7 +522,7 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 35, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
         initialized = True
         # header.stamp = rospy.Time.now()
@@ -542,7 +554,7 @@ def callback (rgb, depth, pc):
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
         # beta = 3
-        beta = 3500
+        beta = 200
         alpha = 1
         gamma = 1
         mu = 0.05
@@ -553,7 +565,7 @@ def callback (rgb, depth, pc):
         use_decoupling = True
         use_prev_sigma2 = True
         use_ecpd = True
-        omega = 0.0000001
+        omega = 0.00000000001
         threshold = None
         consider_pvis = False
 
@@ -573,8 +585,7 @@ def callback (rgb, depth, pc):
                             use_ecpd = use_ecpd,
                             omega = omega,
                             threshold = threshold,
-                            consider_pvis = consider_pvis,
-                            occluded_nodes = occluded_nodes)
+                            consider_pvis = consider_pvis)
 
         init_nodes = nodes.copy()
 
