@@ -178,6 +178,7 @@ def cpd_lle (X,
         # G = -1/beta**2 * np.exp(-converted_node_dis / np.sqrt(beta)) * (np.sqrt(beta) + np.exp(converted_node_dis/np.sqrt(beta)) * converted_node_dis)
         # G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
 
+        # the new kernel
         G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
 
         # G = np.exp(-converted_node_dis_sq / (2 * beta**2))
@@ -522,7 +523,7 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 10, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
         initialized = True
         # header.stamp = rospy.Time.now()
@@ -553,8 +554,8 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        # beta = 3
-        beta = 200
+        beta = 3000
+        # beta = 200
         alpha = 1
         gamma = 1
         mu = 0.05
