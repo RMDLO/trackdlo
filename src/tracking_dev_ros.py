@@ -11,6 +11,7 @@ import struct
 import time
 import cv2
 import numpy as np
+import math
 
 import time
 import pickle as pkl
@@ -22,6 +23,9 @@ from scipy import ndimage
 
 def pt2pt_dis_sq(pt1, pt2):
     return np.sum(np.square(pt1 - pt2))
+
+def pt2pt_dis(pt1, pt2):
+    return np.sqrt(np.sum(np.square(pt1 - pt2)))
 
 def register(pts, M, mu=0, max_iter=50):
 
@@ -125,27 +129,31 @@ def indices_array(n):
     out[:,:,1] = r
     return out
 
-def cpd_lle (X, 
-             Y_0, 
-             beta, 
-             alpha, 
-             gamma, 
-             mu, 
-             max_iter, 
-             tol, 
-             include_lle=True, 
-             use_decoupling=False, 
-             use_prev_sigma2=False, 
-             sigma2_0=None, 
-             use_ecpd=False, 
-             omega=None, 
-             threshold=None,
-             consider_pvis=False):
+def ecpd_lle (X,                           # input point cloud
+              Y_0,                         # input nodes
+              beta,                        # MCT kernel strength
+              alpha,                       # MCT overall strength
+              gamma,                       # LLE strength
+              mu,                          # noise
+              max_iter,                    # how many iterations EM will run
+              tol,                         # when to terminate the optimization process
+              include_lle = True, 
+              use_geodesic = False, 
+              use_prev_sigma2 = False, 
+              sigma2_0 = None,              # initial variance
+              use_ecpd = False, 
+              correspondence_priors = None,
+              omega = None,                 # ecpd strength. DO NOT go lower than 1e-6
+              kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
+              occluded_nodes = None):
+
+    if correspondence_priors is not None:
+        additional_pc = correspondence_priors[:, 1:4]
+        X = np.vstack((additional_pc, X))
 
     # define params
     M = len(Y_0)
     N = len(X)
-    # D = len(X[0])
     D = 3
 
     # initialization
@@ -155,8 +163,17 @@ def cpd_lle (X,
     diff = np.sum(diff, 2)
 
     converted_node_dis = []
-    if not use_decoupling:
-        G = np.exp(-diff / (2 * beta**2))
+    if not use_geodesic:
+        if kernel == 'Gaussian':
+            G = np.exp(-diff / (2 * beta**2))
+        elif kernel == 'Laplacian':
+            G = np.exp(- np.sqrt(diff) / (2 * beta**2))
+        elif kernel == '1st order':
+            G = 1/(2*beta)**2 * np.exp(-np.sqrt(2)*np.sqrt(diff)/beta) * (np.sqrt(2)*np.sqrt(diff) + beta)
+        elif kernel == '2nd order':
+            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*np.sqrt(diff)/beta) * (np.sqrt(3)*beta**2 + 3*beta*np.sqrt(diff) + np.sqrt(3)*diff)
+        else: # default gaussian
+            G = np.exp(-diff / (2 * beta**2))
     else:
         seg_dis = np.sqrt(np.sum(np.square(np.diff(Y_0, axis=0)), axis=1))
         converted_node_coord = []
@@ -169,26 +186,16 @@ def cpd_lle (X,
         converted_node_dis = np.abs(converted_node_coord[None, :] - converted_node_coord[:, None])
         converted_node_dis_sq = np.square(converted_node_dis)
 
-        # # TEST
-        # if threshold is not None:
-        #     dis_transform_coeff = 1
-        #     converted_node_dis_sq = -np.exp(-(dis_transform_coeff * converted_node_dis_sq - np.log(threshold))) + threshold
-
-        # G = np.exp(-converted_node_dis / (2 * beta**2))
-        # G = -1/beta**2 * np.exp(-converted_node_dis / np.sqrt(beta)) * (np.sqrt(beta) + np.exp(converted_node_dis/np.sqrt(beta)) * converted_node_dis)
-        # G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
-
-        # the new kernel
-        G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
-
-        # G = np.exp(-converted_node_dis_sq / (2 * beta**2))
-        # G = -(np.pi*converted_node_dis*scipy.special.erf(converted_node_dis/beta) + beta*np.sqrt(np.pi)*np.exp(-converted_node_dis_sq/beta**2))
-
-        # G = np.exp(-np.square(converted_node_dis) / np.sqrt(converted_node_dis) / (2 * beta**2))
-
-        # temp = np.power(converted_node_dis + np.identity(M), 1.2) - np.identity(M)
-        # temp = converted_node_dis
-        # G = np.exp(-temp / (2 * beta**2))
+        if kernel == 'Gaussian':
+            G = np.exp(-converted_node_dis_sq / (2 * beta**2))
+        elif kernel == 'Laplacian':
+            G = np.exp(-converted_node_dis / (2 * beta**2))
+        elif kernel == '1st order':
+            G = 1/(4*beta**2) * np.exp(-np.sqrt(2)*converted_node_dis/beta) * (np.sqrt(2)*converted_node_dis + beta)
+        elif kernel == '2nd order':
+            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*converted_node_dis/beta) * (np.sqrt(3)*beta**2 + 3*beta*converted_node_dis + np.sqrt(3)*converted_node_dis_sq)
+        else:
+            G = np.exp(-converted_node_dis_sq / (2 * beta**2))
     
     Y = Y_0.copy()
 
@@ -206,36 +213,24 @@ def cpd_lle (X,
     cur_time = time.time()
     L = calc_LLE_weights(6, Y_0)
     H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
-    print('time taken = ', time.time() - cur_time)
     
     # loop until convergence or max_iter reached
     for it in range (0, max_iter):
 
         # faster P computation
         pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
-
         c = (2 * np.pi * sigma2) ** (D / 2)
         c = c * mu / (1 - mu)
         c = c * M / N
-
         P = np.exp(-pts_dis_sq / (2 * sigma2))
         den = np.sum(P, axis=0)
         den = np.tile(den, (M, 1))
         den[den == 0] = np.finfo(float).eps
         den += c
-
         P = np.divide(P, den)
+        max_p_nodes = np.argmax(P, axis=0)
 
-        if use_decoupling:
-            max_p_nodes = np.argmax(P, axis=0)
-
-            # determine occluded nodes
-            occluded_nodes = []
-            for node_idx in range(0, M):
-                if np.count_nonzero(max_p_nodes == node_idx) == 0:
-                    occluded_nodes.append(node_idx)
-            occluded_nodes = np.array(occluded_nodes)
-
+        if use_geodesic:
             potential_2nd_max_p_nodes_1 = max_p_nodes - 1
             potential_2nd_max_p_nodes_2 = max_p_nodes + 1
             potential_2nd_max_p_nodes_1 = np.where(potential_2nd_max_p_nodes_1 < 0, 1, potential_2nd_max_p_nodes_1)
@@ -273,8 +268,8 @@ def cpd_lle (X,
 
             P = np.divide(P, den)
 
-            if len(occluded_nodes) != 0:
-                P[occluded_nodes] = 0
+        if occluded_nodes is not None:
+            P[occluded_nodes] = 0
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
@@ -285,14 +280,10 @@ def cpd_lle (X,
         if include_lle:
             if use_ecpd:
                 P_tilde = np.zeros((M, N))
-                pt_node_correspondence = np.argmax(P, axis=0)
-                
-                for node_num in range (0, M):
-                    node_num_pts_indices = np.where(pt_node_correspondence == node_num)
-                    P_tilde[node_num, node_num_pts_indices] = 1
-                
-                if len(occluded_nodes) != 0:
-                    P_tilde[occluded_nodes] = 0
+                # correspondence priors: index, x, y, z
+                for i in range (len(correspondence_priors)):
+                    index = correspondence_priors[i, 0]
+                    P_tilde[int(index), i] = 1
 
                 P_tilde_1 = np.sum(P_tilde, axis=1)
                 P_tilde_X = np.matmul(P_tilde, X)
@@ -335,8 +326,106 @@ def cpd_lle (X,
             break
         else:
             Y = Y_0 + np.matmul(G, W)
+
+    return Y, sigma2
+
+def pre_process (X, Y_0):
+    global total_len
+
+    guide_nodes, _ = ecpd_lle(X, Y_0, 0.5, 1, 1, 0.2, 30, 0.00001, True, True, kernel = 'Gaussian')
+
+    # determine which head node is occluded, if any
+    head_visible = False
+    tail_visible = False
+
+    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.01:
+        head_visible = True
+    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.01:
+        tail_visible = True
+
+    # visible_dist = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
+    last_visible_index = None
+    correspondence_priors = None
+    occluded_nodes = None
+
+    cur_total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
+
+    print('tail displacement = ', pt2pt_dis(guide_nodes[-1], Y_0[-1]))
+    print('head displacement = ', pt2pt_dis(guide_nodes[0], Y_0[0]))
+    print('length difference = ', abs(cur_total_len - total_len))
+
+    if (head_visible and tail_visible) or abs(cur_total_len - total_len) < 0.01:
+        correspondence_priors = []
+        correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
+        correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
     
-    print('sigma2 after reg = ', sigma2)
+    elif head_visible and not tail_visible:
+        correspondence_priors = []
+        total_dist_Y_0 = 0
+        total_dist_guide_nodes = 0
+        it_gn = 0
+        correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
+        for it_y0 in range (0, len(guide_nodes)-1):
+            total_dist_Y_0 += pt2pt_dis(Y_0[it_y0], Y_0[it_y0+1])
+            # step guide nodes dist until greater than current y0 total dist
+            while total_dist_guide_nodes < total_dist_Y_0:
+                total_dist_guide_nodes += pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn+1])
+                if total_dist_guide_nodes >= total_dist_Y_0:
+                    total_dist_guide_nodes -= pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn+1])
+                    new_y0_coord = guide_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn + 1])*(guide_nodes[it_gn + 1] - guide_nodes[it_gn])
+                    correspondence_priors.append(np.append(np.array([it_y0+1]), new_y0_coord))
+                    break
+                # if at the end of guide nodes
+                if it_gn == len(guide_nodes) - 2:
+                    last_visible_index = it_y0
+                    break
+                it_gn += 1
+            
+            if last_visible_index is not None:
+                break
+        if last_visible_index is None:
+            last_visible_index = len(Y_0) - 1
+        
+        occluded_nodes = np.arange(last_visible_index+1, len(Y_0), 1)
+        print(last_visible_index)
+
+    elif tail_visible and not head_visible:
+        correspondence_priors = []
+        total_dist_Y_0 = 0
+        total_dist_guide_nodes = 0
+        it_gn = len(guide_nodes) - 1
+        correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
+        for it_y0 in range (len(guide_nodes)-1, 0, -1):
+            total_dist_Y_0 += pt2pt_dis(Y_0[it_y0], Y_0[it_y0-1])
+            # step guide nodes dist until greater than current y0 total dist
+            while total_dist_guide_nodes < total_dist_Y_0:
+                total_dist_guide_nodes += pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn-1])
+                if total_dist_guide_nodes >= total_dist_Y_0:
+                    total_dist_guide_nodes -= pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn-1])
+                    new_y0_coord = guide_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn - 1])*(guide_nodes[it_gn - 1] - guide_nodes[it_gn])
+                    correspondence_priors.append(np.append(np.array([it_y0-1]), new_y0_coord))
+                    break
+                # if at the end of guide nodes
+                if it_gn == 1:
+                    last_visible_index = it_y0
+                    break
+                it_gn -= 1
+            
+            if last_visible_index is not None:
+                break
+        if last_visible_index is None:
+            last_visible_index = 0
+        
+        occluded_nodes = np.arange(0, last_visible_index, 1)
+    
+    print(np.array(correspondence_priors)[-1, 0])
+
+    return guide_nodes, np.array(correspondence_priors), occluded_nodes
+
+def tracking_step (X, Y_0, sigma2_0):
+    guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0)
+    Y, sigma2 = ecpd_lle(X, Y_0, 5, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, '2nd order', occluded_nodes)
+
     return Y, sigma2
 
 def find_closest (pt, arr):
@@ -443,6 +532,7 @@ init_nodes = []
 nodes = []
 sigma2 = 0
 cur_time = time.time()
+total_len = 0
 def callback (rgb, depth, pc):
     global saved
     global initialized
@@ -450,6 +540,7 @@ def callback (rgb, depth, pc):
     global nodes
     global sigma2
     global cur_time
+    global total_len
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -525,6 +616,7 @@ def callback (rgb, depth, pc):
     if not initialized:
         init_nodes, sigma2 = register(filtered_pc, 10, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
+        total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1)))
         initialized = True
         # header.stamp = rospy.Time.now()
         # converted_init_nodes = pcl2.create_cloud(header, fields, init_nodes)
@@ -552,41 +644,24 @@ def callback (rgb, depth, pc):
         bmask_transformed = ndimage.distance_transform_edt(255 - bmask)
         # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
         vis = bmask_transformed[uvs_t]
-        occluded_nodes = np.where(vis > mask_dis_threshold)[0]
+        # occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        beta = 3000
-        # beta = 200
-        alpha = 1
-        gamma = 1
-        mu = 0.05
-        max_iter = 30
-        tol = 0.00001
+        # beta = 3000
+        # # beta = 200
+        # alpha = 1
+        # gamma = 1
+        # mu = 0.05
+        # max_iter = 30
+        # tol = 0.00001
 
-        include_lle = True
-        use_decoupling = True
-        use_prev_sigma2 = True
-        use_ecpd = True
-        omega = 0.00000000001
-        threshold = None
-        consider_pvis = False
+        # include_lle = True
+        # use_decoupling = True
+        # use_prev_sigma2 = True
+        # use_ecpd = True
+        # omega = 0.00000000001
 
         cur_time = time.time()
-        nodes, sigma2 = cpd_lle(X = filtered_pc, 
-                            Y_0 = init_nodes, 
-                            beta = beta,       # beta   : a constant representing the strength of interaction between points
-                            alpha = alpha,     # alpha  : a constant regulating the strength of smoothing
-                            gamma = gamma,     # gamma  : a constant regulating the strength of LLE
-                            mu = mu,           # mu     : a constant representing how noisy the input is (0 - 1)
-                            max_iter = max_iter, 
-                            tol = tol, 
-                            include_lle = include_lle, 
-                            use_decoupling = use_decoupling, 
-                            use_prev_sigma2 = use_prev_sigma2, 
-                            sigma2_0 = sigma2,
-                            use_ecpd = use_ecpd,
-                            omega = omega,
-                            threshold = threshold,
-                            consider_pvis = consider_pvis)
+        nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2)
 
         init_nodes = nodes.copy()
 
