@@ -329,10 +329,8 @@ def ecpd_lle (X,                           # input point cloud
 
     return Y, sigma2
 
-def pre_process (X, Y_0):
-    global total_len
-
-    guide_nodes, _ = ecpd_lle(X, Y_0, 0.5, 1, 1, 0.2, 30, 0.00001, True, True, kernel = 'Gaussian')
+def pre_process (X, Y_0, geodesic_coord, total_len):
+    guide_nodes, _ = ecpd_lle(X, Y_0, 0.5, 1, 1, 0.1, 30, 0.00001, True, True, kernel = 'Gaussian')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -343,30 +341,32 @@ def pre_process (X, Y_0):
     if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.01:
         tail_visible = True
 
-    # visible_dist = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
-    last_visible_index = None
-    correspondence_priors = None
-    occluded_nodes = None
-
     cur_total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
 
     print('tail displacement = ', pt2pt_dis(guide_nodes[-1], Y_0[-1]))
     print('head displacement = ', pt2pt_dis(guide_nodes[0], Y_0[0]))
     print('length difference = ', abs(cur_total_len - total_len))
 
-    if (head_visible and tail_visible) or abs(cur_total_len - total_len) < 0.01:
+    # visible_dist = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
+    last_visible_index = None
+    correspondence_priors = None
+    occluded_nodes = None
+
+    if (head_visible and tail_visible) or abs(cur_total_len - total_len) < 0.005:
+        print('head visible and tail visible or the same len')
         correspondence_priors = []
         correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
         correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
     
     elif head_visible and not tail_visible:
+        print('head visible')
         correspondence_priors = []
         total_dist_Y_0 = 0
         total_dist_guide_nodes = 0
         it_gn = 0
         correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
         for it_y0 in range (0, len(guide_nodes)-1):
-            total_dist_Y_0 += pt2pt_dis(Y_0[it_y0], Y_0[it_y0+1])
+            total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0+1])
             # step guide nodes dist until greater than current y0 total dist
             while total_dist_guide_nodes < total_dist_Y_0:
                 total_dist_guide_nodes += pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn+1])
@@ -389,14 +389,15 @@ def pre_process (X, Y_0):
         occluded_nodes = np.arange(last_visible_index+1, len(Y_0), 1)
         print(last_visible_index)
 
-    elif tail_visible and not head_visible:
+    elif tail_visible and not head_visible and not abs(cur_total_len - total_len) < 0.01:
+        print('tail visible')
         correspondence_priors = []
         total_dist_Y_0 = 0
         total_dist_guide_nodes = 0
         it_gn = len(guide_nodes) - 1
         correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
         for it_y0 in range (len(guide_nodes)-1, 0, -1):
-            total_dist_Y_0 += pt2pt_dis(Y_0[it_y0], Y_0[it_y0-1])
+            total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0-1])
             # step guide nodes dist until greater than current y0 total dist
             while total_dist_guide_nodes < total_dist_Y_0:
                 total_dist_guide_nodes += pt2pt_dis(guide_nodes[it_gn], guide_nodes[it_gn-1])
@@ -422,11 +423,11 @@ def pre_process (X, Y_0):
 
     return guide_nodes, np.array(correspondence_priors), occluded_nodes
 
-def tracking_step (X, Y_0, sigma2_0):
-    guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 5, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, '2nd order', occluded_nodes)
+def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len):
+    guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len)
+    Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.00001, '2nd order', occluded_nodes)
 
-    return Y, sigma2
+    return correspondence_priors[:, 1:4], Y, sigma2
 
 def find_closest (pt, arr):
     closest = arr[0].copy()
@@ -533,6 +534,7 @@ nodes = []
 sigma2 = 0
 cur_time = time.time()
 total_len = 0
+geodesic_coord = []
 def callback (rgb, depth, pc):
     global saved
     global initialized
@@ -541,6 +543,7 @@ def callback (rgb, depth, pc):
     global sigma2
     global cur_time
     global total_len
+    global geodesic_coord
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -616,7 +619,18 @@ def callback (rgb, depth, pc):
     if not initialized:
         init_nodes, sigma2 = register(filtered_pc, 10, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
+
+        # compute preset coord and total len. one time action
+        seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
+        geodesic_coord = []
+        last_pt = 0
+        geodesic_coord.append(last_pt)
+        for i in range (1, len(init_nodes)):
+            last_pt += seg_dis[i-1]
+            geodesic_coord.append(last_pt)
+        geodesic_coord = np.array(geodesic_coord)
         total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1)))
+
         initialized = True
         # header.stamp = rospy.Time.now()
         # converted_init_nodes = pcl2.create_cloud(header, fields, init_nodes)
@@ -661,7 +675,7 @@ def callback (rgb, depth, pc):
         # omega = 0.00000000001
 
         cur_time = time.time()
-        nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2)
+        guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len)
 
         init_nodes = nodes.copy()
 
@@ -673,6 +687,15 @@ def callback (rgb, depth, pc):
         header.stamp = rospy.Time.now()
         converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
         nodes_pub.publish(converted_nodes)
+
+        # add color for guide nodes
+        guide_nodes_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
+        guide_nodes_rgba_arr = np.full((len(guide_nodes), 1), guide_nodes_rgba)
+        guide_nodes_colored = np.hstack((guide_nodes, guide_nodes_rgba_arr)).astype('O')
+        guide_nodes_colored[:, 3] = guide_nodes_colored[:, 3].astype(int)
+        header.stamp = rospy.Time.now()
+        converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
+        guide_nodes_pub.publish(converted_guide_nodes)
 
         # project and pub image
         nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
@@ -722,6 +745,7 @@ if __name__=='__main__':
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     init_nodes_pub = rospy.Publisher ('/init_nodes', PointCloud2, queue_size=10)
     nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
+    guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 

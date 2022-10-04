@@ -179,7 +179,8 @@ def cpd_lle (X,
         # G = -1/beta**2 * np.exp(-converted_node_dis / beta) * (beta + np.exp(converted_node_dis/beta) * converted_node_dis)
 
         # the new kernel
-        G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
+        # G = -1/(4*beta**2) * np.sqrt(np.pi/2) * np.exp(-2*converted_node_dis / beta) * (beta + 2*np.exp(2*converted_node_dis/beta) * converted_node_dis)
+        G = 1/(4*beta**2) * np.exp(-np.sqrt(2)*converted_node_dis/beta) * (np.sqrt(2)*converted_node_dis + beta)
 
         # G = np.exp(-converted_node_dis_sq / (2 * beta**2))
         # G = -(np.pi*converted_node_dis*scipy.special.erf(converted_node_dis/beta) + beta*np.sqrt(np.pi)*np.exp(-converted_node_dis_sq/beta**2))
@@ -554,8 +555,8 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        beta = 3000
-        # beta = 200
+        # beta = 3000
+        beta = 200
         alpha = 1
         gamma = 1
         mu = 0.05
