@@ -335,7 +335,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                             [             0.0,              0.0,               1.0, 0.0]])
 
-    guide_nodes, _ = ecpd_lle(X, Y_0, 5, 1, 1, 0.1, 30, 0.00001, True, True, kernel = 'Laplacian')
+    guide_nodes, _ = ecpd_lle(X, Y_0, 10, 1, 1, 0.2, 30, 0.00001, True, True, kernel = 'Laplacian')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -363,7 +363,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
     correspondence_priors = None
     occluded_nodes = None
 
-    if abs(cur_total_len - total_len) < 0.01: # (head_visible and tail_visible) or 
+    if abs(cur_total_len - total_len) < 0.008: # (head_visible and tail_visible) or 
         print('head visible and tail visible or the same len')
         correspondence_priors = []
         correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
@@ -427,9 +427,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
         total_dist_guide_nodes = 0
         it_gn = 0
         correspondence_priors.append(np.append(np.array([0]), valid_head_nodes[0]))
-        print('---')
-        print('head appended:', np.array([0]), valid_head_nodes[0])
-        print('---')
+        # print('---')
+        # print('head appended:', np.array([0]), valid_head_nodes[0])
+        # print('---')
         for it_y0 in range (0, len(valid_head_nodes)-1):
             total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0+1])
             # step guide nodes dist until greater than current y0 total dist
@@ -439,9 +439,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
                     total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1])
                     new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])*(valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn])
                     correspondence_priors.append(np.append(np.array([it_y0+1]), new_y0_coord))
-                    print('---')
-                    print('head appended:', np.array([it_y0+1]), new_y0_coord)
-                    print('---')
+                    # print('---')
+                    # print('head appended:', np.array([it_y0+1]), new_y0_coord)
+                    # print('---')
                     break
                 # if at the end of guide nodes
                 if it_gn == len(valid_head_nodes) - 2:
@@ -459,9 +459,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
         total_dist_guide_nodes = 0
         it_gn = len(valid_tail_nodes) - 1
         correspondence_priors.append(np.append(np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1]))
-        print('---')
-        print('tail appended:', np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1])
-        print('---')
+        # print('---')
+        # print('tail appended:', np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1])
+        # print('---')
         for it_y0 in range (len(valid_tail_nodes)-1, 0, -1):
             total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0-1])
             # step guide nodes dist until greater than current y0 total dist
@@ -471,9 +471,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
                     total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1])
                     new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])*(valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn])
                     correspondence_priors.append(np.append(np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord))
-                    print('---')
-                    print('tail appended:', np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord)
-                    print('---')
+                    # print('---')
+                    # print('tail appended:', np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord)
+                    # print('---')
                     break
                 # if at the end of guide nodes
                 if it_gn == 1:
@@ -488,10 +488,10 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
 
         # compile occluded nodes
         occluded_nodes = np.arange(last_visible_index_head+1, last_visible_index_tail + valid_tail_node_indices[0], 1)
-        print('last visible head index:', last_visible_index_head)
-        print('last visible tail index:', last_visible_index_tail + valid_tail_node_indices[0])
-        print('occluded_nodes:', occluded_nodes)
-        print(np.array(correspondence_priors))
+        # print('last visible head index:', last_visible_index_head)
+        # print('last visible tail index:', last_visible_index_tail + valid_tail_node_indices[0])
+        # print('occluded_nodes:', occluded_nodes)
+        # print(np.array(correspondence_priors))
 
     elif head_visible and not tail_visible:
         print('head visible')
@@ -557,13 +557,15 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask):
     else:
         print('error!')
     
-    print('last visible index:', last_visible_index)
+    # print('last visible index:', last_visible_index)
 
     return guide_nodes, np.array(correspondence_priors), occluded_nodes
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask)
-    Y, sigma2 = ecpd_lle(X, Y_0, 5, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, '1st order', occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, '1st order', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 3, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.00001, 'Gaussian', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.00001, '2nd order', occluded_nodes)
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
@@ -755,7 +757,7 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = np.array(sort_pts(init_nodes.tolist()))
 
         # compute preset coord and total len. one time action
