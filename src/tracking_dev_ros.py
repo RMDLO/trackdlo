@@ -278,8 +278,9 @@ def ecpd_lle (X,                           # input point cloud
         # if len(visible_nodes) != 0:
         #     P[visible_nodes] = 0
 
-        # if occluded_nodes is not None:
-        #     P[occluded_nodes] = 0
+        if occluded_nodes is not None:
+            print(occluded_nodes)
+            P[occluded_nodes] = 0
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
@@ -373,6 +374,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     correspondence_priors = None
     occluded_nodes = None
 
+    mask_dis_threshold = 10
+
     if abs(cur_total_len - total_len) < 0.007: # (head_visible and tail_visible) or 
         print('head visible and tail visible or the same len')
         correspondence_priors = []
@@ -385,7 +388,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 5
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
@@ -495,7 +497,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                     break
                 # if at the end of guide nodes
                 if it_gn == 1:
-                    last_visible_index_tail = it_y0
+                    last_visible_index_tail = it_y0 # + valid_tail_node_indices[0] # it_y0
                     break
                 it_gn -= 1
             
@@ -515,7 +517,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 5
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
@@ -553,9 +554,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         it_gn = 0
         if len(valid_head_node_indices) != 0:
             correspondence_priors.append(np.append(np.array([0]), valid_head_nodes[0]))
-        # print('---')
-        # print('head appended:', np.array([0]), valid_head_nodes[0])
-        # print('---')
+        print('---')
+        print('head appended:', 0, valid_head_node_indices[0])
+        print('---')
         for it_y0 in range (0, len(valid_head_nodes)-1):
             total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0+1])
             # step guide nodes dist until greater than current y0 total dist
@@ -565,9 +566,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                     total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1])
                     new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])*(valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn])
                     correspondence_priors.append(np.append(np.array([it_y0+1]), new_y0_coord))
-                    # print('---')
-                    # print('head appended:', np.array([it_y0+1]), new_y0_coord)
-                    # print('---')
+                    print('---')
+                    print('head appended:', it_y0+1, new_y0_coord)
+                    print('---')
                     break
                 # if at the end of guide nodes
                 if it_gn == len(valid_head_nodes) - 2:
@@ -586,7 +587,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 5
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
@@ -627,9 +627,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         it_gn = len(valid_tail_nodes) - 1
         if len(valid_tail_node_indices) != 0:
             correspondence_priors.append(np.append(np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1]))
-        # print('---')
-        # print('tail appended:', np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1])
-        # print('---')
+        print('---')
+        print('tail appended:', len(valid_tail_nodes)-1 + valid_tail_node_indices[0], valid_tail_node_indices[-1])
+        print('---')
         for it_y0 in range (len(valid_tail_nodes)-1, 0, -1):
             total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0-1])
             # step guide nodes dist until greater than current y0 total dist
@@ -639,13 +639,13 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                     total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1])
                     new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])*(valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn])
                     correspondence_priors.append(np.append(np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord))
-                    # print('---')
-                    # print('tail appended:', np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord)
-                    # print('---')
+                    print('---')
+                    print('tail appended:', it_y0-1 + valid_tail_node_indices[0], new_y0_coord)
+                    print('---')
                     break
                 # if at the end of guide nodes
                 if it_gn == 1:
-                    last_visible_index_tail = it_y0
+                    last_visible_index_tail = it_y0 + valid_tail_node_indices[0] # it_y0
                     break
                 it_gn -= 1
             
@@ -667,9 +667,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 6, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000005, kernel='1st order', occluded_nodes=occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 3, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.00001, 'Gaussian', occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.00001, '2nd order', occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.001, kernel='1st order', occluded_nodes=occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, '2nd order', occluded_nodes)
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 

@@ -6,10 +6,10 @@
     <arg name="json_file_path" value="/home/$(arg user)/Desktop/preset_decimation_4.0_depth_step_100.json" />
     <arg name="publish_tf" value="false" />
     <arg name="filters" value="pointcloud,temporal,decimation" />
-    <arg name="depth_fps" value="30" />
+    <arg name="depth_fps" value="6" />
     <arg name="depth_height" value="720" />
     <arg name="depth_width" value="1280" />
-    <arg name="color_fps" value="30" />
+    <arg name="color_fps" value="6" />
     <arg name="color_height" value="720" />
     <arg name="color_width" value="1280" />
     <arg name="align_depth" value="true" />
