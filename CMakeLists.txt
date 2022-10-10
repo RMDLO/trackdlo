@@ -8,13 +8,13 @@ project(test)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  abb_egm_hardware_interface
-  abb_egm_state_controller
-  abb_rws_service_provider
-  abb_rws_state_publisher
-  controller_manager
-  joint_state_controller
-  velocity_controllers
+  # abb_egm_hardware_interface
+  # abb_egm_state_controller
+  # abb_rws_service_provider
+  # abb_rws_state_publisher
+  # controller_manager
+  # joint_state_controller
+  # velocity_controllers
 )
 
 ## System dependencies are found with CMake's conventions
