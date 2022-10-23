@@ -438,7 +438,6 @@ def sort_pts (pts_orig):
 
     return sorted_pts
 
-    saved = False
 initialized = False
 init_nodes = []
 nodes = []
@@ -465,11 +464,6 @@ def callback (rgb, depth, pc):
     # cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
 
-    # # test
-    # cv2.imshow('img', cur_image)
-    # cv2.waitKey(0) 
-    # cv2.destroyAllWindows()
-
     # process depth image
     cur_depth = ros_numpy.numpify(depth)
 
@@ -479,12 +473,47 @@ def callback (rgb, depth, pc):
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
     # color thresholding
-    lower = (90, 100, 100)
-    upper = (120, 255, 255)
-    mask = cv2.inRange(hsv_image, lower, upper)
-    bmask = mask.copy() # for checking visibility, max = 255
-    mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
-    # print('mask shape = ', np.shape(mask))
+    # --- blue ---
+    lower = (98, 100, 100)
+    upper = (130, 255, 255)
+    mask_blue = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+
+    # --- green ---
+    lower = (85, 130, 60)
+    upper = (95, 255, 255)
+    mask_green = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+
+    # test
+    mask = cv2.bitwise_or(mask_blue.copy(), mask_green.copy()) # mask_green.copy()
+    bmask = mask.copy()
+    mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB) # should be the mask of the whole wire
+
+    # blob detection
+    params = cv2.SimpleBlobDetector_Params()
+    params.filterByColor = False
+    params.filterByArea = True
+    params.filterByCircularity = False
+    params.filterByInertia = True
+    params.filterByConvexity = False
+
+    # Create a detector with the parameters
+    detector = cv2.SimpleBlobDetector_create(params)
+    keypoints = detector.detect(mask_blue)
+
+    # Find blob centers in the image coordinates
+    blob_image_center = []
+    guide_nodes = []
+    num_blobs = len(keypoints)
+    tracking_img = cur_image.copy()
+    for i in range(num_blobs):
+        blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
+        guide_nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])].tolist())
+        # draw image
+        uv = (int(keypoints[i].pt[1]), int(keypoints[i].pt[0]))
+        cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
+
+    # mauual occlusion
+    mask[0:100, :] = 0
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
@@ -496,18 +525,6 @@ def callback (rgb, depth, pc):
     filtered_pc = filtered_pc[((filtered_pc[:, :, 0] != 0) | (filtered_pc[:, :, 1] != 0) | (filtered_pc[:, :, 2] != 0))]
     filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.705]
     filtered_pc = filtered_pc[filtered_pc[:, 2] > 0.4]
-
-    # # save points
-    # if not saved:
-    #     username = 'ablcts18'
-    #     folder = 'tracking/'
-    #     f = open("/home/" + username + "/Research/" + folder + "ros_pc.json", 'wb')
-    #     pkl.dump(filtered_pc, f)
-    #     f.close()
-    #     saved = True
-
-    # downsample to 2.5%
-    # filtered_pc = filtered_pc[::int(1/0.1)]
 
     # downsample with open3d
     pcd = o3d.geometry.PointCloud()
@@ -528,19 +545,29 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 35, mu=0.05, max_iter=100)
-        init_nodes = np.array(sort_pts(init_nodes.tolist()))
-
-        # compute preset coord and total len. one time action
-        seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
-        geodesic_coord = []
-        last_pt = 0
-        geodesic_coord.append(last_pt)
-        for i in range (1, len(init_nodes)):
-            last_pt += seg_dis[i-1]
-            geodesic_coord.append(last_pt)
-        geodesic_coord = np.array(geodesic_coord)
-        total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1)))
+        guide_nodes = np.array(sort_pts(guide_nodes))
+        # use ecpd to get the variance
+        # correspondence priors: [index, x, y, z]
+        # total of 31 markers
+        temp = np.arange(0, 31, 1)
+        correspondence_priors = np.vstack((temp, guide_nodes.T)).T
+        init_nodes, sigma2 = ecpd_lle (X = filtered_pc,                           # input point cloud
+                                       Y_0 = guide_nodes,                         # input nodes
+                                       beta = 0.5,                        # MCT kernel strength
+                                       alpha = 1,                       # MCT overall strength
+                                       gamma = 1,                       # LLE strength
+                                       mu = 0.1,                          # noise
+                                       max_iter = 30,                    # how many iterations EM will run
+                                       tol = 0.00001,                         # when to terminate the optimization process
+                                       include_lle = True, 
+                                       use_geodesic = False, 
+                                       use_prev_sigma2 = False, 
+                                       sigma2_0 = None,              # initial variance
+                                       use_ecpd = True, 
+                                       correspondence_priors = correspondence_priors,
+                                       omega = 0.001,                 # ecpd strength. DO NOT go lower than 1e-6
+                                       kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
+                                       occluded_nodes = None)
 
         initialized = True
         # header.stamp = rospy.Time.now()
@@ -549,6 +576,7 @@ def callback (rgb, depth, pc):
 
     # cpd
     if initialized:
+        guide_nodes = np.array(guide_nodes)
         # determined which nodes are occluded from mask information
         mask_dis_threshold = 10
         # projection
@@ -571,22 +599,27 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         # occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        # beta = 3000
-        # # beta = 200
-        # alpha = 1
-        # gamma = 1
-        # mu = 0.05
-        # max_iter = 30
-        # tol = 0.00001
-
-        # include_lle = True
-        # use_decoupling = True
-        # use_prev_sigma2 = True
-        # use_ecpd = True
-        # omega = 0.00000000001
-
         cur_time = time.time()
-        guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask)
+        nodes, sigma2 = ecpd_lle (X = filtered_pc,                           # input point cloud
+                                  Y_0 = init_nodes,                         # input nodes
+                                  beta = 0.5,                        # MCT kernel strength
+                                  alpha = 1,                       # MCT overall strength
+                                  gamma = 1,                       # LLE strength
+                                  mu = 0.1,                          # noise
+                                  max_iter = 30,                    # how many iterations EM will run
+                                  tol = 0.00001,                         # when to terminate the optimization process
+                                  include_lle = True, 
+                                  use_geodesic = False, 
+                                  use_prev_sigma2 = True, 
+                                  sigma2_0 = sigma2,              # initial variance
+                                  use_ecpd = False, 
+                                  correspondence_priors = None,
+                                  omega = None,                 # ecpd strength. DO NOT go lower than 1e-6
+                                  kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
+                                  occluded_nodes = None)
+
+        print('time taken = ', time.time() - cur_time)
+        cur_time = time.time()
 
         init_nodes = nodes.copy()
 
@@ -626,6 +659,10 @@ def callback (rgb, depth, pc):
             else:
                 cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
 
+            # draw ground truth points
+            uv_gt = (int(keypoints[i].pt[0]), int(keypoints[i].pt[1]))
+            cv2.circle(tracking_img, uv_gt, 5, (255, 150, 0), -1)
+
             # draw line
             if i != len(image_coords)-1:
                 if vis[i] < mask_dis_threshold:
@@ -636,7 +673,7 @@ def callback (rgb, depth, pc):
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
 
-        print(time.time() - cur_time)
+        print('total time taken = ', time.time() - cur_time)
         cur_time = time.time()
 
 

@@ -32,6 +32,11 @@ def callback (rgb, depth, pc):
     # cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
 
+    # process point cloud
+    pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)
+    cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
+    cur_pc = cur_pc.reshape((720, 1280, 3))
+
     # color thresholding
     # --- blue ---
     lower = (98, 100, 100)
@@ -46,39 +51,39 @@ def callback (rgb, depth, pc):
     # bmask = mask.copy() # for checking visibility, max = 255
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
 
-    # test
-    mask = cv2.bitwise_or(mask.copy(), mask_green.copy()) # mask_green.copy()
+    # # test
+    # mask = cv2.bitwise_or(mask.copy(), mask_green.copy()) # mask_green.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
 
     # blob detection
     params = cv2.SimpleBlobDetector_Params()
-    # Filter by Color
     params.filterByColor = False
-    # Filter by Area.
     params.filterByArea = True
-    # Filter by Circularity
     params.filterByCircularity = False
-    # Filter by Inerita
     params.filterByInertia = True
-    # Filter by Convexity
     params.filterByConvexity = False
 
-    # # Create a detector with the parameters
-    # detector = cv2.SimpleBlobDetector_create(params)
-    # keypoints = detector.detect(mask)
+    # Create a detector with the parameters
+    detector = cv2.SimpleBlobDetector_create(params)
+    keypoints = detector.detect(mask)
 
-    # # Find blob centers in the image coordinates
-    # blob_image_center = []
-    # num_blobs = len(keypoints)
-    # for i in range(num_blobs):
-    #     blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
+    # Find blob centers in the image coordinates
+    blob_image_center = []
+    nodes = []
+    num_blobs = len(keypoints)
+    tracking_img = cur_image.copy()
+    for i in range(num_blobs):
+        blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
+        nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])])
+        # draw image
+        uv = (int(keypoints[i].pt[1]), int(keypoints[i].pt[0]))
+        cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
 
     # blob_image_center = np.array(blob_image_center)
 
     # us = blob_image_center[:, 0].astype(int)
     # vs = blob_image_center[:, 1].astype(int)
 
-    # tracking_img = cur_image.copy()
     # for i in range (len(blob_image_center)):
     #     # draw circle
     #     uv = (us[i], vs[i])
@@ -87,9 +92,18 @@ def callback (rgb, depth, pc):
         # # draw line
         # if i != len(blob_image_center)-1:
         #     cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 150, 0), 2)
+
+    # add color
+    nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
+    nodes_rgba_arr = np.full((len(nodes), 1), nodes_rgba)
+    nodes_colored = np.hstack((nodes, nodes_rgba_arr)).astype('O')
+    nodes_colored[:, 3] = nodes_colored[:, 3].astype(int)
+    header.stamp = rospy.Time.now()
+    converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
+    nodes_pub.publish(converted_nodes)
     
-    # tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
-    # tracking_img_pub.publish(tracking_img_msg)
+    tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
+    tracking_img_pub.publish(tracking_img_msg)
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
