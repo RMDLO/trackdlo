@@ -38,14 +38,20 @@ def callback (rgb, depth, pc):
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
     # color thresholding
-    # --- blue ---
-    lower = (98, 100, 100)
-    upper = (130, 255, 255)
+    # --- wire blue ---
+    # lower = (98, 100, 100)
+    # upper = (130, 255, 255)
+    # --- rope blue ---
+    lower = (90, 100, 100)
+    upper = (120, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
 
-    # --- green ---
-    lower = (85, 130, 60)
-    upper = (95, 255, 255)
+    # --- wire green ---
+    # lower = (85, 130, 60)
+    # upper = (95, 255, 255)
+    # --- tape green ---
+    lower = (40, 110, 60)
+    upper = (85, 255, 255)
     mask_green = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
     # bmask = mask.copy() # for checking visibility, max = 255
