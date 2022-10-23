@@ -58,13 +58,19 @@ def callback (rgb):
 
     cur_image = ros_numpy.numpify(rgb)
 
-    # initialize mask if none
-    if mouse_mask is None:
-        mouse_mask = np.ones(cur_image.shape)
-
     # convert color for opencv display
     cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
-    frame = cur_image.copy()
+
+    # frame = cur_image.copy()
+    # resize for smaller window
+    height, width, layers = cur_image.shape
+    new_h = int(height / 1.5)
+    new_w = int(width / 1.5)
+    frame = cv2.resize(cur_image, (new_w, new_h))
+
+    # initialize mask if none
+    if mouse_mask is None:
+        mouse_mask = np.ones(frame.shape)
 
     # filter with mask
     frame = (frame * mouse_mask).astype('uint8')
@@ -76,10 +82,10 @@ def callback (rgb):
 
     if key == 114: # r
         # reset everyhting
-        frame = cur_image.copy()
+        frame = cv2.resize(cur_image, (new_w, new_h))
         startPoint = False
         endPoint = False
-        mouse_mask = np.ones(cur_image.shape)
+        mouse_mask = np.ones(frame.shape)
         cv2.imshow('frame',frame)
     else:
         #drawing rectangle
@@ -90,10 +96,14 @@ def callback (rgb):
         if startPoint == True and endPoint == True:
             mouse_mask[rect[1]:rect[3], rect[0]:rect[2], :] = 0
 
-        cv2.imshow('frame',frame)
+        cv2.imshow('frame', frame)
 
     # publish mask
     occlusion_mask = (mouse_mask*255).astype('uint8')
+
+    # resize back for pub
+    occlusion_mask = cv2.resize(occlusion_mask, (width, height))
+
     occlusion_mask_img_msg = ros_numpy.msgify(Image, occlusion_mask, 'rgb8')
     occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
 
