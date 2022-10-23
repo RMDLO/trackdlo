@@ -438,6 +438,11 @@ def sort_pts (pts_orig):
 
     return sorted_pts
 
+occlusion_mask_rgb = None
+def update_occlusion_mask(data):
+	global occlusion_mask_rgb
+	occlusion_mask_rgb = ros_numpy.numpify(data)
+
 initialized = False
 init_nodes = []
 nodes = []
@@ -454,6 +459,7 @@ def callback (rgb, depth, pc):
     global cur_time
     global total_len
     global geodesic_coord
+    global occlusion_mask_rgb
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -472,6 +478,11 @@ def callback (rgb, depth, pc):
     cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
+    # process opencv mask
+    if occlusion_mask_rgb is None:
+        occlusion_mask_rgb = np.ones(cur_image.shape)
+    occlusion_mask = cv2.cvtColor(occlusion_mask_rgb.copy(), cv2.COLOR_RGB2GRAY)
+
     # color thresholding
     # --- blue ---
     lower = (98, 100, 100)
@@ -485,6 +496,7 @@ def callback (rgb, depth, pc):
 
     # test
     mask = cv2.bitwise_or(mask_blue.copy(), mask_green.copy()) # mask_green.copy()
+    mask = cv2.bitwise_and(mask.copy(), occlusion_mask.copy())
     bmask = mask.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB) # should be the mask of the whole wire
 
@@ -505,15 +517,10 @@ def callback (rgb, depth, pc):
     guide_nodes = []
     num_blobs = len(keypoints)
     tracking_img = cur_image.copy()
+
     for i in range(num_blobs):
         blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
         guide_nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])].tolist())
-        # draw image
-        uv = (int(keypoints[i].pt[1]), int(keypoints[i].pt[0]))
-        cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
-
-    # mauual occlusion
-    mask[0:100, :] = 0
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
@@ -651,6 +658,10 @@ def callback (rgb, depth, pc):
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
         tracking_img = cur_image.copy()
+        # visualize manual occlusion as black block
+        print(np.amax(occlusion_mask_rgb))
+        tracking_img = (tracking_img*(occlusion_mask_rgb/255).astype('uint8')).astype('uint8')
+        
         for i in range (len(image_coords)):
             # draw circle
             uv = (us[i], vs[i])
@@ -683,6 +694,7 @@ if __name__=='__main__':
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
     depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
+    opencv_mask_sub = rospy.Subscriber('/mask_with_occlusion', Image, update_occlusion_mask)
 
     # header
     header = std_msgs.msg.Header()

@@ -53,7 +53,7 @@ def on_mouse(event, x, y, flags, params):
     elif event == cv2.EVENT_MOUSEMOVE and startPoint == True and endPoint == False:
         rect = (rect[0], rect[1], x, y)
 
-def callback (rgb, depth, pc):
+def callback (rgb):
     global rect, startPoint, endPoint, mouse_mask
 
     cur_image = ros_numpy.numpify(rgb)
@@ -68,10 +68,6 @@ def callback (rgb, depth, pc):
 
     # filter with mask
     frame = (frame * mouse_mask).astype('uint8')
-
-    # print('start point = ', startPoint)
-    # print('end point = ', endPoint)
-    # print('rect = ', rect)
 
     cv2.namedWindow('frame')
     cv2.setMouseCallback('frame', on_mouse)    
@@ -96,18 +92,18 @@ def callback (rgb, depth, pc):
 
         cv2.imshow('frame',frame)
 
+    # publish mask
+    occlusion_mask = (mouse_mask*255).astype('uint8')
+    occlusion_mask_img_msg = ros_numpy.msgify(Image, occlusion_mask, 'rgb8')
+    occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
+
 
 if __name__=='__main__':
     rospy.init_node('test', anonymous=True)
 
-    rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
-    pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
+    rgb_sub = rospy.Subscriber('/camera/color/image_raw', Image, callback)
 
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
-    mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
-
-    ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
-    ts.registerCallback(callback)
+    occlusion_mask_img_pub = rospy.Publisher('/mask_with_occlusion', Image, queue_size=10)
 
     rospy.spin()
