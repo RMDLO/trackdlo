@@ -33,7 +33,7 @@
 
   <node name="realsense_tf" pkg="test" type="pub_camera_tf.py"/>
   <node name="opencv_interaction" pkg="test" type="opencv_interactive.py"/>
-  <node name="tracking_eval_existing_method" pkg="test" type="eval_cpd_lle.py"/>
+  <node name="tracking_eval_existing_method" pkg="test" type="eval_mct_predict.py"/>
 
   <!-- tracking rviz file -->
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find test)/rviz/tracking_eval.rviz" />

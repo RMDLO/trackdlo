@@ -661,7 +661,6 @@ def callback (rgb, depth, pc):
 
         tracking_img = cur_image.copy()
         # visualize manual occlusion as black block
-        print(np.amax(occlusion_mask_rgb))
         tracking_img = (tracking_img*(occlusion_mask_rgb/255).astype('uint8')).astype('uint8')
         
         for i in range (len(image_coords)):
