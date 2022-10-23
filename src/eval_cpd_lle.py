@@ -450,6 +450,7 @@ sigma2 = 0
 cur_time = time.time()
 total_len = 0
 geodesic_coord = []
+last_guide_node_head = None
 def callback (rgb, depth, pc):
     global saved
     global initialized
@@ -460,6 +461,7 @@ def callback (rgb, depth, pc):
     global total_len
     global geodesic_coord
     global occlusion_mask_rgb
+    global last_guide_node_head
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -523,7 +525,17 @@ def callback (rgb, depth, pc):
         guide_nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])].tolist())
 
     # sort guide nodes
-    guide_nodes = np.array(sort_pts(guide_nodes))
+    if last_guide_node_head is None:
+        guide_nodes = np.array(sort_pts(guide_nodes))
+        last_guide_node_head = guide_nodes[0]
+    else:
+        guide_nodes = np.array(sort_pts(guide_nodes))
+        if pt2pt_dis(last_guide_node_head, guide_nodes[-1]) < 0.05:
+            # need to reverse
+            guide_nodes = guide_nodes.tolist()
+            guide_nodes.reverse()
+            guide_nodes = np.array(guide_nodes)
+            last_guide_node_head = guide_nodes[0]
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')

@@ -667,7 +667,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.001, kernel='1st order', occluded_nodes=occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.001, kernel='1st order', occluded_nodes=occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, '2nd order', occluded_nodes)
 
@@ -783,6 +783,7 @@ sigma2 = 0
 cur_time = time.time()
 total_len = 0
 geodesic_coord = []
+last_guide_node_head = None
 def callback (rgb, depth, pc):
     global saved
     global initialized
@@ -793,6 +794,7 @@ def callback (rgb, depth, pc):
     global total_len
     global geodesic_coord
     global occlusion_mask_rgb
+    global last_guide_node_head
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -856,7 +858,17 @@ def callback (rgb, depth, pc):
         guide_nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])].tolist())
 
     # sort guide nodes
-    guide_nodes = np.array(sort_pts(guide_nodes))
+    if last_guide_node_head is None:
+        guide_nodes = np.array(sort_pts(guide_nodes))
+        last_guide_node_head = guide_nodes[0]
+    else:
+        guide_nodes = np.array(sort_pts(guide_nodes))
+        if pt2pt_dis(last_guide_node_head, guide_nodes[-1]) < 0.05:
+            # need to reverse
+            guide_nodes = guide_nodes.tolist()
+            guide_nodes.reverse()
+            guide_nodes = np.array(guide_nodes)
+            last_guide_node_head = guide_nodes[0]
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
@@ -996,6 +1008,10 @@ def callback (rgb, depth, pc):
             else:
                 cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
 
+            # draw ground truth points
+            uv_gt = (int(keypoints[i].pt[0]), int(keypoints[i].pt[1]))
+            cv2.circle(tracking_img, uv_gt, 5, (255, 150, 0), -1)
+
             # draw line
             if i != len(image_coords)-1:
                 if vis[i] < mask_dis_threshold:
@@ -1038,7 +1054,7 @@ if __name__=='__main__':
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
-    error_pub = rospy.Publisher('/cpd_lle_error', std_msgs.msg.Float32, queue_size=10)
+    error_pub = rospy.Publisher('/mct_predict_error', std_msgs.msg.Float32, queue_size=10)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
     ts.registerCallback(callback)
