@@ -697,7 +697,7 @@ def callback (rgb, depth, pc):
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
 
-        error = np.sum(np.sqrt(np.sum(np.square(guide_nodes - nodes), axis=1)))
+        error = np.sum(np.sqrt(np.sum(np.square(guide_nodes - nodes), axis=1))) / 31
         error_pub.publish(error)
 
         print('total time taken = ', time.time() - cur_time)
@@ -724,12 +724,12 @@ if __name__=='__main__':
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-    init_nodes_pub = rospy.Publisher ('/init_nodes', PointCloud2, queue_size=10)
-    nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
-    guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
-    tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
-    mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
-    error_pub = rospy.Publisher('/cpd_lle_error', std_msgs.msg.Float32, queue_size=10)
+    init_nodes_pub = rospy.Publisher ('/cpd_lle/init_nodes', PointCloud2, queue_size=10)
+    nodes_pub = rospy.Publisher ('/cpd_lle/nodes', PointCloud2, queue_size=10)
+    guide_nodes_pub = rospy.Publisher ('/cpd_lle/guide_nodes', PointCloud2, queue_size=10)
+    tracking_img_pub = rospy.Publisher ('/cpd_lle/tracking_img', Image, queue_size=10)
+    mask_img_pub = rospy.Publisher('/cpd_lle/mask', Image, queue_size=10)
+    error_pub = rospy.Publisher('/cpd_lle/error', std_msgs.msg.Float32, queue_size=10)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
     ts.registerCallback(callback)

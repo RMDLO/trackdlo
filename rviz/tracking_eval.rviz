@@ -38,7 +38,7 @@ Panels:
     refresh_freq: 40
     w_time: 1
     window_time_enable: false
-    y_max: 1.5
+    y_max: 0.05
     y_min: 0
     yaxis_rescale_auto: false
 Preferences:
@@ -124,7 +124,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/color/image_raw
+      Image Topic: /tracking_img
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -136,7 +136,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /tracking_img
+      Image Topic: /camera/color/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
