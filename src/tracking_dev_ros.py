@@ -289,6 +289,7 @@ def ecpd_lle (X,                           # input point cloud
                 den[den == 0] = np.finfo(float).eps
                 c = (2 * np.pi * sigma2) ** (D / 2) * mu / (1 - mu) / N
                 den += c
+                P = np.divide(P, den)
 
             else:
                 den = np.sum(P, axis=0)
@@ -298,6 +299,7 @@ def ecpd_lle (X,                           # input point cloud
                 c = c * mu / (1 - mu)
                 c = c * M / N
                 den += c
+                P = np.divide(P, den)
 
             # # original method
             # den = np.sum(P, axis=0)
@@ -307,8 +309,7 @@ def ecpd_lle (X,                           # input point cloud
             # c = c * mu / (1 - mu)
             # c = c * M / N
             # den += c
-
-            P = np.divide(P, den)
+            # P = np.divide(P, den)
 
         # if occluded_nodes is not None:
         #     print(occluded_nodes)
