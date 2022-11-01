@@ -145,7 +145,7 @@ def ecpd_lle (X,                           # input point cloud
               correspondence_priors = None,
               omega = None,                 # ecpd strength. DO NOT go lower than 1e-6
               kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
-              occluded_nodes = None):
+              occluded_nodes = None):       # nodes that are not in this array are either head nodes or tail nodes
 
     if correspondence_priors is not None and len(correspondence_priors) != 0:
         additional_pc = correspondence_priors[:, 1:4]
@@ -245,42 +245,74 @@ def ecpd_lle (X,                           # input point cloud
             max_node_larger_index = np.arange(0, N)[node_indices_diff > 0]
             dis_to_max_p_nodes = np.sqrt(np.sum(np.square(Y[max_p_nodes]-X), axis=1))
             dis_to_2nd_largest_p_nodes = np.sqrt(np.sum(np.square(Y[next_max_p_nodes]-X), axis=1))
-            converted_P = np.zeros((M, N)).T
+            geodesic_dists = np.zeros((M, N)).T
 
             for idx in max_node_smaller_index:
-                converted_P[idx, 0:max_p_nodes[idx]+1] = converted_node_dis[max_p_nodes[idx], 0:max_p_nodes[idx]+1] + dis_to_max_p_nodes[idx]
-                converted_P[idx, next_max_p_nodes[idx]:M] = converted_node_dis[next_max_p_nodes[idx], next_max_p_nodes[idx]:M] + dis_to_2nd_largest_p_nodes[idx]
+                geodesic_dists[idx, 0:max_p_nodes[idx]+1] = converted_node_dis[max_p_nodes[idx], 0:max_p_nodes[idx]+1] + dis_to_max_p_nodes[idx]
+                geodesic_dists[idx, next_max_p_nodes[idx]:M] = converted_node_dis[next_max_p_nodes[idx], next_max_p_nodes[idx]:M] + dis_to_2nd_largest_p_nodes[idx]
 
             for idx in max_node_larger_index:
-                converted_P[idx, 0:next_max_p_nodes[idx]+1] = converted_node_dis[next_max_p_nodes[idx], 0:next_max_p_nodes[idx]+1] + dis_to_2nd_largest_p_nodes[idx]
-                converted_P[idx, max_p_nodes[idx]:M] = converted_node_dis[max_p_nodes[idx], max_p_nodes[idx]:M] + dis_to_max_p_nodes[idx]
+                geodesic_dists[idx, 0:next_max_p_nodes[idx]+1] = converted_node_dis[next_max_p_nodes[idx], 0:next_max_p_nodes[idx]+1] + dis_to_2nd_largest_p_nodes[idx]
+                geodesic_dists[idx, max_p_nodes[idx]:M] = converted_node_dis[max_p_nodes[idx], max_p_nodes[idx]:M] + dis_to_max_p_nodes[idx]
 
-            converted_P = converted_P.T
+            geodesic_dists = geodesic_dists.T
 
-            P = np.exp(-np.square(converted_P) / (2 * sigma2))
-            den = np.sum(P, axis=0)
-            den = np.tile(den, (M, 1))
-            den[den == 0] = np.finfo(float).eps
-            c = (2 * np.pi * sigma2) ** (D / 2)
-            c = c * mu / (1 - mu)
-            c = c * M / N
-            den += c
+            P = np.exp(-np.square(geodesic_dists) / (2 * sigma2))
+
+            if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+                print('--- modified p ---')
+                # modified probability distribution
+                P_vis = np.zeros((M, N))
+
+                # determine the indices where head, tail, floating region starts/ends
+                M_head = occluded_nodes[0]
+                M_tail = M - 1 - occluded_nodes[-1]
+
+                P_vis_fill_head = np.zeros((M, 1))
+                P_vis_fill_tail = np.zeros((M, 1))
+                P_vis_fill_floating = np.zeros((M, 1))
+
+                P_vis_fill_head[0 : M_head, 0] = 1 / M_head
+                P_vis_fill_tail[M-M_tail : M, 0] = 1 / M_tail
+                P_vis_fill_floating[M_head : M-M_tail, 0] = 1 / (M - M_head - M_tail)
+
+                # fill in P_vis
+                P_vis[:, (max_p_nodes >= 0)&(max_p_nodes < M_head)] = P_vis_fill_head
+                P_vis[:, (max_p_nodes >= M-M_tail)&(max_p_nodes < M)] = P_vis_fill_tail
+                P_vis[:, (max_p_nodes >= M_head)&(max_p_nodes < M-M_tail)] = P_vis_fill_floating
+
+                # modify P
+                P = P_vis * P
+
+                den = np.sum(P, axis=0)
+                den = np.tile(den, (M, 1))
+                den[den == 0] = np.finfo(float).eps
+                c = (2 * np.pi * sigma2) ** (D / 2) * mu / (1 - mu) / N
+                den += c
+
+            else:
+                den = np.sum(P, axis=0)
+                den = np.tile(den, (M, 1))
+                den[den == 0] = np.finfo(float).eps
+                c = (2 * np.pi * sigma2) ** (D / 2)
+                c = c * mu / (1 - mu)
+                c = c * M / N
+                den += c
+
+            # # original method
+            # den = np.sum(P, axis=0)
+            # den = np.tile(den, (M, 1))
+            # den[den == 0] = np.finfo(float).eps
+            # c = (2 * np.pi * sigma2) ** (D / 2)
+            # c = c * mu / (1 - mu)
+            # c = c * M / N
+            # den += c
 
             P = np.divide(P, den)
 
-        # visible_nodes = []
         # if occluded_nodes is not None:
-        #     for node_idx in range (0, M):
-        #         if node_idx not in occluded_nodes:
-        #             visible_nodes.append(node_idx)
-        #     visible_nodes = np.array(visible_nodes)
-
-        # if len(visible_nodes) != 0:
-        #     P[visible_nodes] = 0
-
-        if occluded_nodes is not None:
-            print(occluded_nodes)
-            P[occluded_nodes] = 0
+        #     print(occluded_nodes)
+        #     P[occluded_nodes] = 0
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
@@ -668,7 +700,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
     Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.001, kernel='1st order', occluded_nodes=occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, '2nd order', occluded_nodes)
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
