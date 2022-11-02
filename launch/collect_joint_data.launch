@@ -1,7 +1,0 @@
-<launch>
-	<include file="$(find abb_irb120_moveit_config)/launch/moveit_planning_execution.launch">
-		<arg name="sim" value="false" />
-		<arg name="robot_ip" value="192.168.125.1" />
-	</include>
-	<node name="collect_joint_angles" pkg="test" type="collect_joint_states.py" />
-</launch>

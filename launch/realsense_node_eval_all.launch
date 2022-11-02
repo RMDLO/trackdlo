@@ -18,7 +18,7 @@
 
   <!-- include file="$(find apriltag_ros)/launch/continuous_detection.launch" -->
   <!-- include file="$(find charuco_detector)/launch/charuco_detector.launch" -->
-  <!-- <include file="$(find test)/launch/python_charuco_detector.launch" /> -->
+  <!-- <include file="$(find tracking_ros)/launch/python_charuco_detector.launch" /> -->
 
   <!-- <arg name="namespace_prefix" default="irb120_eih_calib" />
   <arg name="eye_on_hand" default="true" />
@@ -31,13 +31,13 @@
     <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
   </include> -->
 
-  <node name="realsense_tf" pkg="test" type="pub_camera_tf.py"/>
-  <node name="opencv_interaction" pkg="test" type="opencv_interactive.py"/>
-  <node name="tracking_eval_method_1" pkg="test" type="eval_mct_predict.py"/>
-  <node name="tracking_eval_method_2" pkg="test" type="eval_cpd_lle.py"/>
+  <node name="realsense_tf" pkg="tracking_ros" type="pub_camera_tf.py"/>
+  <node name="opencv_interaction" pkg="tracking_ros" type="opencv_interactive.py"/>
+  <node name="tracking_eval_method_1" pkg="tracking_ros" type="eval_mct_predict.py"/>
+  <node name="tracking_eval_method_2" pkg="tracking_ros" type="eval_cpd_lle.py"/>
 
   <!-- tracking rviz file -->
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find test)/rviz/tracking_eval_all.rviz" />
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find tracking_ros)/rviz/tracking_eval_all.rviz" />
 
   <!-- start Rviz with our configuration, in the move group's namespace 
   <node if="$(arg start_rviz)" ns="$(arg move_group_namespace)" name="$(anon rviz)" pkg="rviz" type="rviz" respawn="true"
