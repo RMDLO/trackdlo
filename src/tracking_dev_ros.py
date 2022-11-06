@@ -651,7 +651,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         else:
             valid_tail_nodes = []
 
-        print('tail visible')
+        print('tail visible', valid_tail_node_indices, guide_nodes[0])
         last_visible_index_tail = None
         correspondence_priors = []
         total_dist_Y_0 = 0
@@ -688,6 +688,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
         # compile occluded nodes        
         occluded_nodes = np.arange(0, last_visible_index_tail, 1)
+        print(occluded_nodes)
     
     # if none of the above condition is satisfied
     else:
@@ -772,7 +773,7 @@ def sort_pts_mst (pts_orig):
                             minimum = G[m][n]
                             a = m
                             b = n
-        
+
         # print(str(a) + "-" + str(b) + ":" + str(G[a][b]))
         if len(sorted_pts) == 0:
             sorted_pts.append(pts_orig[a])
