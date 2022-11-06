@@ -403,7 +403,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     print('length difference = ', abs(cur_total_len - total_len))
 
     # visible_dist = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
-    last_visible_index = None
     correspondence_priors = None
     occluded_nodes = None
 
@@ -741,68 +740,56 @@ def find_opposite_closest (pt, arr, direction_pt):
     
     return opposite_closest, opposite_closest_found
 
-def sort_pts (pts_orig):
+def sort_pts_mst (pts_orig):
 
-    start_idx = 5
+    INF = 999999
+    diff = pts_orig[:, None, :] - pts_orig[None, :,  :]
+    diff = np.square(diff)
+    diff = np.sum(diff, 2)
+    N = len(diff)
+    G = diff.copy()
+    selected_node = np.zeros(N,).tolist()
 
-    pts = pts_orig.copy()
-    starting_pt = pts[start_idx].copy()
-    pts.pop(start_idx)
-    # starting point will be the current first point in the new list
+    no_edge = 0
+    selected_node[0] = True
     sorted_pts = []
-    sorted_pts.append(starting_pt)
 
-    # get the first closest point
-    closest_1, min_idx = find_closest (starting_pt, pts)
-    sorted_pts.append(closest_1)
-    pts.pop(min_idx)
+    # printing for edge and weight
+    print("Edge : Weight\n")
+    init_a = None
+    reverse = False
+    while (no_edge < N - 1):
+        
+        minimum = INF
+        a = 0
+        b = 0
+        for m in range(N):
+            if selected_node[m]:
+                for n in range(N):
+                    if ((not selected_node[n]) and G[m][n]):  
+                        # not in selected and there is an edge
+                        if minimum > G[m][n]:
+                            minimum = G[m][n]
+                            a = m
+                            b = n
+        
+        # print(str(a) + "-" + str(b) + ":" + str(G[a][b]))
+        if len(sorted_pts) == 0:
+            sorted_pts.append(pts_orig[a])
+            sorted_pts.append(pts_orig[b])
+            init_a = a
+        else:
+            if a == init_a:
+                reverse = True
+            if reverse:
+                # switch direction
+                sorted_pts.insert(0, pts_orig[b])
+            else:
+                sorted_pts.append(pts_orig[b])
+        selected_node[b] = True
+        no_edge += 1
 
-    # get the second closest point
-    closest_2, found = find_opposite_closest(starting_pt, pts, closest_1)
-    true_start = False
-    if not found:
-        # closest 1 is true start
-        true_start = True
-    # closest_2 is not popped from pts
-
-    # move through the rest of pts to build the sorted pt list
-    # if true_start:
-    #   can proceed until pts is empty
-    # if !true_start:
-    #   start in the direction of closest_1, the list would build until one end is reached. 
-    #   in that case the next closest point would be closest_2. starting that point, all 
-    #   newly added points to sorted_pts should be inserted at the front
-    while len(pts) != 0:
-        cur_target = sorted_pts[-1]
-        cur_direction = sorted_pts[-2]
-        cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
-
-        if not found:
-            print ("not found!")
-            break
-
-        sorted_pts.append(cur_closest)
-        pts.remove (cur_closest)
-
-    # begin the second loop that inserts new points at front
-    if not true_start:
-        # first insert closest_2 at front and pop it from pts
-        sorted_pts.insert(0, closest_2)
-        pts.remove(closest_2)
-
-        while len(pts) != 0:
-            cur_target = sorted_pts[0]
-            cur_direction = sorted_pts[1]
-            cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
-
-            if not found:
-                print ("not found!")
-                break
-
-            sorted_pts.insert(0, cur_closest)
-            pts.remove(cur_closest)
-
-    return sorted_pts
+    return np.array(sorted_pts)
 
 saved = False
 initialized = False
@@ -863,18 +850,6 @@ def callback (rgb, depth, pc):
     filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.705]
     filtered_pc = filtered_pc[filtered_pc[:, 2] > 0.4]
 
-    # # save points
-    # if not saved:
-    #     username = 'ablcts18'
-    #     folder = 'tracking/'
-    #     f = open("/home/" + username + "/Research/" + folder + "ros_pc.json", 'wb')
-    #     pkl.dump(filtered_pc, f)
-    #     f.close()
-    #     saved = True
-
-    # downsample to 2.5%
-    # filtered_pc = filtered_pc[::int(1/0.1)]
-
     # downsample with open3d
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(filtered_pc)
@@ -894,8 +869,8 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 35, mu=0.05, max_iter=100)
-        init_nodes = np.array(sort_pts(init_nodes.tolist()))
+        init_nodes, sigma2 = register(filtered_pc, 14, mu=0.05, max_iter=100)
+        init_nodes = sort_pts_mst(init_nodes)
 
         # compute preset coord and total len. one time action
         seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
