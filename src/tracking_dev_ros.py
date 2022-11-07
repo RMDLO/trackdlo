@@ -426,7 +426,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
-        # temp
+        # cap uv to be within (1280, 720)
         us = np.where(us >= 1280, 1279, us)
         vs = np.where(vs >= 720, 719, vs)
         uvs = np.vstack((vs, us)).T
@@ -436,6 +436,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
         vis = bmask_transformed[uvs_t]
         valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
+
+        # TEMP
+        cur_time = time.time()
 
         # determine a set of nodes for head and a set of nodes for tail
         valid_head_node_indices = []
@@ -449,6 +452,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             valid_head_nodes = guide_nodes[np.array(valid_head_node_indices)]
         else:
             valid_head_nodes = []
+            print('error! no valid head nodes')
 
         valid_tail_node_indices = []
         for node_idx in range (len(guide_nodes)-1, -1, -1):
@@ -457,92 +461,59 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                 valid_tail_node_indices.append(node_idx)
             else:
                 break
-        # reverse to follow the covention
-        valid_tail_node_indices.reverse()
+
         if len(valid_tail_node_indices) != 0:
-            valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)]
+            valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)] # valid tail node is reversed, starting from the end
         else:
             valid_tail_nodes = []
-        print('valid_head_node_indices:', valid_head_node_indices, len(valid_head_nodes))
-        print('valid_tail_node_indices:', valid_tail_node_indices, len(valid_tail_nodes))
+            print('error! no valid tail nodes')
 
         # initialize a variable for last visible head index and last visible tail index
         last_visible_index_head = None
         last_visible_index_tail = None
 
         # ----- head visible part -----
-        correspondence_priors = []
-        total_dist_Y_0 = 0
-        total_dist_guide_nodes = 0
-        it_gn = 0
-        if len(valid_head_node_indices) != 0:
-            correspondence_priors.append(np.append(np.array([0]), valid_head_nodes[0]))
-        # print('---')
-        # print('head appended:', np.array([0]), valid_head_nodes[0])
-        # print('---')
-        for it_y0 in range (0, len(valid_head_nodes)-1):
-            total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0+1])
-            # step guide nodes dist until greater than current y0 total dist
-            while total_dist_guide_nodes < total_dist_Y_0:
-                total_dist_guide_nodes += pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1])
-                if total_dist_guide_nodes >= total_dist_Y_0:
-                    total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1])
-                    new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])*(valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn])
-                    correspondence_priors.append(np.append(np.array([it_y0+1]), new_y0_coord))
-                    # print('---')
-                    # print('head appended:', np.array([it_y0+1]), new_y0_coord)
-                    # print('---')
-                    break
-                # if at the end of guide nodes
-                if it_gn == len(valid_head_nodes) - 2:
-                    last_visible_index_head = it_y0
-                    break
-                it_gn += 1
-            
-            if last_visible_index_head is not None:
-                break
-        if last_visible_index_head is None:
-            last_visible_index_head = len(valid_head_nodes) - 1
+        correspondence_priors_head = []
+
+        num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_head_nodes, axis=0)), axis=1)))/0.001)
+        tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
+        u_fine = np.linspace(0,1,num_true_pts)
+        x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+        spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+        total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
+
+        last_visible_index_head = len(geodesic_coord[geodesic_coord <= total_spline_len]) - 1
+
+        # geodesic coord is 1D
+        correspondence_priors_head = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
+        # occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
         
         # ----- tail visible part -----
-        total_dist_Y_0 = 0
-        total_dist_guide_nodes = 0
-        it_gn = len(valid_tail_nodes) - 1
-        if len(valid_tail_node_indices) != 0:
-            correspondence_priors.append(np.append(np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1]))
-        # print('---')
-        # print('tail appended:', np.array([len(valid_tail_nodes)-1 + valid_tail_node_indices[0]]), valid_tail_nodes[-1])
-        # print('---')
-        for it_y0 in range (len(valid_tail_nodes)-1, 0, -1):
-            total_dist_Y_0 += pt2pt_dis(geodesic_coord[it_y0], geodesic_coord[it_y0-1])
-            # step guide nodes dist until greater than current y0 total dist
-            while total_dist_guide_nodes < total_dist_Y_0:
-                total_dist_guide_nodes += pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1])
-                if total_dist_guide_nodes >= total_dist_Y_0:
-                    total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1])
-                    new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y_0 - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])*(valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn])
-                    correspondence_priors.append(np.append(np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord))
-                    # print('---')
-                    # print('tail appended:', np.array([it_y0-1 + valid_tail_node_indices[0]]), new_y0_coord)
-                    # print('---')
-                    break
-                # if at the end of guide nodes
-                if it_gn == 1:
-                    last_visible_index_tail = it_y0 # + valid_tail_node_indices[0] # it_y0
-                    break
-                it_gn -= 1
-            
-            if last_visible_index_tail is not None:
-                break
-        if last_visible_index_tail is None:
-            last_visible_index_tail = 0
+        correspondence_priors_tail = []
+
+        num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_tail_nodes, axis=0)), axis=1)))/0.001)
+        tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
+        u_fine = np.linspace(0,1,num_true_pts)
+        x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+        spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+        total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
+
+        geodesic_coord_from_tail = np.abs(geodesic_coord - geodesic_coord[-1]).tolist()
+        geodesic_coord_from_tail.reverse()
+        geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
+
+        last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail <= total_spline_len])
+
+        # geodesic coord is 1D
+        correspondence_priors_tail = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail <= total_spline_len])]*1000).astype(int)].T)).T        
+        # occluded_nodes = np.arange(0, last_visible_index_tail, 1)
 
         # compile occluded nodes
-        occluded_nodes = np.arange(last_visible_index_head+1, last_visible_index_tail + valid_tail_node_indices[0], 1)
-        # print('last visible head index:', last_visible_index_head)
-        # print('last visible tail index:', last_visible_index_tail + valid_tail_node_indices[0])
-        # print('occluded_nodes:', occluded_nodes)
-        # print(np.array(correspondence_priors))
+        occluded_nodes = np.arange(last_visible_index_head+1, last_visible_index_tail, 1)
+        correspondence_priors = np.vstack((correspondence_priors_head, correspondence_priors_tail))
+
+        # TEMP
+        print('pre-process time taken:', time.time()-cur_time)
 
     elif head_visible and not tail_visible:
 
@@ -622,9 +593,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                 valid_tail_node_indices.append(node_idx)
             else:
                 break
-        # # reverse to follow the covention
-        # temp = valid_tail_node_indices.copy()
-        # valid_tail_node_indices.reverse()
+
         if len(valid_tail_node_indices) != 0:
             valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)] # valid tail node is reversed, starting from the end
         else:
@@ -633,12 +602,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
         print('tail visible')
         correspondence_priors = []
-        # valid_tail_nodes = (guide_nodes.copy()).tolist()
-        # valid_tail_nodes.reverse()
-        # valid_tail_nodes = np.array(valid_tail_nodes)
 
         num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_tail_nodes, axis=0)), axis=1)))/0.001)
-        cur_time = time.time()
         tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
         u_fine = np.linspace(0,1,num_true_pts)
         x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
@@ -665,7 +630,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
     Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.001, kernel='1st order', occluded_nodes=occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, '2nd order', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
@@ -830,7 +795,7 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 14, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
 
         # compute preset coord and total len. one time action
