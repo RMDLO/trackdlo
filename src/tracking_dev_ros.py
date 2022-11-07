@@ -84,7 +84,6 @@ def register(pts, M, mu=0, max_iter=50):
         prev_Y, prev_s = new_Y, new_s
         new_Y, new_s = get_estimates(prev_Y, prev_s)
 
-    # print(repr(new_x), new_s)
     return new_Y, new_s
 
 # assuming Y is sorted
@@ -422,9 +421,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
         # projection
-        init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
+        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
+        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
         # temp
@@ -459,7 +458,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             else:
                 break
         # reverse to follow the covention
-        temp = valid_tail_node_indices.copy()
         valid_tail_node_indices.reverse()
         if len(valid_tail_node_indices) != 0:
             valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)]
@@ -551,9 +549,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
         # projection
-        init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
+        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
+        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
         # temp
@@ -583,8 +581,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         print('head visible')
         correspondence_priors = []
 
-        print('valid head node indices:', valid_guide_nodes_indices)
-
         num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_head_nodes, axis=0)), axis=1)))/0.001)
         tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
         u_fine = np.linspace(0,1,num_true_pts)
@@ -593,14 +589,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
 
         last_visible_index_head = len(geodesic_coord[geodesic_coord <= total_spline_len]) - 1
-        print(last_visible_index_head)
-        print(total_spline_len, geodesic_coord[last_visible_index_head], np.amax(geodesic_coord))
 
         # geodesic coord is 1D
         correspondence_priors = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
-
-        print('added head node indices:', np.arange(0, last_visible_index_head+1))
-        
         occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
 
     elif tail_visible and not head_visible:
@@ -608,9 +599,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
         # projection
-        init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
+        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, init_nodes_h.T).T
+        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
         # temp
@@ -623,9 +614,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
         vis = bmask_transformed[uvs_t]
         valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
-
-        print('vis:', vis)
-        print('valid guide node indices:', valid_guide_nodes_indices)
 
         valid_tail_node_indices = []
         for node_idx in range (len(guide_nodes)-1, -1, -1):
@@ -649,8 +637,6 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # valid_tail_nodes.reverse()
         # valid_tail_nodes = np.array(valid_tail_nodes)
 
-        print('valid tail node indices:', valid_tail_node_indices)
-
         num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_tail_nodes, axis=0)), axis=1)))/0.001)
         cur_time = time.time()
         tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
@@ -664,21 +650,14 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
 
         last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail <= total_spline_len])
-        print(last_visible_index_tail)
-        print(total_spline_len, geodesic_coord[-1] - geodesic_coord[last_visible_index_tail])
 
         # geodesic coord is 1D
-        correspondence_priors = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail <= total_spline_len])]*1000).astype(int)].T)).T
-
-        print('added tail node indices:', np.arange(len(Y_0)-1, last_visible_index_tail-1, -1))
-        
+        correspondence_priors = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail <= total_spline_len])]*1000).astype(int)].T)).T        
         occluded_nodes = np.arange(0, last_visible_index_tail, 1)
     
     # if none of the above condition is satisfied
     else:
         print('error!')
-    
-    # print('last visible index:', last_visible_index)
 
     return guide_nodes, np.array(correspondence_priors), occluded_nodes
 
@@ -688,7 +667,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, '2nd order', occluded_nodes)
 
-    return guide_nodes, Y, sigma2  # correspondence_priors[:, 1:4]
+    return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
 def find_closest (pt, arr):
     closest = arr[0].copy()
@@ -739,8 +718,6 @@ def sort_pts_mst (pts_orig):
     selected_node[0] = True
     sorted_pts = []
 
-    # printing for edge and weight
-    print("Edge : Weight\n")
     init_a = None
     reverse = False
     while (no_edge < N - 1):
@@ -758,7 +735,6 @@ def sort_pts_mst (pts_orig):
                             a = m
                             b = n
 
-        # print(str(a) + "-" + str(b) + ":" + str(G[a][b]))
         if len(sorted_pts) == 0:
             sorted_pts.append(pts_orig[a])
             sorted_pts.append(pts_orig[b])
@@ -821,13 +797,8 @@ def callback (rgb, depth, pc):
     upper = (120, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
     bmask = mask.copy() # for checking visibility, max = 255
-
-    # TEMP
-    bmask_transformed = ndimage.distance_transform_edt(255 - bmask)/np.amax(ndimage.distance_transform_edt(255 - bmask))
-    mask = cv2.cvtColor(bmask_transformed.copy(), cv2.COLOR_GRAY2BGR)
     
-    # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
-    # print('mask shape = ', np.shape(mask))
+    mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
@@ -902,20 +873,6 @@ def callback (rgb, depth, pc):
         vis = bmask_transformed[uvs_t]
         # occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
-        # beta = 3000
-        # # beta = 200
-        # alpha = 1
-        # gamma = 1
-        # mu = 0.05
-        # max_iter = 30
-        # tol = 0.00001
-
-        # include_lle = True
-        # use_decoupling = True
-        # use_prev_sigma2 = True
-        # use_ecpd = True
-        # omega = 0.00000000001
-
         cur_time = time.time()
         guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask)
 
@@ -940,8 +897,8 @@ def callback (rgb, depth, pc):
         guide_nodes_pub.publish(converted_guide_nodes)
 
         # project and pub image
-        # nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
-        nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1))))
+        nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
+        # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
 
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
         image_coords = np.matmul(proj_matrix, nodes_h.T).T
