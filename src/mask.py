@@ -56,7 +56,7 @@ def callback (rgb, depth, pc):
     # lower = (40, 110, 60)
     # upper = (85, 255, 255)
     # --- tape red ---
-    lower = (150, 90, 50)
+    lower = (110, 50, 50)
     upper = (255, 255, 255)
     mask_red = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 

@@ -782,7 +782,7 @@ def callback (rgb, depth, pc):
 
     # color thresholding
     # --- tape red ---
-    lower = (150, 90, 50)
+    lower = (110, 50, 50)
     upper = (255, 255, 255)
     mask_marker = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
