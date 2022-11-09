@@ -2,7 +2,7 @@
 
 ***********
 
-**Note: eval files are currectly broken, please do not touch**
+**Note: eval files are currently broken, please do not touch**
 
 ***********
 
