@@ -44,6 +44,9 @@ def callback (rgb, depth, pc):
     # --- rope blue ---
     lower = (90, 100, 100)
     upper = (120, 255, 255)
+    # --- background green ---
+    # lower = (0, 0, 0)
+    # upper = (220, 255, 210)
     mask = cv2.inRange(hsv_image, lower, upper)
 
     # --- wire green ---
@@ -53,14 +56,14 @@ def callback (rgb, depth, pc):
     # lower = (40, 110, 60)
     # upper = (85, 255, 255)
     # --- tape red ---
-    lower = (150, 180, 180)
+    lower = (150, 90, 50)
     upper = (255, 255, 255)
     mask_red = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
     # bmask = mask.copy() # for checking visibility, max = 255
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
 
-    # # test
+    # test
     mask = cv2.bitwise_or(mask.copy(), mask_red.copy()) # mask_green.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
 
@@ -85,7 +88,7 @@ def callback (rgb, depth, pc):
         blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
         nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])])
         # draw image
-        uv = (int(keypoints[i].pt[1]), int(keypoints[i].pt[0]))
+        uv = (int(keypoints[i].pt[0]), int(keypoints[i].pt[1]))
         cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
 
     # # add color

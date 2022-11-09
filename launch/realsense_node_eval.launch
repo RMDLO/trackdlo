@@ -31,11 +31,10 @@
     <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
   </include> -->
 
-  <arg name="method" />
+  <!-- <arg name="method" /> -->
   <node name="realsense_tf" pkg="tracking_ros" type="pub_camera_tf.py"/>
   <node name="opencv_interaction" pkg="tracking_ros" type="opencv_interactive.py"/>
-  <!-- <node name="tracking_eval_existing_method" pkg="tracking_ros" type="eval_mct_predict.py"/> -->
-  <node name="tracking_eval_existing_method" pkg="tracking_ros" type="eval_$(arg method).py"/>
+  <!-- <node name="tracking_eval_existing_method" pkg="tracking_ros" type="eval_$(arg method).py"/> -->
 
   <!-- tracking rviz file -->
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find tracking_ros)/rviz/tracking_eval.rviz" />

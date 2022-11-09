@@ -86,6 +86,54 @@ def register(pts, M, mu=0, max_iter=50):
 
     return new_Y, new_s
 
+def sort_pts_mst (pts_orig):
+
+    INF = 999999
+    diff = pts_orig[:, None, :] - pts_orig[None, :,  :]
+    diff = np.square(diff)
+    diff = np.sum(diff, 2)
+    N = len(diff)
+    G = diff.copy()
+    selected_node = np.zeros(N,).tolist()
+
+    no_edge = 0
+    selected_node[0] = True
+    sorted_pts = []
+
+    init_a = None
+    reverse = False
+    while (no_edge < N - 1):
+        
+        minimum = INF
+        a = 0
+        b = 0
+        for m in range(N):
+            if selected_node[m]:
+                for n in range(N):
+                    if ((not selected_node[n]) and G[m][n]):  
+                        # not in selected and there is an edge
+                        if minimum > G[m][n]:
+                            minimum = G[m][n]
+                            a = m
+                            b = n
+
+        if len(sorted_pts) == 0:
+            sorted_pts.append(pts_orig[a])
+            sorted_pts.append(pts_orig[b])
+            init_a = a
+        else:
+            if a == init_a:
+                reverse = True
+            if reverse:
+                # switch direction
+                sorted_pts.insert(0, pts_orig[b])
+            else:
+                sorted_pts.append(pts_orig[b])
+        selected_node[b] = True
+        no_edge += 1
+
+    return np.array(sorted_pts)
+
 # assuming Y is sorted
 # k -- going left for k indices, going right for k indices. a total of 2k neighbors.
 def get_nearest_indices (k, Y, idx):
@@ -633,89 +681,6 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
-
-def find_closest (pt, arr):
-    closest = arr[0].copy()
-    min_dis = np.sqrt((pt[0] - closest[0])**2 + (pt[1] - closest[1])**2 + (pt[2] - closest[2])**2)
-    idx = 0
-
-    for i in range (0, len(arr)):
-        cur_pt = arr[i].copy()
-        cur_dis = np.sqrt((pt[0] - cur_pt[0])**2 + (pt[1] - cur_pt[1])**2 + (pt[2] - cur_pt[2])**2)
-        if cur_dis < min_dis:
-            min_dis = cur_dis
-            closest = arr[i].copy()
-            idx = i
-    
-    return closest, idx
-
-def find_opposite_closest (pt, arr, direction_pt):
-    arr_copy = arr.copy()
-    opposite_closest_found = False
-    opposite_closest = pt.copy()  # will get overwritten
-
-    while (not opposite_closest_found) and (len(arr_copy) != 0):
-        cur_closest, cur_index = find_closest (pt, arr_copy)
-        arr_copy.pop (cur_index)
-
-        vec1 = np.array(cur_closest) - np.array(pt)
-        vec2 = np.array(direction_pt) - np.array(pt)
-
-        # threshold: 0.07m
-        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
-            opposite_closest_found = True
-            opposite_closest = cur_closest.copy()
-            break
-    
-    return opposite_closest, opposite_closest_found
-
-def sort_pts_mst (pts_orig):
-
-    INF = 999999
-    diff = pts_orig[:, None, :] - pts_orig[None, :,  :]
-    diff = np.square(diff)
-    diff = np.sum(diff, 2)
-    N = len(diff)
-    G = diff.copy()
-    selected_node = np.zeros(N,).tolist()
-
-    no_edge = 0
-    selected_node[0] = True
-    sorted_pts = []
-
-    init_a = None
-    reverse = False
-    while (no_edge < N - 1):
-        
-        minimum = INF
-        a = 0
-        b = 0
-        for m in range(N):
-            if selected_node[m]:
-                for n in range(N):
-                    if ((not selected_node[n]) and G[m][n]):  
-                        # not in selected and there is an edge
-                        if minimum > G[m][n]:
-                            minimum = G[m][n]
-                            a = m
-                            b = n
-
-        if len(sorted_pts) == 0:
-            sorted_pts.append(pts_orig[a])
-            sorted_pts.append(pts_orig[b])
-            init_a = a
-        else:
-            if a == init_a:
-                reverse = True
-            if reverse:
-                # switch direction
-                sorted_pts.insert(0, pts_orig[b])
-            else:
-                sorted_pts.append(pts_orig[b])
-        selected_node[b] = True
-        no_edge += 1
-
-    return np.array(sorted_pts)
 
 saved = False
 initialized = False
