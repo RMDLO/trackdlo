@@ -1,5 +1,11 @@
 # tracking_ros
 
+***********
+
+**Note: eval files are currently broken, please do not touch**
+
+***********
+
 ### To test the most recent version of the tracking algorithm:
 
 1. Run ```roslaunch tracking_ros realsense_node.launch```. This will bring up the rviz window with color image, mask, and tracking result (2D and 3D) visualized.
