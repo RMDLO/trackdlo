@@ -374,6 +374,17 @@ def ecpd_lle (X_orig,                      # input point cloud
         #     print(occluded_nodes)
         #     P[occluded_nodes] = 0
 
+        # add color
+        pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+        pc_rgba_arr = np.full((len(X), 1), pc_rgba)
+        filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
+        filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+
+        # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+        header.stamp = rospy.Time.now()
+        converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+        pc_pub.publish(converted_points)
+
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
         Np = np.sum(P1)
@@ -687,7 +698,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.01, kernel='1st order', occluded_nodes=occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 5, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
 
@@ -758,16 +769,16 @@ def callback (rgb, depth, pc):
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # # add color
+    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
+    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    # header.stamp = rospy.Time.now()
+    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    # pc_pub.publish(converted_points)
 
     # register nodes
     if not initialized:
