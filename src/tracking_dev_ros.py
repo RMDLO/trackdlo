@@ -773,7 +773,7 @@ def callback (rgb, depth, pc):
 
     filtered_pc = cur_pc*mask
     filtered_pc = filtered_pc[((filtered_pc[:, :, 0] != 0) | (filtered_pc[:, :, 1] != 0) | (filtered_pc[:, :, 2] != 0))]
-    filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.705]
+    # filtered_pc = filtered_pc[filtered_pc[:, 2] < 0.705]
     filtered_pc = filtered_pc[filtered_pc[:, 2] > 0.4]
 
     # downsample with open3d
