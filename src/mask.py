@@ -50,15 +50,18 @@ def callback (rgb, depth, pc):
     # lower = (85, 130, 60)
     # upper = (95, 255, 255)
     # --- tape green ---
-    lower = (40, 110, 60)
-    upper = (85, 255, 255)
-    mask_green = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    # lower = (40, 110, 60)
+    # upper = (85, 255, 255)
+    # --- tape red ---
+    lower = (150, 180, 180)
+    upper = (255, 255, 255)
+    mask_red = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
     # bmask = mask.copy() # for checking visibility, max = 255
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
 
     # # test
-    # mask = cv2.bitwise_or(mask.copy(), mask_green.copy()) # mask_green.copy()
+    mask = cv2.bitwise_or(mask.copy(), mask_red.copy()) # mask_green.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
 
     # blob detection
@@ -85,28 +88,14 @@ def callback (rgb, depth, pc):
         uv = (int(keypoints[i].pt[1]), int(keypoints[i].pt[0]))
         cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
 
-    # blob_image_center = np.array(blob_image_center)
-
-    # us = blob_image_center[:, 0].astype(int)
-    # vs = blob_image_center[:, 1].astype(int)
-
-    # for i in range (len(blob_image_center)):
-    #     # draw circle
-    #     uv = (us[i], vs[i])
-    #     cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
-
-        # # draw line
-        # if i != len(blob_image_center)-1:
-        #     cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 150, 0), 2)
-
-    # add color
-    nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
-    nodes_rgba_arr = np.full((len(nodes), 1), nodes_rgba)
-    nodes_colored = np.hstack((nodes, nodes_rgba_arr)).astype('O')
-    nodes_colored[:, 3] = nodes_colored[:, 3].astype(int)
-    header.stamp = rospy.Time.now()
-    converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
-    nodes_pub.publish(converted_nodes)
+    # # add color
+    # nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
+    # nodes_rgba_arr = np.full((len(nodes), 1), nodes_rgba)
+    # nodes_colored = np.hstack((nodes, nodes_rgba_arr)).astype('O')
+    # nodes_colored[:, 3] = nodes_colored[:, 3].astype(int)
+    # header.stamp = rospy.Time.now()
+    # converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
+    # nodes_pub.publish(converted_nodes)
     
     tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
     tracking_img_pub.publish(tracking_img_msg)
