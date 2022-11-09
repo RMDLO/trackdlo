@@ -177,7 +177,7 @@ def indices_array(n):
     out[:,:,1] = r
     return out
 
-def ecpd_lle (X,                           # input point cloud
+def ecpd_lle (X_orig,                      # input point cloud
               Y_0,                         # input nodes
               beta,                        # MCT kernel strength
               alpha,                       # MCT overall strength
@@ -195,6 +195,7 @@ def ecpd_lle (X,                           # input point cloud
               kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
               occluded_nodes = None):       # nodes that are not in this array are either head nodes or tail nodes
 
+    X = X_orig.copy()
     if correspondence_priors is not None and len(correspondence_priors) != 0:
         additional_pc = correspondence_priors[:, 1:4]
         X = np.vstack((additional_pc, X))
@@ -331,6 +332,13 @@ def ecpd_lle (X,                           # input point cloud
                 # P_vis[:, (max_p_nodes >= 0)&(max_p_nodes <= M_head)] = P_vis_fill_head
                 # P_vis[:, (max_p_nodes >= M-M_tail-1)&(max_p_nodes < M)] = P_vis_fill_tail
                 # P_vis[:, (max_p_nodes > M_head)&(max_p_nodes < M-M_tail-1)] = P_vis_fill_floating
+
+                # critical nodes: M_head and M-M_tail-1
+                X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
+                P_vis = np.delete(P_vis, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+                P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+                print('deleted', N - len(X))
+                N = len(X)
 
                 # modify P
                 P = P_vis * P
@@ -679,7 +687,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0001, kernel='1st order', occluded_nodes=occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.01, kernel='1st order', occluded_nodes=occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
 
