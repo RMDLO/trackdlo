@@ -279,6 +279,29 @@ def ecpd_lle (X_orig,                      # input point cloud
         P = np.divide(P, den)
         max_p_nodes = np.argmax(P, axis=0)
 
+        # if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+        #     # determine the indices where head, tail, floating region starts/ends
+        #     M_head = occluded_nodes[0]
+        #     M_tail = M - 1 - occluded_nodes[-1]
+
+        #     # critical nodes: M_head and M-M_tail-1
+        #     X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
+        #     # P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+        #     print('deleted', N - len(X))
+        #     N = len(X)
+
+        # pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
+        # c = (2 * np.pi * sigma2) ** (D / 2)
+        # c = c * mu / (1 - mu)
+        # c = c * M / N
+        # P = np.exp(-pts_dis_sq / (2 * sigma2))
+        # den = np.sum(P, axis=0)
+        # den = np.tile(den, (M, 1))
+        # den[den == 0] = np.finfo(float).eps
+        # den += c
+        # P = np.divide(P, den)
+        # max_p_nodes = np.argmax(P, axis=0)
+
         if use_geodesic:
             potential_2nd_max_p_nodes_1 = max_p_nodes - 1
             potential_2nd_max_p_nodes_2 = max_p_nodes + 1
@@ -333,12 +356,12 @@ def ecpd_lle (X_orig,                      # input point cloud
                 # P_vis[:, (max_p_nodes >= M-M_tail-1)&(max_p_nodes < M)] = P_vis_fill_tail
                 # P_vis[:, (max_p_nodes > M_head)&(max_p_nodes < M-M_tail-1)] = P_vis_fill_floating
 
-                # critical nodes: M_head and M-M_tail-1
-                X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
-                P_vis = np.delete(P_vis, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
-                P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
-                print('deleted', N - len(X))
-                N = len(X)
+                # # critical nodes: M_head and M-M_tail-1
+                # X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
+                # P_vis = np.delete(P_vis, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+                # P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+                # print('deleted', N - len(X))
+                # N = len(X)
 
                 # modify P
                 P = P_vis * P
