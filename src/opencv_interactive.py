@@ -16,23 +16,27 @@ import math
 import time
 import pickle as pkl
 
-import message_filters
-from sklearn.neighbors import NearestNeighbors
-import open3d as o3d
-from scipy import ndimage
-import pyrealsense2 as rs
+# import message_filters
+# from sklearn.neighbors import NearestNeighbors
+# import open3d as o3d
+# from scipy import ndimage
+# import pyrealsense2 as rs
 
 
 rect = (0,0,0,0)
 startPoint = False
 endPoint = False
+start_moving = False
+rect_center = None
+offsets = None
+resting = False
 
 # this mask will get updated each iteration
 mouse_mask = None
 
 def on_mouse(event, x, y, flags, params):
 
-    global rect, startPoint, endPoint
+    global rect, startPoint, endPoint, start_moving, rect_center, offsets, resting
 
     # get mouse click
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -53,8 +57,29 @@ def on_mouse(event, x, y, flags, params):
     elif event == cv2.EVENT_MOUSEMOVE and startPoint == True and endPoint == False:
         rect = (rect[0], rect[1], x, y)
 
+    elif event == cv2.EVENT_MBUTTONDOWN and start_moving == False and np.sum(mouse_mask[y, x]) == 0:
+        start_moving = True
+        # record rect center
+        rect_center = (x, y)
+        # offsets: left, up, right, down
+        offsets = (rect[0]-rect_center[0], rect[1]-rect_center[1], rect[2]-rect_center[0], rect[3]-rect_center[1])
+    
+    elif event == cv2.EVENT_MOUSEMOVE and start_moving == True:
+        rect = (x+offsets[0], y+offsets[1], x+offsets[2], y+offsets[3])
+        resting = False
+
+    elif event == cv2.EVENT_MBUTTONDOWN and start_moving == True:
+        start_moving = False
+    
+    elif not event == cv2.EVENT_MOUSEMOVE and start_moving == True:
+        resting = True
+
 def callback (rgb):
-    global rect, startPoint, endPoint, mouse_mask
+    global rect, startPoint, endPoint, mouse_mask, start_moving, resting
+
+    # # debug
+    # print("start moving =", start_moving)
+    # print("resting =", resting)
 
     cur_image = ros_numpy.numpify(rgb)
 
@@ -87,6 +112,11 @@ def callback (rgb):
         endPoint = False
         mouse_mask = np.ones(frame.shape)
         cv2.imshow('frame',frame)
+    elif start_moving == True and resting == False:
+        # first reset
+        mouse_mask = np.ones(frame.shape)
+        mouse_mask[rect[1]:rect[3], rect[0]:rect[2], :] = 0
+        cv2.imshow('frame', frame)
     else:
         #drawing rectangle
         if startPoint == True and endPoint != True:
