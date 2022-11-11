@@ -506,8 +506,10 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
     mask_dis_threshold = 10
     num_fit_pts = 100
+    state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
     if abs(cur_total_len - total_len) < 0.01: # (head_visible and tail_visible) or 
+        state = 0
         print('head visible and tail visible or the same len')
         correspondence_priors = []
         correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
@@ -515,6 +517,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     
     # elif head_visible and tail_visible:
     elif head_visible and tail_visible: # but length condiiton not met - middle part is occluded
+
+        state = 2
         print('head and tail visible but total length changed')
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
@@ -644,6 +648,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
     elif head_visible and not tail_visible:
 
+        state = 1
+
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
         # projection
@@ -708,6 +714,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
 
     elif tail_visible and not head_visible:
+
+        state = 1
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
         # determined which nodes are occluded from mask information
@@ -781,12 +789,15 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     else:
         print('error!')
 
-    return guide_nodes, np.array(correspondence_priors), occluded_nodes
+    return guide_nodes, np.array(correspondence_priors), occluded_nodes, state
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
-    guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0000001, kernel='1st order', occluded_nodes=occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 0.7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, 'Gaussian', occluded_nodes)
+    guide_nodes, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
+
+    if state != 2:
+        Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0000001, kernel='1st order', occluded_nodes=occluded_nodes)
+    else:
+        Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000000001, '2nd order', occluded_nodes)
 
     rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
