@@ -196,9 +196,6 @@ def ecpd_lle (X_orig,                      # input point cloud
               occluded_nodes = None):       # nodes that are not in this array are either head nodes or tail nodes
 
     X = X_orig.copy()
-    if correspondence_priors is not None and len(correspondence_priors) != 0:
-        additional_pc = correspondence_priors[:, 1:4]
-        X = np.vstack((additional_pc, X))
 
     # define params
     M = len(Y_0)
@@ -262,6 +259,45 @@ def ecpd_lle (X_orig,                      # input point cloud
     cur_time = time.time()
     L = calc_LLE_weights(6, Y_0)
     H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
+
+    # TEMP TEST
+    if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+        pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
+        c = (2 * np.pi * sigma2) ** (D / 2)
+        c = c * mu / (1 - mu)
+        c = c * M / N
+        P = np.exp(-pts_dis_sq / (2 * sigma2))
+        den = np.sum(P, axis=0)
+        den = np.tile(den, (M, 1))
+        den[den == 0] = np.finfo(float).eps
+        den += c
+        P = np.divide(P, den)
+        max_p_nodes = np.argmax(P, axis=0)
+
+        # determine the indices where head, tail, floating region starts/ends
+        M_head = occluded_nodes[0]
+        M_tail = M - 1 - occluded_nodes[-1]
+
+        # critical nodes: M_head and M-M_tail-1
+        X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
+        print('deleted', N - len(X))
+
+    if correspondence_priors is not None and len(correspondence_priors) != 0:
+        additional_pc = correspondence_priors[:, 1:4]
+        X = np.vstack((additional_pc, X))
+
+    # add color
+    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    pc_rgba_arr = np.full((len(X), 1), pc_rgba)
+    filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
+    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+
+    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    header.stamp = rospy.Time.now()
+    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    pc_pub.publish(converted_points)
+
+    N = len(X)
     
     # loop until convergence or max_iter reached
     for it in range (0, max_iter):
@@ -279,28 +315,29 @@ def ecpd_lle (X_orig,                      # input point cloud
         P = np.divide(P, den)
         max_p_nodes = np.argmax(P, axis=0)
 
-        # if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
-        #     # determine the indices where head, tail, floating region starts/ends
-        #     M_head = occluded_nodes[0]
-        #     M_tail = M - 1 - occluded_nodes[-1]
+        # if it == 0:
+        #     if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+        #         # determine the indices where head, tail, floating region starts/ends
+        #         M_head = occluded_nodes[0]
+        #         M_tail = M - 1 - occluded_nodes[-1]
 
-        #     # critical nodes: M_head and M-M_tail-1
-        #     X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
-        #     # P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
-        #     print('deleted', N - len(X))
-        #     N = len(X)
+        #         # critical nodes: M_head and M-M_tail-1
+        #         X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
+        #         # P = np.delete(P, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 1)
+        #         print('deleted', N - len(X))
+        #         N = len(X)
 
-        # pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
-        # c = (2 * np.pi * sigma2) ** (D / 2)
-        # c = c * mu / (1 - mu)
-        # c = c * M / N
-        # P = np.exp(-pts_dis_sq / (2 * sigma2))
-        # den = np.sum(P, axis=0)
-        # den = np.tile(den, (M, 1))
-        # den[den == 0] = np.finfo(float).eps
-        # den += c
-        # P = np.divide(P, den)
-        # max_p_nodes = np.argmax(P, axis=0)
+        #     pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
+        #     c = (2 * np.pi * sigma2) ** (D / 2)
+        #     c = c * mu / (1 - mu)
+        #     c = c * M / N
+        #     P = np.exp(-pts_dis_sq / (2 * sigma2))
+        #     den = np.sum(P, axis=0)
+        #     den = np.tile(den, (M, 1))
+        #     den[den == 0] = np.finfo(float).eps
+        #     den += c
+        #     P = np.divide(P, den)
+        #     max_p_nodes = np.argmax(P, axis=0)
 
         if use_geodesic:
             potential_2nd_max_p_nodes_1 = max_p_nodes - 1
@@ -397,17 +434,6 @@ def ecpd_lle (X_orig,                      # input point cloud
         #     print(occluded_nodes)
         #     P[occluded_nodes] = 0
 
-        # add color
-        pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-        pc_rgba_arr = np.full((len(X), 1), pc_rgba)
-        filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
-        filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
-
-        # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-        header.stamp = rospy.Time.now()
-        converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-        pc_pub.publish(converted_points)
-
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
         Np = np.sum(P1)
@@ -477,7 +503,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                             [             0.0,              0.0,               1.0, 0.0]])
 
-    guide_nodes, _ = ecpd_lle(X, Y_0, 5, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
+    guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -508,7 +534,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     num_fit_pts = 100
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
-    if abs(cur_total_len - total_len) < 0.01: # (head_visible and tail_visible) or 
+    if abs(cur_total_len - total_len) < 0.015: # (head_visible and tail_visible) or 
         state = 0
         print('head visible and tail visible or the same len')
         correspondence_priors = []
@@ -591,7 +617,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
 
             # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
             u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
@@ -621,7 +647,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
 
             # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
             u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
@@ -698,7 +724,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
 
             # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
             u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
@@ -766,7 +792,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
 
             # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
             u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
@@ -793,11 +819,11 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-
+    # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     if state != 2:
-        Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0000001, kernel='1st order', occluded_nodes=occluded_nodes)
+        Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     else:
-        Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, 'Gaussian', occluded_nodes)
+        Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000001, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000000001, '2nd order', occluded_nodes)
 
     rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
