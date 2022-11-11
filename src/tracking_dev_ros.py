@@ -460,13 +460,14 @@ def ecpd_lle (X_orig,                      # input point cloud
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
             Y = Y_0 + np.matmul(G, W)
+            rospy.loginfo('Iteration until covnergence: ' + str(i) + '. Kernel used: ' + kernel)
             break
         else:
             Y = Y_0 + np.matmul(G, W)
 
         if i == max_iter - 1:
             # print error messages if optimization did not compile
-            rospy.logerr('Optimization did not converge!')
+            rospy.logerr('Optimization did not converge! ' + 'Kernel used: ' + kernel)
 
     return Y, sigma2
 
@@ -476,7 +477,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                             [             0.0,              0.0,               1.0, 0.0]])
 
-    guide_nodes, _ = ecpd_lle(X, Y_0, 10, 1, 1, 0.05, 30, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
+    guide_nodes, _ = ecpd_lle(X, Y_0, 10, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -573,7 +574,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         correspondence_priors_head = []
 
         # if only one head node is visible, should not fit spline
-        if len(valid_head_nodes) <= 2:
+        if len(valid_head_nodes) <= 3:
             correspondence_priors_head = np.hstack((valid_head_node_indices[0], valid_head_nodes[0]))
             last_visible_index_head = 0
 
@@ -595,7 +596,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         correspondence_priors_tail = []
 
         # if not enough tail node is visible, should not fit spline
-        if len(valid_tail_nodes) <= 2:
+        if len(valid_tail_nodes) <= 3:
             correspondence_priors_tail = np.hstack((valid_tail_node_indices[0], valid_tail_nodes[0]))
             last_visible_index_tail = len(Y_0) - 1
 
@@ -662,7 +663,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         correspondence_priors = []
 
         # if only one head node is visible, should not fit spline
-        if len(valid_head_nodes) == 1:
+        if len(valid_head_nodes) <= 3:
             correspondence_priors_head = np.hstack((valid_head_node_indices[0], valid_head_nodes[0]))
             last_visible_index_head = 0
 
@@ -720,7 +721,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         correspondence_priors = []
 
         # if only one tail node is visible, should not fit spline
-        if len(valid_tail_nodes) == 1:
+        if len(valid_tail_nodes) <= 3:
             correspondence_priors_tail = np.hstack((valid_tail_node_indices[0], valid_tail_nodes[0]))
             last_visible_index_tail = len(Y_0) - 1
 
@@ -751,9 +752,11 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
-    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
+    Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0000001, kernel='1st order', occluded_nodes=occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
+
+    rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
@@ -835,7 +838,7 @@ def callback (rgb, depth, pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 25, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
 
         # compute preset coord and total len. one time action
