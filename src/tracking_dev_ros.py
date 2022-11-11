@@ -477,7 +477,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                             [             0.0,              0.0,               1.0, 0.0]])
 
-    guide_nodes, _ = ecpd_lle(X, Y_0, 10, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
+    guide_nodes, _ = ecpd_lle(X, Y_0, 5, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -505,6 +505,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     occluded_nodes = None
 
     mask_dis_threshold = 10
+    num_fit_pts = 100
 
     if abs(cur_total_len - total_len) < 0.01: # (head_visible and tail_visible) or 
         print('head visible and tail visible or the same len')
@@ -579,14 +580,22 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             last_visible_index_head = 0
 
         else:
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_head_nodes, axis=0)), axis=1)))/0.001)
             tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
-            u_fine = np.linspace(0,1,num_true_pts)
+            # 1st fit, less points
+            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
+            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+
+            # 2nd fit, higher accuracy
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
             total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
 
             last_visible_index_head = len(geodesic_coord[geodesic_coord < total_spline_len]) - 1
+
+            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord = " + str(geodesic_coord[0:last_visible_index_head+1]))
 
             # geodesic coord is 1D
             correspondence_priors_head = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
@@ -601,9 +610,15 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             last_visible_index_tail = len(Y_0) - 1
 
         else:
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_tail_nodes, axis=0)), axis=1)))/0.001)
             tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
-            u_fine = np.linspace(0,1,num_true_pts)
+            # 1st fit, less points
+            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
+            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+
+            # 2nd fit, higher accuracy
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
             total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
@@ -613,6 +628,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
 
             last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])
+
+            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord_from_tail = " + str(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]))
 
             # geodesic coord is 1D
             correspondence_priors_tail = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]*1000).astype(int)].T)).T        
@@ -668,14 +685,22 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             last_visible_index_head = 0
 
         else:
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_head_nodes, axis=0)), axis=1)))/0.001)
             tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
-            u_fine = np.linspace(0,1,num_true_pts)
+            # 1st fit, less points
+            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
+            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+
+            # 2nd fit, higher accuracy
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
             total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
 
             last_visible_index_head = len(geodesic_coord[geodesic_coord < total_spline_len]) - 1
+
+            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord = " + str(geodesic_coord[0:last_visible_index_head+1]))
 
             # geodesic coord is 1D
             correspondence_priors = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
@@ -726,9 +751,15 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             last_visible_index_tail = len(Y_0) - 1
 
         else:
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(valid_tail_nodes, axis=0)), axis=1)))/0.001)
             tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
-            u_fine = np.linspace(0,1,num_true_pts)
+            # 1st fit, less points
+            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
+            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+
+            # 2nd fit, higher accuracy
+            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1005)
+            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
             x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
             spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
             total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
@@ -738,6 +769,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
             geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
 
             last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])
+
+            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord_from_tail = " + str(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]))
 
             # geodesic coord is 1D
             correspondence_priors = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]*1000).astype(int)].T)).T        
@@ -753,8 +786,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     guide_nodes, correspondence_priors, occluded_nodes = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
     Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.0000001, kernel='1st order', occluded_nodes=occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.01, 'Gaussian', occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 2, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.001, '2nd order', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 0.7, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.0000001, 'Gaussian', occluded_nodes)
+    # Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000000001, '2nd order', occluded_nodes)
 
     rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
 
