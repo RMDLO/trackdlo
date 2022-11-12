@@ -474,7 +474,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     cur_time = time.time()
     guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
     # guide_nodes, _ = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Gaussian')
-    rospy.logwarn('Pre-processing registration: ' + str(time.time() - cur_time) + ' ms')
+    rospy.logwarn('Pre-processing registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     # determine which head node is occluded, if any
     head_visible = False
@@ -786,7 +786,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     cur_time = time.time()
     guide_nodes, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
     # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
-    rospy.logwarn('Pre-processing total: ' + str(time.time() - cur_time) + ' ms')
+    rospy.logwarn('Pre-processing total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     # log time
     cur_time = time.time()
@@ -795,7 +795,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
     else:
         Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000001, 'Gaussian', occluded_nodes)
     # Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000000001, '2nd order', occluded_nodes)
-    rospy.logwarn('tracking_step registration: ' + str(time.time() - cur_time) + ' ms')
+    rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     # rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
 
@@ -808,7 +808,7 @@ nodes = []
 sigma2 = 0
 total_len = 0
 geodesic_coord = []
-def callback (rgb, depth, pc):
+def callback (rgb, pc):
     global saved
     global initialized
     global init_nodes
@@ -834,9 +834,6 @@ def callback (rgb, depth, pc):
     # cv2.imshow('img', cur_image)
     # cv2.waitKey(0) 
     # cv2.destroyAllWindows()
-
-    # process depth image
-    cur_depth = ros_numpy.numpify(depth)
 
     # process point cloud
     pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)
@@ -879,7 +876,7 @@ def callback (rgb, depth, pc):
     # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
     # pc_pub.publish(converted_points)
 
-    rospy.logwarn('callback before initialized: ' + str(time.time() - cur_time_cb) + ' ms')
+    rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
     # register nodes
     if not initialized:
@@ -929,7 +926,7 @@ def callback (rgb, depth, pc):
         # log time
         cur_time = time.time()
         guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask)
-        rospy.logwarn('tracking_step total: ' + str(time.time() - cur_time) + ' ms')
+        rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
 
@@ -979,13 +976,13 @@ def callback (rgb, depth, pc):
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
 
-        rospy.logwarn('callback total: ' + str(time.time() - cur_time_cb) + ' ms')
+        rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
 if __name__=='__main__':
-    rospy.init_node('test', anonymous=True)
+    rospy.init_node('track_dlo', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+    # depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
 
     # header
@@ -1003,7 +1000,7 @@ if __name__=='__main__':
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
-    ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
+    ts = message_filters.TimeSynchronizer([rgb_sub, pc_sub], 10)
     ts.registerCallback(callback)
 
     rospy.spin()
