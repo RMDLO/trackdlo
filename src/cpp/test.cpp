@@ -144,7 +144,8 @@ MatrixXd cpd (MatrixXd X_orig,
         }
     }
 
-    MatrixXd converted_node_dis = MatrixXd::Zero(1, M);
+    MatrixXd converted_node_dis = MatrixXd::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
+    MatrixXd converted_node_dis_sq = MatrixXd::Zero(M, M);
     MatrixXd G = MatrixXd::Zero(M, M);
     if (!use_geodesic) {
         if (kernel == "Gaussian") {
@@ -159,6 +160,40 @@ MatrixXd cpd (MatrixXd X_orig,
         else if (kernel == "2nd order") {
             G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*diff_sqrt/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*diff_sqrt.array() + sqrt(3)*diff.array());
         }
+        else { // default to gaussian
+            G = (-diff / (2 * beta * beta)).array().exp();
+        }
+    }
+    else {
+        std::vector<double> converted_node_coord = {0.0};
+        double cur_sum = 0;
+        for (int i = 0; i < M-1; i ++) {
+            cur_sum += (Y_0.row(i+1) - Y_0.row(i)).norm();
+            converted_node_coord.push_back(cur_sum);
+        }
+
+        for (int i = 0; i < converted_node_coord.size(); i ++) {
+            for (int j = 0; j < converted_node_coord.size(); j ++) {
+                converted_node_dis_sq(i, j) = pow(converted_node_coord[i] - converted_node_coord[j], 2);
+                converted_node_dis(i, j) = abs(converted_node_coord[i] - converted_node_coord[j]);
+            }
+        }
+
+        if (kernel == "Gaussian") {
+            G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
+        }
+        else if (kernel == "Laplacian") {
+            G = (-converted_node_dis / (2 * beta * beta)).array().exp();
+        }
+        else if (kernel == "1st order") {
+            G = 1/(2*beta * 2*beta) * (-sqrt(2)*converted_node_dis/beta).array().exp() * (sqrt(2)*converted_node_dis.array() + beta);
+        }
+        else if (kernel == "2nd order") {
+            G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*converted_node_dis/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*converted_node_dis.array() + sqrt(3)*diff.array());
+        }
+        else { // default to gaussian
+            G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
+        }
     }
     
     return G;
@@ -172,6 +207,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < m1.rows(); i ++) {
         for (int j = 0; j < m1.cols(); j ++) {
             m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
+            m1(i, j) *= m1(i, j);
         }
     }
 
@@ -183,5 +219,5 @@ int main(int argc, char **argv) {
     // // std::cout << out << std::endl;
 
     // ----- test ecpd -----
-    std::cout << cpd(MatrixXd::Zero(1, 3), m1, 0.3, 0, 0, 0, 30, 0.00001, false, false, 0, false, MatrixXd(0, 0), 0, "2nd order") << std::endl;
+    std::cout << cpd(MatrixXd::Zero(1, 3), m1, 0.3, 0, 0, 0, 30, 0.00001, false, false, 0, false, MatrixXd(0, 0), 0, "Gaussian") << std::endl;
 }

@@ -367,7 +367,7 @@ def ecpd_lle (X_orig,                      # input point cloud
 
 
 if __name__=='__main__':
-    m1 = np.arange(0, 5*3, 1).reshape((5, 3)) / 100
+    m1 = np.square(np.arange(0, 5*3, 1).reshape((5, 3))) / 10000
     # print(m1)
 
     # # ----- test LLE weights -----
@@ -377,4 +377,4 @@ if __name__=='__main__':
     # # print(out)
 
     # test ecpd
-    print(ecpd_lle(np.array([0, 0, 0]), m1, 0.3, None, None, None, kernel="2nd order"))
+    print(ecpd_lle(np.array([0, 0, 0]), m1, 0.3, None, None, None, use_geodesic=False, kernel="Gaussian"))
