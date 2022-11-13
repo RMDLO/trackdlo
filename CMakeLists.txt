@@ -8,6 +8,11 @@ project(TrackDLO)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  sensor_msgs
+  std_msgs
+  cv_bridge
+  image_transport
   # abb_egm_hardware_interface
   # abb_egm_state_controller
   # abb_rws_service_provider
@@ -16,6 +21,10 @@ find_package(catkin REQUIRED COMPONENTS
   # joint_state_controller
   # velocity_controllers
 )
+
+find_package(OpenCV 4 REQUIRED)
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+include_directories(${Eigen_INCLUDE_DIRS})
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -136,7 +145,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/tracking_ros_node.cpp)
+add_executable(cpp_test src/cpp/test.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -149,9 +158,10 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(cpp_test
+  ${catkin_LIBRARIES}
+  Eigen3::Eigen
+)
 
 #############
 ## Install ##
