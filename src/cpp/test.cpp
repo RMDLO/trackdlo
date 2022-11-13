@@ -6,6 +6,7 @@
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include<ctime>
 
 // typedef Eigen::Matrix<double, 1, Eigen::Dynamic> RowVector;
 // typedef Eigen::Matrix<double, Eigen::Dynamic, 1> ColumnVector;
@@ -115,8 +116,8 @@ MatrixXd cpd (MatrixXd X_orig,
               double alpha,
               double gamma,
               double mu,
-              int max_iter,
-              double tol,
+              int max_iter = 30,
+              double tol = 0.00001,
               bool use_geodesic = false,
               bool use_prev_sigma2 = false,
               double sigma2_0 = 0,
@@ -124,26 +125,63 @@ MatrixXd cpd (MatrixXd X_orig,
               MatrixXd correspondence_priors = MatrixXd::Zero(0, 0),
               double omega = 0,
               std::string kernel = "Gaussian",
-              RowVectorXi occluded_nodes = RowVectorXi::Zero(0)) {
+              std::vector<int> occluded_nodes = {}) {
+
+    MatrixXd X = X_orig.replicate(1, 1);
+
+    int M = Y_0.rows();
+    int N = X.rows();
+    int D = 3;
+
+    std::cout << "---" << std::endl;
+
+    MatrixXd diff = MatrixXd::Zero(M, M);
+    MatrixXd diff_sqrt = MatrixXd::Zero(M, M);
+    for (int i = 0; i < Y_0.rows(); i ++) {
+        for (int j = 0; j < Y_0.rows(); j ++) {
+            diff(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
+            diff_sqrt(i, j) = (Y_0.row(i) - Y_0.row(j)).norm();
+        }
+    }
+
+    MatrixXd converted_node_dis = MatrixXd::Zero(1, M);
+    MatrixXd G = MatrixXd::Zero(M, M);
+    if (!use_geodesic) {
+        if (kernel == "Gaussian") {
+            G = (-diff / (2 * beta * beta)).array().exp();
+        }
+        else if (kernel == "Laplacian") {
+            G = (-diff_sqrt / (2 * beta * beta)).array().exp();
+        }
+        else if (kernel == "1st order") {
+            G = 1/(2*beta * 2*beta) * (-sqrt(2)*diff_sqrt/beta).array().exp() * (sqrt(2)*diff_sqrt.array() + beta);
+        }
+        else if (kernel == "2nd order") {
+            G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*diff_sqrt/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*diff_sqrt.array() + sqrt(3)*diff.array());
+        }
+    }
     
-    return MatrixXd::Zero(0, 0);
+    return G;
 }
 
 int main(int argc, char **argv) {
     ros::init (argc, argv, "test");
     ros::NodeHandle nh;
 
-    // test eigen matrix slicing
-    MatrixXd m1 = MatrixXd::Zero(6, 3);
+    MatrixXd m1 = MatrixXd::Zero(5, 3);
     for (int i = 0; i < m1.rows(); i ++) {
         for (int j = 0; j < m1.cols(); j ++) {
             m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
         }
     }
 
-    std::cout << m1 << std::endl;
+    // // ----- test LLE weights -----
+    // std::cout << m1 << std::endl;
+    // clock_t cur_time = clock();
+    // MatrixXd out = calc_LLE_weights(2, m1);
+    // std::cout << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
+    // // std::cout << out << std::endl;
 
-    MatrixXd out = calc_LLE_weights(2, m1);
-    std::cout << "-----" << std::endl;
-    std::cout << out << std::endl;
+    // ----- test ecpd -----
+    std::cout << cpd(MatrixXd::Zero(1, 3), m1, 0.3, 0, 0, 0, 30, 0.00001, false, false, 0, false, MatrixXd(0, 0), 0, "2nd order") << std::endl;
 }

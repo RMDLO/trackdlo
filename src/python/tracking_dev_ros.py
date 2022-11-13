@@ -183,8 +183,8 @@ def ecpd_lle (X_orig,                      # input point cloud
               alpha,                       # MCT overall strength
               gamma,                       # LLE strength
               mu,                          # noise
-              max_iter,                    # how many iterations EM will run
-              tol,                         # when to terminate the optimization process
+              max_iter = 30,               # how many iterations EM will run
+              tol = 0.00001,               # when to terminate the optimization process
               include_lle = True, 
               use_geodesic = False, 
               use_prev_sigma2 = False, 
