@@ -1,10 +1,10 @@
-# TrackDLO Package
+# TrackDLO ROS Package
 
-***********
+This is the TrackDLO ROS package for tracking deformable linear objects under occlusion. The TrackDLO algorithm solves the problem of real-time state estimation of Deformable Linear Objects (DLOs), like wires and ropes, under occlusion. The goal of DLO state estimation under occlusion is to extract the structure of the DLO from a noisy or incomplete set of measurements. TrackDLO accounts for directional rigidity to infer the motion of the occluded part of the object from the motion of the visible part. TrackDLO also introduces the notion of a geodesic proximity metric for linking a set of nodes which represent the configuration of the DLO. This modified proximity metric not only improves tracking under occlusion, but also mitigates tracking entanglement for cases of self-occlusion. TrackDLO performs robust wire state estimation under known confounders like partial occlusion by other objects, tip occlusion, and self-occlusion.
 
-**Note: eval files are currently broken, please do not touch**
-
-***********
+<p align="center">
+  <img src="images/ours.png" width="500" title="hover text">
+</p>
 
 ### To test the most recent version of TrackDLO with RGB-D camera stream:
 
@@ -26,3 +26,9 @@
 ### To compare two methods side by side:
 
 1. Simply run ```roslaunch TrackDLO realsense_node_eval_all.launch```. This will start both ```eval_mct_predict.py``` and ```eval_cpd_lle.py```.
+
+***********
+
+**Note: eval files are currently broken, please do not touch**
+
+***********
