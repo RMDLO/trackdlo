@@ -290,11 +290,6 @@ def ecpd_lle (X_orig,                      # input point cloud
     filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
     filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
-
     N = len(X)
     
     # loop until convergence or max_iter reached
@@ -472,8 +467,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
 
     # log time
     cur_time = time.time()
-    guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
-    # guide_nodes, _ = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Gaussian')
+    # guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
+    guide_nodes, _ = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Gaussian')
     rospy.logwarn('Pre-processing registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     # determine which head node is occluded, if any
@@ -801,7 +796,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
 
     return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
-saved = False
+
 initialized = False
 init_nodes = []
 nodes = []
@@ -809,7 +804,6 @@ sigma2 = 0
 total_len = 0
 geodesic_coord = []
 def callback (rgb, pc):
-    global saved
     global initialized
     global init_nodes
     global nodes
