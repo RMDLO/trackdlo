@@ -185,7 +185,7 @@ if __name__=='__main__':
                 PointField('rgba', 12, PointField.UINT32, 1)]
     init_nodes_pub = rospy.Publisher ('/init_nodes', PointCloud2, queue_size=10)
     nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
-    tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
+    tracking_img_pub = rospy.Publisher ('/trackdlo/tracking_img', Image, queue_size=10)
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
 
     rospy.spin()
