@@ -501,6 +501,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
     if abs(cur_total_len - total_len) < 0.015: # (head_visible and tail_visible) or 
+
+        rospy.loginfo("Total length unchanged, state = 0")
+
         state = 0
         # print('head visible and tail visible or the same len')
         correspondence_priors = []
@@ -508,7 +511,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
     
     # elif head_visible and tail_visible:
-    elif head_visible and tail_visible: # but length condiiton not met - middle part is occluded
+    elif head_visible and tail_visible: # but length condition not met - middle part is occluded
+
+        rospy.loginfo("Both ends visible but total length changed, state = 2")
 
         state = 2
         # print('head and tail visible but total length changed')
@@ -531,6 +536,13 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
         vis = bmask_transformed[uvs_t]
         valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
+
+        # # special case: all nodes visible but length is slightly above the threshold
+        # if len(valid_guide_nodes_indices) == len(guide_nodes):
+        #     correspondence_priors = []
+        #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
+        #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
+        #     return guide_nodes, np.array(correspondence_priors), None, 0
 
         # determine a set of nodes for head and a set of nodes for tail
         valid_head_node_indices = []
@@ -632,7 +644,13 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         occluded_nodes = np.arange(last_visible_index_head+1, last_visible_index_tail, 1)
         correspondence_priors = np.vstack((correspondence_priors_head, correspondence_priors_tail))
 
+        # if len(valid_guide_nodes_indices) == len(guide_nodes):
+        #     occluded_nodes = None
+        #     correspondence_priors = correspondence_priors_head
+
     elif head_visible and not tail_visible:
+
+        rospy.loginfo("Head visible, state = 1")
 
         state = 1
 
@@ -699,6 +717,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
 
     elif tail_visible and not head_visible:
+
+        rospy.loginfo("Tail visible, state = 1")
 
         state = 1
 
@@ -785,6 +805,11 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
 
     # log time
     cur_time = time.time()
+
+    # state: 0 --> both tips visible and length unchanged; 1 --> one tip visible; 2 --> both tips visible but length changed
+    # if state == 0:
+    #     Y, sigma2 = ecpd_lle(X, Y_0, 3, 1, 1, 0.0, 30, 0.00001, True, True, False, None, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
+    # elif state == 1:
     if state != 2:
         Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     else:
