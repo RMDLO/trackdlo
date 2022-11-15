@@ -96,7 +96,7 @@ def callback (pc):
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
-        # temp
+        # limit the range of calculated image coordinates
         us = np.where(us >= 1280, 1279, us)
         vs = np.where(vs >= 720, 719, vs)
 
@@ -142,6 +142,10 @@ def callback (pc):
         image_coords = np.matmul(proj_matrix, nodes_h.T).T
         us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
         vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+
+        # limit the range of calculated image coordinates
+        us = np.where(us >= 1280, 1279, us)
+        vs = np.where(vs >= 720, 719, vs)
 
         tracking_img = cur_image.copy()
         for i in range (len(image_coords)):

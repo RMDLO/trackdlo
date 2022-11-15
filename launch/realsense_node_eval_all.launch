@@ -33,7 +33,7 @@
 
   <node name="realsense_tf" pkg="TrackDLO" type="pub_camera_tf.py"/>
   <node name="opencv_interaction" pkg="TrackDLO" type="opencv_interactive.py"/>
-  <node name="tracking_eval_method_1" pkg="TrackDLO" type="eval_mct_predict.py"/>
+  <node name="tracking_eval_method_1" pkg="TrackDLO" type="eval_trackdlo.py"/>
   <node name="tracking_eval_method_2" pkg="TrackDLO" type="eval_cpd_lle.py"/>
 
   <!-- tracking rviz file -->
