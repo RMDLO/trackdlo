@@ -14,6 +14,7 @@ import numpy as np
 import math
 
 import time
+import sys
 import pickle as pkl
 
 import message_filters
@@ -256,7 +257,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         sigma2 = sigma2_0
 
     # get the LLE matrix
-    L = calc_LLE_weights(6, Y_0)
+    L = calc_LLE_weights(2, Y_0)
     H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
 
     # TEMP TEST
@@ -301,6 +302,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         c = c * mu / (1 - mu)
         c = c * M / N
         P = np.exp(-pts_dis_sq / (2 * sigma2))
+        P_stored = P.copy()
         den = np.sum(P, axis=0)
         den = np.tile(den, (M, 1))
         den[den == 0] = np.finfo(float).eps
@@ -337,60 +339,63 @@ def ecpd_lle (X_orig,                      # input point cloud
 
             P = np.exp(-np.square(geodesic_dists) / (2 * sigma2))
 
-            if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+        else:
+            P = P_stored.copy()
 
-                # modified probability distribution
-                P_vis = np.zeros((M, N))
+        if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
 
-                # determine the indices where head, tail, floating region starts/ends
-                M_head = occluded_nodes[0]
-                M_tail = M - 1 - occluded_nodes[-1]
+            # modified probability distribution
+            P_vis = np.zeros((M, N))
 
-                P_vis_fill_head = np.zeros((M, 1))
-                P_vis_fill_tail = np.zeros((M, 1))
-                P_vis_fill_floating = np.zeros((M, 1))
+            # determine the indices where head, tail, floating region starts/ends
+            M_head = occluded_nodes[0]
+            M_tail = M - 1 - occluded_nodes[-1]
 
-                P_vis_fill_head[0 : M_head, 0] = 1 / M_head
-                P_vis_fill_tail[M-M_tail : M, 0] = 1 / M_tail
-                P_vis_fill_floating[M_head : M-M_tail, 0] = 1 / (M - M_head - M_tail)
+            P_vis_fill_head = np.zeros((M, 1))
+            P_vis_fill_tail = np.zeros((M, 1))
+            P_vis_fill_floating = np.zeros((M, 1))
 
-                # fill in P_vis
-                P_vis[:, (max_p_nodes >= 0)&(max_p_nodes < M_head)] = P_vis_fill_head
-                P_vis[:, (max_p_nodes >= M-M_tail)&(max_p_nodes < M)] = P_vis_fill_tail
-                P_vis[:, (max_p_nodes >= M_head)&(max_p_nodes < M-M_tail)] = P_vis_fill_floating
-                # P_vis[:, (max_p_nodes >= 0)&(max_p_nodes <= M_head)] = P_vis_fill_head
-                # P_vis[:, (max_p_nodes >= M-M_tail-1)&(max_p_nodes < M)] = P_vis_fill_tail
-                # P_vis[:, (max_p_nodes > M_head)&(max_p_nodes < M-M_tail-1)] = P_vis_fill_floating
+            P_vis_fill_head[0 : M_head, 0] = 1 / M_head
+            P_vis_fill_tail[M-M_tail : M, 0] = 1 / M_tail
+            P_vis_fill_floating[M_head : M-M_tail, 0] = 1 / (M - M_head - M_tail)
 
-                # modify P
-                P = P_vis * P
+            # fill in P_vis
+            P_vis[:, (max_p_nodes >= 0)&(max_p_nodes < M_head)] = P_vis_fill_head
+            P_vis[:, (max_p_nodes >= M-M_tail)&(max_p_nodes < M)] = P_vis_fill_tail
+            P_vis[:, (max_p_nodes >= M_head)&(max_p_nodes < M-M_tail)] = P_vis_fill_floating
+            # P_vis[:, (max_p_nodes >= 0)&(max_p_nodes <= M_head)] = P_vis_fill_head
+            # P_vis[:, (max_p_nodes >= M-M_tail-1)&(max_p_nodes < M)] = P_vis_fill_tail
+            # P_vis[:, (max_p_nodes > M_head)&(max_p_nodes < M-M_tail-1)] = P_vis_fill_floating
 
-                den = np.sum(P, axis=0)
-                den = np.tile(den, (M, 1))
-                den[den == 0] = np.finfo(float).eps
-                c = (2 * np.pi * sigma2) ** (D / 2) * mu / (1 - mu) / N
-                den += c
-                P = np.divide(P, den)
+            # modify P
+            P = P_vis * P
 
-            else:
-                den = np.sum(P, axis=0)
-                den = np.tile(den, (M, 1))
-                den[den == 0] = np.finfo(float).eps
-                c = (2 * np.pi * sigma2) ** (D / 2)
-                c = c * mu / (1 - mu)
-                c = c * M / N
-                den += c
-                P = np.divide(P, den)
+            den = np.sum(P, axis=0)
+            den = np.tile(den, (M, 1))
+            den[den == 0] = np.finfo(float).eps
+            c = (2 * np.pi * sigma2) ** (D / 2) * mu / (1 - mu) / N
+            den += c
+            P = np.divide(P, den)
 
-            # # original method
-            # den = np.sum(P, axis=0)
-            # den = np.tile(den, (M, 1))
-            # den[den == 0] = np.finfo(float).eps
-            # c = (2 * np.pi * sigma2) ** (D / 2)
-            # c = c * mu / (1 - mu)
-            # c = c * M / N
-            # den += c
-            # P = np.divide(P, den)
+        else:
+            den = np.sum(P, axis=0)
+            den = np.tile(den, (M, 1))
+            den[den == 0] = np.finfo(float).eps
+            c = (2 * np.pi * sigma2) ** (D / 2)
+            c = c * mu / (1 - mu)
+            c = c * M / N
+            den += c
+            P = np.divide(P, den)
+
+        # # original method
+        # den = np.sum(P, axis=0)
+        # den = np.tile(den, (M, 1))
+        # den[den == 0] = np.finfo(float).eps
+        # c = (2 * np.pi * sigma2) ** (D / 2)
+        # c = c * mu / (1 - mu)
+        # c = c * M / N
+        # den += c
+        # P = np.divide(P, den)
 
         # if occluded_nodes is not None:
         #     print(occluded_nodes)
@@ -459,7 +464,7 @@ def ecpd_lle (X_orig,                      # input point cloud
 
     return Y, sigma2
 
-def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
+def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -468,6 +473,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     # log time
     cur_time = time.time()
     # guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
+    # guide_nodes, guide_nodes_sigma2_0 = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=True, sigma2_0=sigma2_0*200, kernel = 'Gaussian')
     guide_nodes, _ = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Gaussian')
     rospy.logwarn('Pre-processing registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
@@ -481,6 +487,8 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
         tail_visible = True
 
     if not head_visible and not tail_visible:
+        rospy.logerr("Neither end visible!")
+        # sys.exit() # terminate program
         if pt2pt_dis(guide_nodes[0], Y_0[0]) < pt2pt_dis(guide_nodes[-1], Y_0[-1]):
             head_visible = True
         else:
@@ -500,7 +508,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     num_fit_pts = 100
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
-    if abs(cur_total_len - total_len) < 0.015: # (head_visible and tail_visible) or 
+    if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
 
         rospy.loginfo("Total length unchanged, state = 0")
 
@@ -793,13 +801,13 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0):
     else:
         print('error!')
 
-    return guide_nodes, np.array(correspondence_priors), occluded_nodes, state
+    return guide_nodes, guide_nodes_sigma2_0, np.array(correspondence_priors), occluded_nodes, state
 
-def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
+def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     # log time 
     cur_time = time.time()
-    guide_nodes, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0)
+    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
     # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     rospy.logwarn('Pre-processing total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
@@ -819,13 +827,15 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask):
 
     # rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
 
-    return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
+    return guide_nodes, Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
 
 
 initialized = False
 init_nodes = []
 nodes = []
+guide_nodes_Y_0 = []
 sigma2 = 0
+guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
 def callback (rgb, pc):
@@ -835,6 +845,8 @@ def callback (rgb, pc):
     global sigma2
     global total_len
     global geodesic_coord
+    global guide_nodes_Y_0
+    global guide_nodes_sigma2_0
 
     # log time
     cur_time_cb = time.time()
@@ -884,16 +896,16 @@ def callback (rgb, pc):
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
-    # # add color
-    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # add color
+    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    # header.stamp = rospy.Time.now()
-    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    # pc_pub.publish(converted_points)
+    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    header.stamp = rospy.Time.now()
+    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
@@ -901,6 +913,9 @@ def callback (rgb, pc):
     if not initialized:
         init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
+
+        guide_nodes_Y_0 = init_nodes.copy()
+        guide_nodes_sigma2_0 = sigma2
 
         # compute preset coord and total len. one time action
         seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
@@ -944,7 +959,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
