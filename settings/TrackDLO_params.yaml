@@ -1,0 +1,46 @@
+initialization_params:
+  num_of_nodes: 20
+  mu: 0.05
+  max_iter: 100
+  mask_dis_threshold: 10
+
+CPD_LLE_params:
+  beta: 0.2
+  alpha: 1
+  gamma: 1
+  mu: 0.05
+  max_iter: 50
+  tolerance: 0.00001
+  include_lle: true
+  use_geodesic: true
+  use_prev_sigma2: true
+  sigma2_0_scale: 200
+  kernel: "Gaussian"
+
+# params_1 will be used for bounded situation
+ECPD_params_1:
+  beta: 1
+  alpha: 1
+  gamma: 1
+  mu: 0
+  max_iter: 30
+  tolerance: 0.00001
+  include_lle: true
+  use_geodesic: true
+  use_prev_sigma2: true
+  omega: 0.000001
+  kernel: "Gaussian"
+
+# params_2 will be used for unbounded situation
+ECPD_params_2:
+  beta: 7
+  alpha: 1
+  gamma: 1
+  mu: 0
+  max_iter: 30
+  tolerance: 0.00001
+  include_lle: true
+  use_geodesic: true
+  use_prev_sigma2: true
+  omega: 0.000001
+  kernel: "1st order"

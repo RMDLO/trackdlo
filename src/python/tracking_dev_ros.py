@@ -16,6 +16,8 @@ import math
 import time
 import sys
 import pickle as pkl
+import yaml
+from os.path import dirname, abspath, join
 
 import message_filters
 from sklearn.neighbors import NearestNeighbors
@@ -472,9 +474,20 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
 
     # log time
     cur_time = time.time()
-    # guide_nodes, _ = ecpd_lle(X, Y_0, 3, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Laplacian')
-    # guide_nodes, guide_nodes_sigma2_0 = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=True, sigma2_0=sigma2_0*200, kernel = 'Gaussian')
-    guide_nodes, _ = ecpd_lle(X, Y_0, 0.2, 1, 1, 0.05, 50, 0.00001, True, True, use_prev_sigma2=False, sigma2_0=None, kernel = 'Gaussian')
+    guide_nodes, guide_nodes_sigma2_0 = ecpd_lle(X_orig = X, 
+                                                 Y_0 = Y_0, 
+                                                 beta = params["CPD_LLE_params"]["beta"], 
+                                                 alpha = params["CPD_LLE_params"]["alpha"],
+                                                 gamma = params["CPD_LLE_params"]["gamma"], 
+                                                 mu = params["CPD_LLE_params"]["mu"], 
+                                                 max_iter = params["CPD_LLE_params"]["max_iter"],
+                                                 tol = params["CPD_LLE_params"]["tolerance"], 
+                                                 include_lle = params["CPD_LLE_params"]["include_lle"], 
+                                                 use_geodesic = params["CPD_LLE_params"]["use_geodesic"], 
+                                                 use_prev_sigma2 = params["CPD_LLE_params"]["use_prev_sigma2"], 
+                                                 sigma2_0 = sigma2_0*params["CPD_LLE_params"]["sigma2_0_scale"], 
+                                                 kernel = params["CPD_LLE_params"]["kernel"])
+
     rospy.logwarn('Pre-processing registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     # determine which head node is occluded, if any
@@ -504,7 +517,7 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
     correspondence_priors = None
     occluded_nodes = None
 
-    mask_dis_threshold = 10
+    mask_dis_threshold = params["initialization_params"]["mask_dis_threshold"]
     num_fit_pts = 100
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
@@ -819,13 +832,45 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nod
     #     Y, sigma2 = ecpd_lle(X, Y_0, 3, 1, 1, 0.0, 30, 0.00001, True, True, False, None, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     # elif state == 1:
     if state != 2:
-        Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
+        # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
+        Y, sigma2 = ecpd_lle(X_orig = X, 
+                             Y_0 = Y_0, 
+                             beta = params["ECPD_params_2"]["beta"], 
+                             alpha = params["ECPD_params_2"]["alpha"],
+                             gamma = params["ECPD_params_2"]["gamma"], 
+                             mu = params["ECPD_params_2"]["mu"], 
+                             max_iter = params["ECPD_params_2"]["max_iter"],
+                             tol = params["ECPD_params_2"]["tolerance"], 
+                             include_lle = params["ECPD_params_2"]["include_lle"], 
+                             use_geodesic = params["ECPD_params_2"]["use_geodesic"], 
+                             use_prev_sigma2 = params["ECPD_params_2"]["use_prev_sigma2"], 
+                             sigma2_0 = sigma2_0, 
+                             use_ecpd = True,
+                             correspondence_priors = correspondence_priors,
+                             omega = params["ECPD_params_2"]["omega"],
+                             kernel = params["ECPD_params_2"]["kernel"],
+                             occluded_nodes = occluded_nodes)
     else:
-        Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000001, 'Gaussian', occluded_nodes)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 4, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000000001, '2nd order', occluded_nodes)
-    rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
+        # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000001, 'Gaussian', occluded_nodes)
+        Y, sigma2 = ecpd_lle(X_orig = X, 
+                             Y_0 = Y_0, 
+                             beta = params["ECPD_params_1"]["beta"], 
+                             alpha = params["ECPD_params_1"]["alpha"],
+                             gamma = params["ECPD_params_1"]["gamma"], 
+                             mu = params["ECPD_params_1"]["mu"], 
+                             max_iter = params["ECPD_params_1"]["max_iter"],
+                             tol = params["ECPD_params_1"]["tolerance"], 
+                             include_lle = params["ECPD_params_1"]["include_lle"], 
+                             use_geodesic = params["ECPD_params_1"]["use_geodesic"], 
+                             use_prev_sigma2 = params["ECPD_params_1"]["use_prev_sigma2"], 
+                             sigma2_0 = sigma2_0, 
+                             use_ecpd = True,
+                             correspondence_priors = correspondence_priors,
+                             omega = params["ECPD_params_1"]["omega"],
+                             kernel = params["ECPD_params_1"]["kernel"],
+                             occluded_nodes = occluded_nodes)
 
-    # rospy.loginfo("Number of guide nodes: " + str(len(correspondence_priors[:, 1:4])))
+    rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     return guide_nodes, Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
 
@@ -838,6 +883,7 @@ sigma2 = 0
 guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
+params = None
 def callback (rgb, pc):
     global initialized
     global init_nodes
@@ -847,6 +893,7 @@ def callback (rgb, pc):
     global geodesic_coord
     global guide_nodes_Y_0
     global guide_nodes_sigma2_0
+    global params
 
     # log time
     cur_time_cb = time.time()
@@ -911,6 +958,12 @@ def callback (rgb, pc):
 
     # register nodes
     if not initialized:
+        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
+        with open(setting_path, 'r') as file:
+            params = yaml.safe_load(file)
+
+        print(params)
+
         init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
 
@@ -936,7 +989,7 @@ def callback (rgb, pc):
     # cpd
     if initialized:
         # determined which nodes are occluded from mask information
-        mask_dis_threshold = 10
+        mask_dis_threshold = params["initialization_params"]["mask_dis_threshold"]
         # projection
         init_nodes_h = np.hstack((init_nodes, np.ones((len(init_nodes), 1))))
         # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
@@ -1013,6 +1066,7 @@ def callback (rgb, pc):
         rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
 if __name__=='__main__':
+
     rospy.init_node('track_dlo', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
