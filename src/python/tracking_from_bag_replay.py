@@ -40,21 +40,20 @@ def update_mask (data):
 initialized = False
 init_nodes = []
 nodes = []
+guide_nodes_Y_0 = []
 sigma2 = 0
+guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
 def callback (pc):
-    global cur_image
-    global bmask
-    global mask
-
     global initialized
     global init_nodes
     global nodes
     global sigma2
     global total_len
     global geodesic_coord
-
+    global guide_nodes_Y_0
+    global guide_nodes_sigma2_0
     # log time
     cur_time_cb = time.time()
     print('----------')
@@ -69,8 +68,11 @@ def callback (pc):
 
     # register nodes
     if not initialized:
-        init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
+
+        guide_nodes_Y_0 = init_nodes.copy()
+        guide_nodes_sigma2_0 = sigma2
 
         # compute preset coord and total len. one time action
         seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
@@ -111,7 +113,7 @@ def callback (pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()

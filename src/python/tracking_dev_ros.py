@@ -896,16 +896,16 @@ def callback (rgb, pc):
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
-    # # add color
-    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # add color
+    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    # header.stamp = rospy.Time.now()
-    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    # pc_pub.publish(converted_points)
+    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    header.stamp = rospy.Time.now()
+    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
