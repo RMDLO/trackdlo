@@ -220,7 +220,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         elif kernel == '1st order':
             G = 1/(2*beta)**2 * np.exp(-np.sqrt(2)*np.sqrt(diff)/beta) * (np.sqrt(2)*np.sqrt(diff) + beta)
         elif kernel == '2nd order':
-            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*np.sqrt(diff)/beta) * (np.sqrt(3)*beta**2 + 3*beta*np.sqrt(diff) + np.sqrt(3)*diff)
+            G = 1/(beta**3)*np.sqrt(np.pi) * np.exp(-2*np.sqrt(2)*converted_node_dis/beta) * (2*converted_node_dis_sq + 3*beta/2*np.sqrt(2)*converted_node_dis + 3*beta**2/4) 
         else: # default gaussian
             G = np.exp(-diff / (2 * beta**2))
     else:
@@ -242,7 +242,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         elif kernel == '1st order':
             G = 1/(4*beta**2) * np.exp(-np.sqrt(2)*converted_node_dis/beta) * (np.sqrt(2)*converted_node_dis + beta)
         elif kernel == '2nd order':
-            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*converted_node_dis/beta) * (np.sqrt(3)*beta**2 + 3*beta*converted_node_dis + np.sqrt(3)*converted_node_dis_sq)
+            G = 1/(beta**3)*np.sqrt(np.pi) * np.exp(-2*np.sqrt(2)*converted_node_dis/beta) * (2*converted_node_dis_sq + 3*beta/2*np.sqrt(2)*converted_node_dis + 3*beta**2/4) 
         else:
             G = np.exp(-converted_node_dis_sq / (2 * beta**2))
     
