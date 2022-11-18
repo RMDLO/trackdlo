@@ -466,7 +466,7 @@ def ecpd_lle (X_orig,                      # input point cloud
 
     return Y, sigma2
 
-def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
+def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -816,11 +816,11 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
 
     return guide_nodes, guide_nodes_sigma2_0, np.array(correspondence_priors), occluded_nodes, state
 
-def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
+def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     # log time 
     cur_time = time.time()
-    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
+    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
     # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     rospy.logwarn('Pre-processing total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
@@ -962,8 +962,6 @@ def callback (rgb, pc):
         with open(setting_path, 'r') as file:
             params = yaml.safe_load(file)
 
-        print(params)
-
         init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
 
@@ -1012,7 +1010,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
