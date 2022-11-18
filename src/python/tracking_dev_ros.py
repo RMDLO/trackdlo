@@ -494,9 +494,9 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     head_visible = False
     tail_visible = False
 
-    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.01:
+    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.02:
         head_visible = True
-    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.01:
+    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.02:
         tail_visible = True
 
     if not head_visible and not tail_visible:
@@ -521,18 +521,18 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     num_fit_pts = 100
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
-    if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
+    # if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
 
-        rospy.loginfo("Total length unchanged, state = 0")
+    #     rospy.loginfo("Total length unchanged, state = 0")
 
-        state = 0
-        # print('head visible and tail visible or the same len')
-        correspondence_priors = []
-        correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
-        correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
+    #     state = 0
+    #     # print('head visible and tail visible or the same len')
+    #     correspondence_priors = []
+    #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
+    #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
     
     # elif head_visible and tail_visible:
-    elif head_visible and tail_visible: # but length condition not met - middle part is occluded
+    if head_visible and tail_visible: # but length condition not met - middle part is occluded
 
         rospy.loginfo("Both ends visible but total length changed, state = 2")
 
@@ -872,7 +872,7 @@ def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, g
 
     rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
-    return guide_nodes, Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
+    return correspondence_priors[:, 1:4], Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
 
 
 initialized = False
@@ -962,7 +962,7 @@ def callback (rgb, pc):
         with open(setting_path, 'r') as file:
             params = yaml.safe_load(file)
 
-        init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
         init_nodes = sort_pts_mst(init_nodes)
 
         guide_nodes_Y_0 = init_nodes.copy()
