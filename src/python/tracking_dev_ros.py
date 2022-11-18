@@ -220,7 +220,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         elif kernel == '1st order':
             G = 1/(2*beta)**2 * np.exp(-np.sqrt(2)*np.sqrt(diff)/beta) * (np.sqrt(2)*np.sqrt(diff) + beta)
         elif kernel == '2nd order':
-            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*np.sqrt(diff)/beta) * (np.sqrt(3)*beta**2 + 3*beta*np.sqrt(diff) + np.sqrt(3)*diff)
+            G = 1/(beta**3)*np.sqrt(np.pi) * np.exp(-2*np.sqrt(2)*converted_node_dis/beta) * (2*converted_node_dis_sq + 3*beta/2*np.sqrt(2)*converted_node_dis + 3*beta**2/4) 
         else: # default gaussian
             G = np.exp(-diff / (2 * beta**2))
     else:
@@ -242,7 +242,7 @@ def ecpd_lle (X_orig,                      # input point cloud
         elif kernel == '1st order':
             G = 1/(4*beta**2) * np.exp(-np.sqrt(2)*converted_node_dis/beta) * (np.sqrt(2)*converted_node_dis + beta)
         elif kernel == '2nd order':
-            G = 27 * 1/(72*beta**3) * np.exp(-math.sqrt(3)*converted_node_dis/beta) * (np.sqrt(3)*beta**2 + 3*beta*converted_node_dis + np.sqrt(3)*converted_node_dis_sq)
+            G = 1/(beta**3)*np.sqrt(np.pi) * np.exp(-2*np.sqrt(2)*converted_node_dis/beta) * (2*converted_node_dis_sq + 3*beta/2*np.sqrt(2)*converted_node_dis + 3*beta**2/4) 
         else:
             G = np.exp(-converted_node_dis_sq / (2 * beta**2))
     
@@ -466,7 +466,7 @@ def ecpd_lle (X_orig,                      # input point cloud
 
     return Y, sigma2
 
-def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
+def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -494,9 +494,9 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
     head_visible = False
     tail_visible = False
 
-    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.01:
+    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.02:
         head_visible = True
-    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.01:
+    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.02:
         tail_visible = True
 
     if not head_visible and not tail_visible:
@@ -521,18 +521,18 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
     num_fit_pts = 100
     state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
 
-    if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
+    # if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
 
-        rospy.loginfo("Total length unchanged, state = 0")
+    #     rospy.loginfo("Total length unchanged, state = 0")
 
-        state = 0
-        # print('head visible and tail visible or the same len')
-        correspondence_priors = []
-        correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
-        correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
+    #     state = 0
+    #     # print('head visible and tail visible or the same len')
+    #     correspondence_priors = []
+    #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
+    #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
     
     # elif head_visible and tail_visible:
-    elif head_visible and tail_visible: # but length condition not met - middle part is occluded
+    if head_visible and tail_visible: # but length condition not met - middle part is occluded
 
         rospy.loginfo("Both ends visible but total length changed, state = 2")
 
@@ -816,11 +816,11 @@ def pre_process (X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes
 
     return guide_nodes, guide_nodes_sigma2_0, np.array(correspondence_priors), occluded_nodes, state
 
-def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
+def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
 
     # log time 
     cur_time = time.time()
-    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
+    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
     # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
     rospy.logwarn('Pre-processing total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
@@ -872,7 +872,7 @@ def tracking_step (X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nod
 
     rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
-    return guide_nodes, Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
+    return correspondence_priors[:, 1:4], Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
 
 
 initialized = False
@@ -962,9 +962,7 @@ def callback (rgb, pc):
         with open(setting_path, 'r') as file:
             params = yaml.safe_load(file)
 
-        print(params)
-
-        init_nodes, sigma2 = register(filtered_pc, 20, mu=0.05, max_iter=100)
+        init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
         init_nodes = sort_pts_mst(init_nodes)
 
         guide_nodes_Y_0 = init_nodes.copy()
@@ -1012,7 +1010,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()

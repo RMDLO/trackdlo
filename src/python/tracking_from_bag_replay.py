@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 import math
 from scipy import ndimage
+import yaml
+from os.path import dirname, abspath, join
 
 cur_image = []
 cur_image_arr = []
@@ -45,6 +47,7 @@ sigma2 = 0
 guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
+params = None
 def callback (pc):
     global initialized
     global init_nodes
@@ -54,6 +57,8 @@ def callback (pc):
     global geodesic_coord
     global guide_nodes_Y_0
     global guide_nodes_sigma2_0
+    global params
+
     # log time
     cur_time_cb = time.time()
     print('----------')
@@ -66,8 +71,14 @@ def callback (pc):
     pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)
     filtered_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
 
+    print(params)
+
     # register nodes
     if not initialized:
+        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
+        with open(setting_path, 'r') as file:
+            params = yaml.safe_load(file)
+
         init_nodes, sigma2 = register(filtered_pc, 30, mu=0.05, max_iter=100)
         init_nodes = sort_pts_mst(init_nodes)
 
@@ -113,7 +124,7 @@ def callback (pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()

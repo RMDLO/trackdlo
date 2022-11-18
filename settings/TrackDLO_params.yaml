@@ -1,5 +1,5 @@
 initialization_params:
-  num_of_nodes: 20
+  num_of_nodes: 30
   mu: 0.05
   max_iter: 100
   mask_dis_threshold: 10
@@ -13,7 +13,7 @@ CPD_LLE_params:
   tolerance: 0.00001
   include_lle: true
   use_geodesic: true
-  use_prev_sigma2: true
+  use_prev_sigma2: false
   sigma2_0_scale: 200
   kernel: "Gaussian"
 
