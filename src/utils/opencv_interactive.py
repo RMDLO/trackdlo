@@ -142,8 +142,6 @@ if __name__=='__main__':
     rospy.init_node('test', anonymous=True)
 
     rgb_sub = rospy.Subscriber('/camera/color/image_raw', Image, callback)
-
-    tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     occlusion_mask_img_pub = rospy.Publisher('/mask_with_occlusion', Image, queue_size=10)
 
     rospy.spin()

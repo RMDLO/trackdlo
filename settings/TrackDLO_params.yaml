@@ -1,8 +1,10 @@
 initialization_params:
-  num_of_nodes: 30
+  num_of_nodes: 18
   mu: 0.05
   max_iter: 100
   mask_dis_threshold: 10
+  pub_tracking_image: true
+  using_rope_with_markers: true
 
 CPD_LLE_params:
   beta: 0.2

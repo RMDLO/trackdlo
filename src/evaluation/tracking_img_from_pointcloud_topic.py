@@ -76,9 +76,7 @@ def callback (pc):
 
     # invert bmask for distance transform
     bmask_transformed = ndimage.distance_transform_edt(255 - bmask)
-    # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
     vis = bmask_transformed[uvs_t]
-    # occluded_nodes = np.where(vis > mask_dis_threshold)[0]
 
     tracking_img = cur_image.copy()
     for i in range (len(image_coords)):

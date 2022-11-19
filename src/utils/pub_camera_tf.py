@@ -26,9 +26,9 @@ if __name__=='__main__':
     static_transformStamped_5.header.frame_id = "base_link"
     static_transformStamped_5.child_frame_id = "camera_color_optical_frame"
 
-    # this is at the height that works for cdcpd
-    trans_5 = [0.39566792755998736, 0.029390668708380384, 0.7452285330685948]
-    quat_5 = [-0.7066158758441431, 0.7075285859748912, -0.00939425351633863, 0.0030086598771756397]
+    # current camera pos
+    trans_5 = [0.39571294977748606, 0.029380709444140524, 0.6267427288143163]
+    quat_5 = [-0.7065995183555387, 0.7075479083521102, -0.009247187369593136, 0.0027509220319289975]
 
     static_transformStamped_5.transform.translation.x = trans_5[0]
     static_transformStamped_5.transform.translation.y = trans_5[1]

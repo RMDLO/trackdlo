@@ -876,6 +876,7 @@ def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, g
 
 
 initialized = False
+read_params = False
 init_nodes = []
 nodes = []
 guide_nodes_Y_0 = []
@@ -883,17 +884,18 @@ sigma2 = 0
 guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
-params = None
 def callback (rgb, pc):
     global initialized
-    global init_nodes
-    global nodes
-    global sigma2
-    global total_len
-    global geodesic_coord
-    global guide_nodes_Y_0
-    global guide_nodes_sigma2_0
-    global params
+    global init_nodes, nodes, sigma2
+    global total_len, geodesic_coord
+    global guide_nodes_Y_0, guide_nodes_sigma2_0
+    global params, read_params
+
+    if not read_params:
+        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
+        with open(setting_path, 'r') as file:
+            params = yaml.safe_load(file)
+        read_params = True
 
     # log time
     cur_time_cb = time.time()
@@ -918,12 +920,29 @@ def callback (rgb, pc):
     cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
-    # color thresholding
-    lower = (90, 90, 90)
-    upper = (120, 255, 255)
-    mask = cv2.inRange(hsv_image, lower, upper)
+    if not params["initialization_params"]["using_rope_with_markers"]:
+        # color thresholding
+        lower = (90, 90, 90)
+        upper = (120, 255, 255)
+        mask = cv2.inRange(hsv_image, lower, upper)
+    else:
+        # --- rope blue ---
+        lower = (90, 60, 40)
+        upper = (130, 255, 255)
+        mask = cv2.inRange(hsv_image, lower, upper)
+
+        # --- tape red ---
+        lower = (130, 60, 40)
+        upper = (255, 255, 255)
+        mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        lower = (0, 60, 40)
+        upper = (30, 255, 255)
+        mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())
+
+        mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
+
     bmask = mask.copy() # for checking visibility, max = 255
-    
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # publish mask
@@ -943,24 +962,21 @@ def callback (rgb, pc):
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # # add color
+    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
+    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    # header.stamp = rospy.Time.now()
+    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    # pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
     # register nodes
     if not initialized:
-        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
-        with open(setting_path, 'r') as file:
-            params = yaml.safe_load(file)
 
         init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
         init_nodes = sort_pts_mst(init_nodes)
@@ -1033,33 +1049,34 @@ def callback (rgb, pc):
         converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
         guide_nodes_pub.publish(converted_guide_nodes)
 
-        # project and pub image
-        nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
-        # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
+        if params["initialization_params"]["pub_tracking_image"]:
+            # project and pub tracking image
+            nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
+            # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
 
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+            # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
+            image_coords = np.matmul(proj_matrix, nodes_h.T).T
+            us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+            vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
-        tracking_img = cur_image.copy()
-        for i in range (len(image_coords)):
-            # draw circle
-            uv = (us[i], vs[i])
-            if vis[i] < mask_dis_threshold:
-                cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
-            else:
-                cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
-
-            # draw line
-            if i != len(image_coords)-1:
+            tracking_img = cur_image.copy()
+            for i in range (len(image_coords)):
+                # draw circle
+                uv = (us[i], vs[i])
                 if vis[i] < mask_dis_threshold:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
                 else:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
-        
-        tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
-        tracking_img_pub.publish(tracking_img_msg)
+                    cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
+
+                # draw line
+                if i != len(image_coords)-1:
+                    if vis[i] < mask_dis_threshold:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    else:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
+            
+            tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
+            tracking_img_pub.publish(tracking_img_msg)
 
         rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
