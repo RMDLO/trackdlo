@@ -42,7 +42,7 @@ def callback (rgb, depth, pc):
     # lower = (98, 100, 100)
     # upper = (130, 255, 255)
     # --- rope blue ---
-    lower = (90, 100, 100)
+    lower = (90, 90, 90)
     upper = (120, 255, 255)
     # --- background green ---
     # lower = (0, 0, 0)
@@ -56,9 +56,13 @@ def callback (rgb, depth, pc):
     # lower = (40, 110, 60)
     # upper = (85, 255, 255)
     # --- tape red ---
-    lower = (110, 50, 50)
+    lower = (130, 40, 40)
     upper = (255, 255, 255)
-    mask_red = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    lower = (0, 40, 40)
+    upper = (40, 255, 255)
+    mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())
 
     # bmask = mask.copy() # for checking visibility, max = 255
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
