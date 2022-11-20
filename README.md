@@ -19,16 +19,10 @@ This is the TrackDLO ROS package for tracking deformable linear objects under oc
 3. Open a new terminal and run ```rosrun TrackDLO track_from_bag_replay.py```. This will start the tracking algorithm and the results will be published after the bag file starts running. Note: this script calls functions from ```tracking_ros_dev.py```.
 4. Open a new terminal and run ```rosbag play <name_of_the_bag_file>.bag```. This will replay the bag file.
 
-### To evaluate a certain method:
+### To evaluate the performance of TrackDLO:
 
-1. Run ```roslaunch TrackDLO realsense_node_eval.launch```. Use arg ```method:=``` to specify the method to evaluate. Current available options are ```mct_predict``` (ours) and ```cpd_lle```.
-
-### To compare two methods side by side:
-
-1. Simply run ```roslaunch TrackDLO realsense_node_eval_all.launch```. This will start both ```eval_mct_predict.py``` and ```eval_cpd_lle.py```.
-
-***********
-
-**Note: eval files are currently broken, please do not touch**
-
-***********
+1. Run ```roslaunch TrackDLO realsense_node_eval_trackdlo.launch```, this will bring up the rviz window and an interactive opencv frame that can be used to create occlusion blocks.
+2. Run ```rosrun TrackDLO eval_trackdlo.py```. This will start the tracking algorithm and publish all results.
+3. To create an occlusion block in the opencv frame, left click once and move the mouse. Left click again to finish drawing the occlusion block. 
+4. To move the created occlusion block, middle click once and move the mouse. Middle click again to release the occlusion block.
+5. To delete all occlusion blocks and restore the original image, press R once.
