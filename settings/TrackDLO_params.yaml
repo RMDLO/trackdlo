@@ -1,8 +1,12 @@
 initialization_params:
-  num_of_nodes: 30
+  num_of_nodes: 18
   mu: 0.05
   max_iter: 100
   mask_dis_threshold: 10
+  pub_tracking_image: true
+  using_rope_with_markers: true
+  max_end_displacement: 0.01
+  max_total_len_change: 0.015
 
 CPD_LLE_params:
   beta: 0.2
@@ -24,7 +28,7 @@ ECPD_params_1:
   gamma: 1
   mu: 0
   max_iter: 30
-  tolerance: 0.00001
+  tolerance: 0.001
   include_lle: true
   use_geodesic: true
   use_prev_sigma2: true
@@ -38,7 +42,7 @@ ECPD_params_2:
   gamma: 1
   mu: 0
   max_iter: 30
-  tolerance: 0.00001
+  tolerance: 0.0001
   include_lle: true
   use_geodesic: true
   use_prev_sigma2: true

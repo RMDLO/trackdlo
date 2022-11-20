@@ -98,7 +98,7 @@ def callback (rgb):
         mouse_mask = np.ones(frame.shape)
 
     # filter with mask
-    frame = (frame * mouse_mask).astype('uint8')
+    frame = (frame * np.clip(mouse_mask, 0.5, 1)).astype('uint8')
 
     cv2.namedWindow('frame')
     cv2.setMouseCallback('frame', on_mouse)    
@@ -110,6 +110,7 @@ def callback (rgb):
         frame = cv2.resize(cur_image, (new_w, new_h))
         startPoint = False
         endPoint = False
+        start_moving = False
         mouse_mask = np.ones(frame.shape)
         cv2.imshow('frame',frame)
     elif start_moving == True and resting == False:
@@ -142,8 +143,6 @@ if __name__=='__main__':
     rospy.init_node('test', anonymous=True)
 
     rgb_sub = rospy.Subscriber('/camera/color/image_raw', Image, callback)
-
-    tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     occlusion_mask_img_pub = rospy.Publisher('/mask_with_occlusion', Image, queue_size=10)
 
     rospy.spin()

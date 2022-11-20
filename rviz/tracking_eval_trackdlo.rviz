@@ -36,9 +36,13 @@ Panels:
     export_directory: ""
     legend_enable: true
     refresh_freq: 40
+    topic_0_color: 0
+    topic_0_name: /trackdlo/error
+    topic_0_thickness: 1
+    topic_0_type: std_msgs/Float32
     w_time: 1
     window_time_enable: false
-    y_max: 0.05
+    y_max: 0.05000000074505806
     y_min: 0
     yaxis_rescale_auto: false
 Preferences:
@@ -89,7 +93,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.003000000026077032
       Style: Spheres
-      Topic: /pts
+      Topic: /camera/depth/color/points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -117,14 +121,14 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Spheres
-      Topic: /nodes
+      Topic: /trackdlo/nodes
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /tracking_img
+      Image Topic: /trackdlo/tracking_img
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -169,7 +173,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Boxes
-      Topic: /guide_nodes
+      Topic: /trackdlo/guide_nodes
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -202,7 +206,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.46514829993247986
+      Distance: 0.4916003942489624
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -210,17 +214,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.3741912543773651
-        Y: -0.035901736468076706
-        Z: -0.008932007476687431
+        X: 0.37601804733276367
+        Y: -0.04590880125761032
+        Z: -0.012212728150188923
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7497973442077637
+      Pitch: 0.7397975921630859
       Target Frame: <Fixed Frame>
-      Yaw: 3.627192735671997
+      Yaw: 3.0721850395202637
     Saved: ~
 Window Geometry:
   Displays:

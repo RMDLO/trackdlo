@@ -89,6 +89,104 @@ def register(pts, M, mu=0, max_iter=50):
 
     return new_Y, new_s
 
+def find_closest (pt, arr):
+    closest = arr[0].copy()
+    min_dis = np.sqrt((pt[0] - closest[0])**2 + (pt[1] - closest[1])**2 + (pt[2] - closest[2])**2)
+    idx = 0
+
+    for i in range (0, len(arr)):
+        cur_pt = arr[i].copy()
+        cur_dis = np.sqrt((pt[0] - cur_pt[0])**2 + (pt[1] - cur_pt[1])**2 + (pt[2] - cur_pt[2])**2)
+        if cur_dis < min_dis:
+            min_dis = cur_dis
+            closest = arr[i].copy()
+            idx = i
+    
+    return closest, idx
+
+def find_opposite_closest (pt, arr, direction_pt):
+    arr_copy = arr.copy()
+    opposite_closest_found = False
+    opposite_closest = pt.copy()  # will get overwritten
+
+    while (not opposite_closest_found) and (len(arr_copy) != 0):
+        cur_closest, cur_index = find_closest (pt, arr_copy)
+        arr_copy.pop (cur_index)
+
+        vec1 = np.array(cur_closest) - np.array(pt)
+        vec2 = np.array(direction_pt) - np.array(pt)
+
+        # threshold: 0.04m
+        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
+            opposite_closest_found = True
+            opposite_closest = cur_closest.copy()
+            break
+    
+    return opposite_closest, opposite_closest_found
+
+def sort_pts (pts_orig):
+
+    start_idx = 0
+
+    pts = pts_orig.copy()
+    starting_pt = pts[start_idx].copy()
+    pts.pop(start_idx)
+    # starting point will be the current first point in the new list
+    sorted_pts = []
+    sorted_pts.append(starting_pt)
+
+    # get the first closest point
+    closest_1, min_idx = find_closest (starting_pt, pts)
+    sorted_pts.append(closest_1)
+    pts.pop(min_idx)
+
+    # get the second closest point
+    closest_2, found = find_opposite_closest(starting_pt, pts, closest_1)
+    true_start = False
+    if not found:
+        # closest 1 is true start
+        true_start = True
+    # closest_2 is not popped from pts
+
+    # move through the rest of pts to build the sorted pt list
+    # if true_start:
+    #   can proceed until pts is empty
+    # if !true_start:
+    #   start in the direction of closest_1, the list would build until one end is reached. 
+    #   in that case the next closest point would be closest_2. starting that point, all 
+    #   newly added points to sorted_pts should be inserted at the front
+    while len(pts) != 0:
+        cur_target = sorted_pts[-1]
+        cur_direction = sorted_pts[-2]
+        cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
+
+        if not found:
+            print ("not found!")
+            break
+
+        sorted_pts.append(cur_closest)
+        pts.remove (cur_closest)
+
+    # begin the second loop that inserts new points at front
+    if not true_start:
+        # first insert closest_2 at front and pop it from pts
+        sorted_pts.insert(0, closest_2)
+        pts.remove(closest_2)
+
+        while len(pts) != 0:
+            cur_target = sorted_pts[0]
+            cur_direction = sorted_pts[1]
+            cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
+
+            if not found:
+                print ("not found!")
+                break
+
+            sorted_pts.insert(0, cur_closest)
+            pts.remove(cur_closest)
+
+    return sorted_pts
+
 def sort_pts_mst (pts_orig):
 
     INF = 999999
@@ -494,9 +592,9 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     head_visible = False
     tail_visible = False
 
-    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.02:
+    if pt2pt_dis(guide_nodes[0], Y_0[0]) < params["initialization_params"]["max_end_displacement"]:
         head_visible = True
-    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.02:
+    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < params["initialization_params"]["max_end_displacement"]:
         tail_visible = True
 
     if not head_visible and not tail_visible:
@@ -876,6 +974,7 @@ def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, g
 
 
 initialized = False
+read_params = False
 init_nodes = []
 nodes = []
 guide_nodes_Y_0 = []
@@ -883,17 +982,18 @@ sigma2 = 0
 guide_nodes_sigma2_0 = 0
 total_len = 0
 geodesic_coord = []
-params = None
 def callback (rgb, pc):
     global initialized
-    global init_nodes
-    global nodes
-    global sigma2
-    global total_len
-    global geodesic_coord
-    global guide_nodes_Y_0
-    global guide_nodes_sigma2_0
-    global params
+    global init_nodes, nodes, sigma2
+    global total_len, geodesic_coord
+    global guide_nodes_Y_0, guide_nodes_sigma2_0
+    global params, read_params
+
+    if not read_params:
+        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
+        with open(setting_path, 'r') as file:
+            params = yaml.safe_load(file)
+        read_params = True
 
     # log time
     cur_time_cb = time.time()
@@ -908,22 +1008,34 @@ def callback (rgb, pc):
     # cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
 
-    # # test
-    # cv2.imshow('img', cur_image)
-    # cv2.waitKey(0) 
-    # cv2.destroyAllWindows()
-
     # process point cloud
     pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)
     cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
-    # color thresholding
-    lower = (90, 90, 90)
-    upper = (120, 255, 255)
-    mask = cv2.inRange(hsv_image, lower, upper)
+    if not params["initialization_params"]["using_rope_with_markers"]:
+        # color thresholding
+        lower = (90, 90, 90)
+        upper = (120, 255, 255)
+        mask = cv2.inRange(hsv_image, lower, upper)
+    else:
+        # --- rope blue ---
+        lower = (90, 60, 40)
+        upper = (130, 255, 255)
+        mask = cv2.inRange(hsv_image, lower, upper)
+
+        # --- tape red ---
+        lower = (130, 60, 40)
+        upper = (255, 255, 255)
+        mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        lower = (0, 60, 40)
+        upper = (30, 255, 255)
+        mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())
+
+        mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
+
     bmask = mask.copy() # for checking visibility, max = 255
-    
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # publish mask
@@ -943,24 +1055,21 @@ def callback (rgb, pc):
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
 
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # # add color
+    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
+    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    # header.stamp = rospy.Time.now()
+    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    # pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
     # register nodes
     if not initialized:
-        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
-        with open(setting_path, 'r') as file:
-            params = yaml.safe_load(file)
 
         init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
         init_nodes = sort_pts_mst(init_nodes)
@@ -1033,33 +1142,34 @@ def callback (rgb, pc):
         converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
         guide_nodes_pub.publish(converted_guide_nodes)
 
-        # project and pub image
-        nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
-        # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
+        if params["initialization_params"]["pub_tracking_image"]:
+            # project and pub tracking image
+            nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
+            # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
 
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+            # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
+            image_coords = np.matmul(proj_matrix, nodes_h.T).T
+            us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+            vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
-        tracking_img = cur_image.copy()
-        for i in range (len(image_coords)):
-            # draw circle
-            uv = (us[i], vs[i])
-            if vis[i] < mask_dis_threshold:
-                cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
-            else:
-                cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
-
-            # draw line
-            if i != len(image_coords)-1:
+            tracking_img = cur_image.copy()
+            for i in range (len(image_coords)):
+                # draw circle
+                uv = (us[i], vs[i])
                 if vis[i] < mask_dis_threshold:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
                 else:
-                    cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
-        
-        tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
-        tracking_img_pub.publish(tracking_img_msg)
+                    cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
+
+                # draw line
+                if i != len(image_coords)-1:
+                    if vis[i] < mask_dis_threshold:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (0, 255, 0), 2)
+                    else:
+                        cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
+            
+            tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
+            tracking_img_pub.publish(tracking_img_msg)
 
         rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
