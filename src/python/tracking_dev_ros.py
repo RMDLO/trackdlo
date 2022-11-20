@@ -89,6 +89,104 @@ def register(pts, M, mu=0, max_iter=50):
 
     return new_Y, new_s
 
+def find_closest (pt, arr):
+    closest = arr[0].copy()
+    min_dis = np.sqrt((pt[0] - closest[0])**2 + (pt[1] - closest[1])**2 + (pt[2] - closest[2])**2)
+    idx = 0
+
+    for i in range (0, len(arr)):
+        cur_pt = arr[i].copy()
+        cur_dis = np.sqrt((pt[0] - cur_pt[0])**2 + (pt[1] - cur_pt[1])**2 + (pt[2] - cur_pt[2])**2)
+        if cur_dis < min_dis:
+            min_dis = cur_dis
+            closest = arr[i].copy()
+            idx = i
+    
+    return closest, idx
+
+def find_opposite_closest (pt, arr, direction_pt):
+    arr_copy = arr.copy()
+    opposite_closest_found = False
+    opposite_closest = pt.copy()  # will get overwritten
+
+    while (not opposite_closest_found) and (len(arr_copy) != 0):
+        cur_closest, cur_index = find_closest (pt, arr_copy)
+        arr_copy.pop (cur_index)
+
+        vec1 = np.array(cur_closest) - np.array(pt)
+        vec2 = np.array(direction_pt) - np.array(pt)
+
+        # threshold: 0.04m
+        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
+            opposite_closest_found = True
+            opposite_closest = cur_closest.copy()
+            break
+    
+    return opposite_closest, opposite_closest_found
+
+def sort_pts (pts_orig):
+
+    start_idx = 0
+
+    pts = pts_orig.copy()
+    starting_pt = pts[start_idx].copy()
+    pts.pop(start_idx)
+    # starting point will be the current first point in the new list
+    sorted_pts = []
+    sorted_pts.append(starting_pt)
+
+    # get the first closest point
+    closest_1, min_idx = find_closest (starting_pt, pts)
+    sorted_pts.append(closest_1)
+    pts.pop(min_idx)
+
+    # get the second closest point
+    closest_2, found = find_opposite_closest(starting_pt, pts, closest_1)
+    true_start = False
+    if not found:
+        # closest 1 is true start
+        true_start = True
+    # closest_2 is not popped from pts
+
+    # move through the rest of pts to build the sorted pt list
+    # if true_start:
+    #   can proceed until pts is empty
+    # if !true_start:
+    #   start in the direction of closest_1, the list would build until one end is reached. 
+    #   in that case the next closest point would be closest_2. starting that point, all 
+    #   newly added points to sorted_pts should be inserted at the front
+    while len(pts) != 0:
+        cur_target = sorted_pts[-1]
+        cur_direction = sorted_pts[-2]
+        cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
+
+        if not found:
+            print ("not found!")
+            break
+
+        sorted_pts.append(cur_closest)
+        pts.remove (cur_closest)
+
+    # begin the second loop that inserts new points at front
+    if not true_start:
+        # first insert closest_2 at front and pop it from pts
+        sorted_pts.insert(0, closest_2)
+        pts.remove(closest_2)
+
+        while len(pts) != 0:
+            cur_target = sorted_pts[0]
+            cur_direction = sorted_pts[1]
+            cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
+
+            if not found:
+                print ("not found!")
+                break
+
+            sorted_pts.insert(0, cur_closest)
+            pts.remove(cur_closest)
+
+    return sorted_pts
+
 def sort_pts_mst (pts_orig):
 
     INF = 999999
@@ -494,9 +592,9 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     head_visible = False
     tail_visible = False
 
-    if pt2pt_dis(guide_nodes[0], Y_0[0]) < 0.02:
+    if pt2pt_dis(guide_nodes[0], Y_0[0]) < params["initialization_params"]["max_end_displacement"]:
         head_visible = True
-    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < 0.02:
+    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < params["initialization_params"]["max_end_displacement"]:
         tail_visible = True
 
     if not head_visible and not tail_visible:
@@ -909,11 +1007,6 @@ def callback (rgb, pc):
     cur_image = ros_numpy.numpify(rgb)
     # cur_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_BGR2RGB)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
-
-    # # test
-    # cv2.imshow('img', cur_image)
-    # cv2.waitKey(0) 
-    # cv2.destroyAllWindows()
 
     # process point cloud
     pc_data = ros_numpy.point_cloud2.pointcloud2_to_array(pc)

@@ -5,6 +5,8 @@ initialization_params:
   mask_dis_threshold: 10
   pub_tracking_image: true
   using_rope_with_markers: true
+  max_end_displacement: 0.01
+  max_total_len_change: 0.015
 
 CPD_LLE_params:
   beta: 0.2

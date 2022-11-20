@@ -110,6 +110,7 @@ def callback (rgb):
         frame = cv2.resize(cur_image, (new_w, new_h))
         startPoint = False
         endPoint = False
+        start_moving = False
         mouse_mask = np.ones(frame.shape)
         cv2.imshow('frame',frame)
     elif start_moving == True and resting == False:
