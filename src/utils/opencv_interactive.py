@@ -98,7 +98,7 @@ def callback (rgb):
         mouse_mask = np.ones(frame.shape)
 
     # filter with mask
-    frame = (frame * mouse_mask).astype('uint8')
+    frame = (frame * np.clip(mouse_mask, 0.5, 1)).astype('uint8')
 
     cv2.namedWindow('frame')
     cv2.setMouseCallback('frame', on_mouse)    

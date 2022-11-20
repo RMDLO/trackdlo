@@ -129,6 +129,9 @@ def callback (rgb, pc):
             guide_nodes = np.array(guide_nodes)
             last_guide_node_head = guide_nodes[0]
 
+    # remap name because guide_nodes will be re-assigned to something else later
+    blob_nodes = guide_nodes.copy()
+
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
     mask_img_pub.publish(mask_img_msg)
@@ -262,7 +265,7 @@ def callback (rgb, pc):
 
         tracking_img = cur_image.copy()
         # visualize manual occlusion as black block
-        tracking_img = (tracking_img*np.clip((occlusion_mask_rgb/255), 0.3, 1).astype('uint8')).astype('uint8')
+        tracking_img = ((tracking_img*np.clip(occlusion_mask_rgb/255, 0.5, 1)).astype('uint8')).astype('uint8')
 
         for i in range (len(image_coords)):
             # draw circle
@@ -286,8 +289,8 @@ def callback (rgb, pc):
         tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
         tracking_img_pub.publish(tracking_img_msg)
 
-        # error = np.sum(np.sqrt(np.sum(np.square(guide_nodes - nodes), axis=1))) / params["initialization_params"]["num_of_nodes"]
-        # error_pub.publish(error)
+        error = np.sum(np.sqrt(np.sum(np.square(blob_nodes - nodes), axis=1))) / params["initialization_params"]["num_of_nodes"]
+        error_pub.publish(error)
 
         rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
@@ -310,12 +313,12 @@ if __name__=='__main__':
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-    init_nodes_pub = rospy.Publisher ('/mct_predict/init_nodes', PointCloud2, queue_size=10)
-    nodes_pub = rospy.Publisher ('/mct_predict/nodes', PointCloud2, queue_size=10)
-    guide_nodes_pub = rospy.Publisher ('/mct_predict/guide_nodes', PointCloud2, queue_size=10)
-    tracking_img_pub = rospy.Publisher ('/mct_predict/tracking_img', Image, queue_size=10)
-    mask_img_pub = rospy.Publisher('/mct_predict/mask', Image, queue_size=10)
-    error_pub = rospy.Publisher('/mct_predict/error', std_msgs.msg.Float32, queue_size=10)
+    init_nodes_pub = rospy.Publisher ('/trackdlo/init_nodes', PointCloud2, queue_size=10)
+    nodes_pub = rospy.Publisher ('/trackdlo/nodes', PointCloud2, queue_size=10)
+    guide_nodes_pub = rospy.Publisher ('/trackdlo/guide_nodes', PointCloud2, queue_size=10)
+    tracking_img_pub = rospy.Publisher ('/trackdlo/tracking_img', Image, queue_size=10)
+    mask_img_pub = rospy.Publisher('/trackdlo/mask', Image, queue_size=10)
+    error_pub = rospy.Publisher('/trackdlo/error', std_msgs.msg.Float32, queue_size=10)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, pc_sub], 10)
     ts.registerCallback(callback)
