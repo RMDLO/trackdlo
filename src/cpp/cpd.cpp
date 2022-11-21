@@ -18,9 +18,9 @@
 // typedef Eigen::Matrix<double, 1, Eigen::Dynamic> RowVector;
 // typedef Eigen::Matrix<double, Eigen::Dynamic, 1> ColumnVector;
 
-// using Eigen::MatrixXd;
 using Eigen::MatrixXd;
-using Eigen::RowVectorXi;
+using Eigen::MatrixXf;
+using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
 template <typename T>
@@ -31,16 +31,16 @@ void print_1d_vector (std::vector<T> vec) {
     std::cout << std::endl;
 }
 
-double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2) {
+double pt2pt_dis_sq (MatrixXf pt1, MatrixXf pt2) {
     return (pt1 - pt2).rowwise().squaredNorm().sum();
 }
 
-double pt2pt_dis (MatrixXd pt1, MatrixXd pt2) {
+double pt2pt_dis (MatrixXf pt1, MatrixXf pt2) {
     return (pt1 - pt2).rowwise().norm().sum();
 }
 
 // link to original code: https://stackoverflow.com/a/46303314
-void removeRow(MatrixXd& matrix, unsigned int rowToRemove) {
+void removeRow(MatrixXf& matrix, unsigned int rowToRemove) {
     unsigned int numRows = matrix.rows()-1;
     unsigned int numCols = matrix.cols();
 
@@ -50,7 +50,7 @@ void removeRow(MatrixXd& matrix, unsigned int rowToRemove) {
     matrix.conservativeResize(numRows,numCols);
 }
 
-void find_closest (MatrixXd pt, MatrixXd arr, MatrixXd& closest, int& idx) {
+void find_closest (MatrixXf pt, MatrixXf arr, MatrixXf& closest, int& idx) {
     closest = arr.row(0).replicate(1, 1);
     double min_dis = pt2pt_dis(pt, closest);
     idx = 0;
@@ -65,19 +65,19 @@ void find_closest (MatrixXd pt, MatrixXd arr, MatrixXd& closest, int& idx) {
     }
 }
 
-void find_opposite_closest (MatrixXd pt, MatrixXd arr, MatrixXd direction_pt, MatrixXd& opposite_closest, bool& opposite_closest_found) {
-    MatrixXd arr_copy = arr.replicate(1, 1);
+void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, MatrixXf& opposite_closest, bool& opposite_closest_found) {
+    MatrixXf arr_copy = arr.replicate(1, 1);
     opposite_closest_found = false;
     opposite_closest = pt.replicate(1, 1);
 
     while (!opposite_closest_found && arr_copy.rows() != 0) {
-        MatrixXd cur_closest;
+        MatrixXf cur_closest;
         int cur_index;
         find_closest(pt, arr_copy, cur_closest, cur_index);
         removeRow(arr_copy, cur_index);
 
-        RowVectorXd vec1 = cur_closest - pt;
-        RowVectorXd vec2 = direction_pt - pt;
+        RowVectorXf vec1 = cur_closest - pt;
+        RowVectorXf vec2 = direction_pt - pt;
 
         if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.07) {
             opposite_closest_found = true;
@@ -87,28 +87,28 @@ void find_opposite_closest (MatrixXd pt, MatrixXd arr, MatrixXd direction_pt, Ma
     }
 }
 
-MatrixXd sort_pts (MatrixXd pts_orig) {
+MatrixXf sort_pts (MatrixXf pts_orig) {
 
     int start_idx = 0;
 
-    MatrixXd pts = pts_orig.replicate(1, 1);
-    MatrixXd starting_pt = pts.row(start_idx).replicate(1, 1);
+    MatrixXf pts = pts_orig.replicate(1, 1);
+    MatrixXf starting_pt = pts.row(start_idx).replicate(1, 1);
     removeRow(pts, start_idx);
 
     // starting point will be the current first point in the new list
-    MatrixXd sorted_pts = MatrixXd::Zero(pts_orig.rows(), pts_orig.cols());
-    std::vector<MatrixXd> sorted_pts_vec;
+    MatrixXf sorted_pts = MatrixXf::Zero(pts_orig.rows(), pts_orig.cols());
+    std::vector<MatrixXf> sorted_pts_vec;
     sorted_pts_vec.push_back(starting_pt);
 
     // get the first closest point
-    MatrixXd closest_1;
+    MatrixXf closest_1;
     int min_idx;
     find_closest(starting_pt, pts, closest_1, min_idx);
     sorted_pts_vec.push_back(closest_1);
     removeRow(pts, min_idx);
 
     // get the second closest point
-    MatrixXd closest_2;
+    MatrixXf closest_2;
     bool found;
     find_opposite_closest(starting_pt, pts, closest_1, closest_2, found);
     bool true_start = false;
@@ -117,9 +117,9 @@ MatrixXd sort_pts (MatrixXd pts_orig) {
     }
 
     while (pts.rows() != 0) {
-        MatrixXd cur_target = sorted_pts_vec[sorted_pts_vec.size() - 1];
-        MatrixXd cur_direction = sorted_pts_vec[sorted_pts_vec.size() - 2];
-        MatrixXd cur_closest;
+        MatrixXf cur_target = sorted_pts_vec[sorted_pts_vec.size() - 1];
+        MatrixXf cur_direction = sorted_pts_vec[sorted_pts_vec.size() - 2];
+        MatrixXf cur_closest;
         bool found;
         find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
 
@@ -153,9 +153,9 @@ MatrixXd sort_pts (MatrixXd pts_orig) {
         removeRow(pts, row_num);
 
         while (pts.rows() != 0) {
-            MatrixXd cur_target = sorted_pts_vec[0];
-            MatrixXd cur_direction = sorted_pts_vec[1];
-            MatrixXd cur_closest;
+            MatrixXf cur_target = sorted_pts_vec[0];
+            MatrixXf cur_direction = sorted_pts_vec[1];
+            MatrixXf cur_closest;
             bool found;
             find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
         
@@ -212,12 +212,12 @@ std::vector<int> get_nearest_indices (int k, int M, int idx) {
     return indices_arr;
 }
 
-MatrixXd calc_LLE_weights (int k, MatrixXd X) {
-    MatrixXd W = MatrixXd::Zero(X.rows(), X.rows());
+MatrixXf calc_LLE_weights (int k, MatrixXf X) {
+    MatrixXf W = MatrixXf::Zero(X.rows(), X.rows());
     for (int i = 0; i < X.rows(); i ++) {
         std::vector<int> indices = get_nearest_indices(static_cast<int>(k/2), X.rows(), i);
-        MatrixXd xi = X.row(i);
-        MatrixXd Xi = MatrixXd(indices.size(), X.cols());
+        MatrixXf xi = X.row(i);
+        MatrixXf Xi = MatrixXf(indices.size(), X.cols());
 
         // fill in Xi: Xi = X[indices, :]
         for (int r = 0; r < indices.size(); r ++) {
@@ -225,9 +225,9 @@ MatrixXd calc_LLE_weights (int k, MatrixXd X) {
         }
 
         // component = np.full((len(Xi), len(xi)), xi).T - Xi.T
-        MatrixXd component = xi.replicate(Xi.rows(), 1).transpose() - Xi.transpose();
-        MatrixXd Gi = component.transpose() * component;
-        MatrixXd Gi_inv;
+        MatrixXf component = xi.replicate(Xi.rows(), 1).transpose() - Xi.transpose();
+        MatrixXf Gi = component.transpose() * component;
+        MatrixXf Gi_inv;
 
         if (Gi.determinant() != 0) {
             Gi_inv = Gi.inverse();
@@ -240,11 +240,11 @@ MatrixXd calc_LLE_weights (int k, MatrixXd X) {
         }
 
         // wi = Gi_inv * 1 / (1^T * Gi_inv * 1)
-        MatrixXd ones_row_vec = MatrixXd::Constant(1, Xi.rows(), 1.0);
-        MatrixXd ones_col_vec = MatrixXd::Constant(Xi.rows(), 1, 1.0);
+        MatrixXf ones_row_vec = MatrixXf::Constant(1, Xi.rows(), 1.0);
+        MatrixXf ones_col_vec = MatrixXf::Constant(Xi.rows(), 1, 1.0);
 
-        MatrixXd wi = (Gi_inv * ones_col_vec) / (ones_row_vec * Gi_inv * ones_col_vec).value();
-        MatrixXd wi_T = wi.transpose();
+        MatrixXf wi = (Gi_inv * ones_col_vec) / (ones_row_vec * Gi_inv * ones_col_vec).value();
+        MatrixXf wi_T = wi.transpose();
 
         for (int c = 0; c < indices.size(); c ++) {
             W(i, indices[c]) = wi_T(c);
@@ -254,8 +254,8 @@ MatrixXd calc_LLE_weights (int k, MatrixXd X) {
     return W;
 }
 
-MatrixXd cpd (MatrixXd X_orig,
-              MatrixXd Y_0,
+MatrixXf cpd (MatrixXf X_orig,
+              MatrixXf Y_0,
               double beta,
               double alpha,
               double gamma,
@@ -267,7 +267,7 @@ MatrixXd cpd (MatrixXd X_orig,
               bool use_prev_sigma2 = false,
               double sigma2_0 = 0,
               bool use_ecpd = false,
-              MatrixXd correspondence_priors = MatrixXd::Zero(0, 0),
+              MatrixXf correspondence_priors = MatrixXf::Zero(0, 0),
               double omega = 0,
               std::string kernel = "Gaussian",
               std::vector<int> occluded_nodes = {}) {
@@ -275,7 +275,7 @@ MatrixXd cpd (MatrixXd X_orig,
     // log time            
     clock_t cur_time = clock();
 
-    MatrixXd X = X_orig.replicate(1, 1);
+    MatrixXf X = X_orig.replicate(1, 1);
 
     int M = Y_0.rows();
     int N = X.rows();
@@ -283,8 +283,8 @@ MatrixXd cpd (MatrixXd X_orig,
 
     std::cout << "---" << std::endl;
 
-    MatrixXd diff_yy = MatrixXd::Zero(M, M);
-    MatrixXd diff_yy_sqrt = MatrixXd::Zero(M, M);
+    MatrixXf diff_yy = MatrixXf::Zero(M, M);
+    MatrixXf diff_yy_sqrt = MatrixXf::Zero(M, M);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < M; j ++) {
             diff_yy(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
@@ -293,16 +293,16 @@ MatrixXd cpd (MatrixXd X_orig,
     }
 
     // diff_xy should be a (M * N) matrix
-    MatrixXd diff_xy = MatrixXd::Zero(M, N);
+    MatrixXf diff_xy = MatrixXf::Zero(M, N);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < N; j ++) {
             diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
         }
     }
 
-    MatrixXd converted_node_dis = MatrixXd::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
-    MatrixXd converted_node_dis_sq = MatrixXd::Zero(M, M);
-    MatrixXd G = MatrixXd::Zero(M, M);
+    MatrixXf converted_node_dis = MatrixXf::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
+    MatrixXf converted_node_dis_sq = MatrixXf::Zero(M, M);
+    MatrixXf G = MatrixXf::Zero(M, M);
     if (!use_geodesic) {
         if (kernel == "Gaussian") {
             G = (-diff_yy / (2 * beta * beta)).array().exp();
@@ -352,7 +352,7 @@ MatrixXd cpd (MatrixXd X_orig,
         }
     }
 
-    MatrixXd Y = Y_0.replicate(1, 1);
+    MatrixXf Y = Y_0.replicate(1, 1);
 
     // initialize sigma2
     double sigma2 = 0;
@@ -364,8 +364,8 @@ MatrixXd cpd (MatrixXd X_orig,
     }
 
     // get the LLE matrix
-    MatrixXd L = calc_LLE_weights(2, Y_0);
-    MatrixXd H = (MatrixXd::Identity(M, M) - L).transpose() * (MatrixXd::Identity(M, M) - L);
+    MatrixXf L = calc_LLE_weights(2, Y_0);
+    MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
     // TODO: implement node deletion from the original point cloud
 
@@ -378,7 +378,7 @@ MatrixXd cpd (MatrixXd X_orig,
             }
         }
 
-        MatrixXd P = (-0.5 * diff_xy / sigma2).array().exp();
+        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
         double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
         P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
@@ -410,26 +410,26 @@ MatrixXd cpd (MatrixXd X_orig,
         //     }
         // }
 
-        MatrixXd Pt1 = P.colwise().sum();
-        MatrixXd P1 = P.rowwise().sum();
+        MatrixXf Pt1 = P.colwise().sum();
+        MatrixXf P1 = P.rowwise().sum();
         double Np = P1.sum();
-        MatrixXd PX = P * X;
+        MatrixXf PX = P * X;
 
         // M step
-        MatrixXd A_matrix;
-        MatrixXd B_matrix;
+        MatrixXf A_matrix;
+        MatrixXf B_matrix;
         if (include_lle) {
-            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXd::Identity(M, M) + sigma2 * gamma * H * G;
+            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M) + sigma2 * gamma * H * G;
             B_matrix = PX - P1.asDiagonal() * Y_0 - sigma2 * gamma * H * Y_0;
         }
         else {
-            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXd::Identity(M, M);
+            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M);
             B_matrix = PX - P1.asDiagonal() * Y_0;
         }
 
-        MatrixXd W = (A_matrix).householderQr().solve(B_matrix);
+        MatrixXf W = (A_matrix).householderQr().solve(B_matrix);
 
-        MatrixXd T = Y_0 + G * W;
+        MatrixXf T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
         double trPXtT = (PX.transpose() * T).trace();
         double trTtdP1T = (T.transpose() * P1.asDiagonal() * T).trace();
@@ -459,7 +459,7 @@ int main(int argc, char **argv) {
     ros::init (argc, argv, "test");
     ros::NodeHandle nh;
 
-    MatrixXd m1 = MatrixXd::Zero(5, 3);
+    MatrixXf m1 = MatrixXf::Zero(5, 3);
     for (int i = 0; i < m1.rows(); i ++) {
         for (int j = 0; j < m1.cols(); j ++) {
             m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
@@ -467,7 +467,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    MatrixXd m2 = MatrixXd::Zero(10, 3);
+    MatrixXf m2 = MatrixXf::Zero(10, 3);
     for (int i = 0; i < m2.rows(); i ++) {
         for (int j = 0; j < m2.cols(); j ++) {
             m2(i, j) = (static_cast<float>(i)*m2.cols() + static_cast<float>(j))/200;
@@ -480,16 +480,16 @@ int main(int argc, char **argv) {
 
     // // ----- test LLE weights -----
     // clock_t cur_time = clock();
-    // MatrixXd out = calc_LLE_weights(2, m1);
+    // MatrixXf out = calc_LLE_weights(2, m1);
     // std::cout << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
     // // std::cout << out << std::endl;
 
     // // ----- test pt2pt_dis_sq -----
-    // MatrixXd m3 = m2.array() + 0.5;
+    // MatrixXf m3 = m2.array() + 0.5;
     // std::cout << m3 << std::endl;
     // std::cout << pt2pt_dis_sq(m2, m3) << std::endl;
 
     // ----- test ecpd -----
-    std::cout << cpd(m2, m1, 0.3, 1, 1, 0.1, 30, 0.00001, true, false, false, 0, false, MatrixXd(0, 0), 0, "Gaussian") << std::endl;
-    // print_1d_vector(cpd(m2, m1, 0.3, 1, 1, 0.05, 1, 0.00001, false, false, 0, false, MatrixXd(0, 0), 0, "Gaussian"));
+    std::cout << cpd(m2, m1, 0.3, 1, 1, 0.1, 30, 0.00001, true, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian") << std::endl;
+    // print_1d_vector(cpd(m2, m1, 0.3, 1, 1, 0.05, 1, 0.00001, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian"));
 }

@@ -8,10 +8,11 @@
 #define CPD_H
 
 using Eigen::MatrixXd;
+using Eigen::MatrixXf;
 
-MatrixXd cpd (MatrixXd, MatrixXd, double, double, double, double, int, double, bool, 
-              bool, bool, double, bool, MatrixXd, double, std::string, std::vector<int>);
+MatrixXf cpd (MatrixXf, MatrixXf, double, double, double, double, int, double, bool, 
+              bool, bool, double, bool, MatrixXf, double, std::string, std::vector<int>);
 
-MatrixXd sort_pts (MatrixXd pts_orig);
+MatrixXf sort_pts (MatrixXf pts_orig);
 
 #endif
