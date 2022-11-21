@@ -116,7 +116,7 @@ def find_opposite_closest (pt, arr, direction_pt):
         vec1 = np.array(cur_closest) - np.array(pt)
         vec2 = np.array(direction_pt) - np.array(pt)
 
-        # threshold: 0.04m
+        # threshold: 0.07m
         if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
             opposite_closest_found = True
             opposite_closest = cur_closest.copy()

@@ -16,9 +16,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
 
+#include "../../include/cpd.h"
+
 using cv::Mat;
 
-sensor_msgs::PointCloud2 imageCallback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
+sensor_msgs::PointCloud2 Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     std::vector<int> lower_blue = {90, 60, 40};
     std::vector<int> upper_blue = {130, 255, 255};
 
@@ -172,7 +174,7 @@ int main(int argc, char **argv) {
         {
             // sensor_msgs::ImagePtr test_image = imageCallback(msg, _);
             // mask_pub.publish(test_image);
-            sensor_msgs::PointCloud2 test_pc = imageCallback(img_msg, pc_msg);
+            sensor_msgs::PointCloud2 test_pc = Callback(img_msg, pc_msg);
             pc_pub.publish(test_pc);
         }
     );

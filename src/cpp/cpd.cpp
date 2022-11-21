@@ -21,6 +21,169 @@
 // using Eigen::MatrixXd;
 using Eigen::MatrixXd;
 using Eigen::RowVectorXi;
+using Eigen::RowVectorXd;
+
+template <typename T>
+void print_1d_vector (std::vector<T> vec) {
+    for (int i = 0; i < vec.size(); i ++) {
+        std::cout << vec[i] << " ";
+    }
+    std::cout << std::endl;
+}
+
+double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2) {
+    return (pt1 - pt2).rowwise().squaredNorm().sum();
+}
+
+double pt2pt_dis (MatrixXd pt1, MatrixXd pt2) {
+    return (pt1 - pt2).rowwise().norm().sum();
+}
+
+// link to original code: https://stackoverflow.com/a/46303314
+void removeRow(MatrixXd& matrix, unsigned int rowToRemove) {
+    unsigned int numRows = matrix.rows()-1;
+    unsigned int numCols = matrix.cols();
+
+    if( rowToRemove < numRows )
+        matrix.block(rowToRemove,0,numRows-rowToRemove,numCols) = matrix.bottomRows(numRows-rowToRemove);
+
+    matrix.conservativeResize(numRows,numCols);
+}
+
+void find_closest (MatrixXd pt, MatrixXd arr, MatrixXd& closest, int& idx) {
+    closest = arr.row(0).replicate(1, 1);
+    double min_dis = pt2pt_dis(pt, closest);
+    idx = 0;
+
+    for (int i = 0; i < arr.rows(); i ++) {
+        double cur_dis = pt2pt_dis(pt, arr.row(i));
+        if (cur_dis < min_dis) {
+            min_dis = cur_dis;
+            closest = arr.row(i).replicate(1, 1);
+            idx = i;
+        }
+    }
+}
+
+void find_opposite_closest (MatrixXd pt, MatrixXd arr, MatrixXd direction_pt, MatrixXd& opposite_closest, bool& opposite_closest_found) {
+    MatrixXd arr_copy = arr.replicate(1, 1);
+    opposite_closest_found = false;
+    opposite_closest = pt.replicate(1, 1);
+
+    while (!opposite_closest_found && arr_copy.rows() != 0) {
+        MatrixXd cur_closest;
+        int cur_index;
+        find_closest(pt, arr_copy, cur_closest, cur_index);
+        removeRow(arr_copy, cur_index);
+
+        RowVectorXd vec1 = cur_closest - pt;
+        RowVectorXd vec2 = direction_pt - pt;
+
+        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.07) {
+            opposite_closest_found = true;
+            opposite_closest = cur_closest.replicate(1, 1);
+            break;
+        }
+    }
+}
+
+MatrixXd sort_pts (MatrixXd pts_orig) {
+
+    int start_idx = 0;
+
+    MatrixXd pts = pts_orig.replicate(1, 1);
+    MatrixXd starting_pt = pts.row(start_idx).replicate(1, 1);
+    removeRow(pts, start_idx);
+
+    // starting point will be the current first point in the new list
+    MatrixXd sorted_pts = MatrixXd::Zero(pts_orig.rows(), pts_orig.cols());
+    std::vector<MatrixXd> sorted_pts_vec;
+    sorted_pts_vec.push_back(starting_pt);
+
+    // get the first closest point
+    MatrixXd closest_1;
+    int min_idx;
+    find_closest(starting_pt, pts, closest_1, min_idx);
+    sorted_pts_vec.push_back(closest_1);
+    removeRow(pts, min_idx);
+
+    // get the second closest point
+    MatrixXd closest_2;
+    bool found;
+    find_opposite_closest(starting_pt, pts, closest_1, closest_2, found);
+    bool true_start = false;
+    if (!found) {
+        true_start = true;
+    }
+
+    while (pts.rows() != 0) {
+        MatrixXd cur_target = sorted_pts_vec[sorted_pts_vec.size() - 1];
+        MatrixXd cur_direction = sorted_pts_vec[sorted_pts_vec.size() - 2];
+        MatrixXd cur_closest;
+        bool found;
+        find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
+
+        if (!found) {
+            std::cout << "not found!" << std::endl;
+        }
+
+        sorted_pts_vec.push_back(cur_closest);
+        
+        // really dumb method
+        int row_num = 0;
+        for (int i = 0; i < pts.rows(); i ++) {
+            if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
+                row_num = i;
+                break;
+            }
+        }
+        removeRow(pts, row_num);
+    }
+
+    if (!true_start) {
+        sorted_pts_vec.insert(sorted_pts_vec.begin(), closest_2);
+
+        int row_num = 0;
+        for (int i = 0; i < pts.rows(); i ++) {
+            if (pt2pt_dis(pts.row(i), closest_2) < 0.00001) {
+                row_num = i;
+                break;
+            }
+        }
+        removeRow(pts, row_num);
+
+        while (pts.rows() != 0) {
+            MatrixXd cur_target = sorted_pts_vec[0];
+            MatrixXd cur_direction = sorted_pts_vec[1];
+            MatrixXd cur_closest;
+            bool found;
+            find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
+        
+            if (!found) {
+                std::cout << "not found!" << std::endl;
+                break;
+            }
+
+            sorted_pts_vec.insert(sorted_pts_vec.begin(), cur_closest);
+
+            int row_num = 0;
+            for (int i = 0; i < pts.rows(); i ++) {
+                if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
+                    row_num = i;
+                    break;
+                }
+            }
+            removeRow(pts, row_num);
+        }
+    }
+
+    // fill the eigen matrix
+    for (int i = 0; i < sorted_pts.rows(); i ++) {
+        sorted_pts.row(i) = sorted_pts_vec[i];
+    }
+
+    return sorted_pts;
+}
 
 std::vector<int> get_nearest_indices (int k, int M, int idx) {
     std::vector<int> indices_arr;
@@ -89,18 +252,6 @@ MatrixXd calc_LLE_weights (int k, MatrixXd X) {
     }
 
     return W;
-}
-
-template <typename T>
-void print_1d_vector (std::vector<T> vec) {
-    for (int i = 0; i < vec.size(); i ++) {
-        std::cout << vec[i] << " ";
-    }
-    std::cout << std::endl;
-}
-
-double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2) {
-    return (pt1 - pt2).rowwise().squaredNorm().sum();
 }
 
 MatrixXd cpd (MatrixXd X_orig,

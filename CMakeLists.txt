@@ -155,7 +155,7 @@ add_executable(
 )
 
 add_executable(
-  mask src/cpp/mask.cpp
+  trackdlo_node src/cpp/tracking_node.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -176,7 +176,7 @@ target_link_libraries(cpd
   Eigen3::Eigen
 )
 
-target_link_libraries(mask
+target_link_libraries(trackdlo_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
