@@ -150,12 +150,12 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(
-  cpd src/cpp/cpd.cpp
-)
+# add_executable(
+#   cpd src/cpp/cpd.cpp
+# )
 
 add_executable(
-  trackdlo_node src/cpp/tracking_node.cpp
+  trackdlo_node src/cpp/tracking_node.cpp src/cpp/cpd.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -169,16 +169,18 @@ add_executable(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(cpd
+# target_link_libraries(cpd
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBS}
+#   Eigen3::Eigen
+# )
+
+target_link_libraries(trackdlo_node
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenCV_LIBS}
   Eigen3::Eigen
-)
-
-target_link_libraries(trackdlo_node
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBS}
 )
 
 #############

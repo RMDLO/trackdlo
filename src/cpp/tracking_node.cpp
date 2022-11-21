@@ -20,7 +20,7 @@
 #include <chrono>
 #include <thread>
 
-// #include "../../include/cpd.h"
+#include "../../include/cpd.h"
 
 using cv::Mat;
 
@@ -31,167 +31,8 @@ using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
-template <typename T>
-void print_1d_vector (std::vector<T> vec) {
-    for (int i = 0; i < vec.size(); i ++) {
-        std::cout << vec[i] << " ";
-    }
-    std::cout << std::endl;
-}
-
-double pt2pt_dis_sq (MatrixXf pt1, MatrixXf pt2) {
-    return (pt1 - pt2).rowwise().squaredNorm().sum();
-}
-
-double pt2pt_dis (MatrixXf pt1, MatrixXf pt2) {
-    return (pt1 - pt2).rowwise().norm().sum();
-}
-
-// link to original code: https://stackoverflow.com/a/46303314
-void removeRow(MatrixXf& matrix, unsigned int rowToRemove) {
-    unsigned int numRows = matrix.rows()-1;
-    unsigned int numCols = matrix.cols();
-
-    if( rowToRemove < numRows )
-        matrix.block(rowToRemove,0,numRows-rowToRemove,numCols) = matrix.bottomRows(numRows-rowToRemove);
-
-    matrix.conservativeResize(numRows,numCols);
-}
-
-void find_closest (MatrixXf pt, MatrixXf arr, MatrixXf& closest, int& idx) {
-    closest = arr.row(0).replicate(1, 1);
-    double min_dis = pt2pt_dis(pt, closest);
-    idx = 0;
-
-    for (int i = 0; i < arr.rows(); i ++) {
-        double cur_dis = pt2pt_dis(pt, arr.row(i));
-        if (cur_dis < min_dis) {
-            min_dis = cur_dis;
-            closest = arr.row(i).replicate(1, 1);
-            idx = i;
-        }
-    }
-}
-
-void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, MatrixXf& opposite_closest, bool& opposite_closest_found) {
-    MatrixXf arr_copy = arr.replicate(1, 1);
-    opposite_closest_found = false;
-    opposite_closest = pt.replicate(1, 1);
-
-    while (!opposite_closest_found && arr_copy.rows() != 0) {
-        MatrixXf cur_closest;
-        int cur_index;
-        find_closest(pt, arr_copy, cur_closest, cur_index);
-        removeRow(arr_copy, cur_index);
-
-        RowVectorXf vec1 = cur_closest - pt;
-        RowVectorXf vec2 = direction_pt - pt;
-
-        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.07) {
-            opposite_closest_found = true;
-            opposite_closest = cur_closest.replicate(1, 1);
-            break;
-        }
-    }
-}
-
-MatrixXf sort_pts (MatrixXf pts_orig) {
-
-    int start_idx = 0;
-
-    MatrixXf pts = pts_orig.replicate(1, 1);
-    MatrixXf starting_pt = pts.row(start_idx).replicate(1, 1);
-    removeRow(pts, start_idx);
-
-    // starting point will be the current first point in the new list
-    MatrixXf sorted_pts = MatrixXf::Zero(pts_orig.rows(), pts_orig.cols());
-    std::vector<MatrixXf> sorted_pts_vec;
-    sorted_pts_vec.push_back(starting_pt);
-
-    // get the first closest point
-    MatrixXf closest_1;
-    int min_idx;
-    find_closest(starting_pt, pts, closest_1, min_idx);
-    sorted_pts_vec.push_back(closest_1);
-    removeRow(pts, min_idx);
-
-    // get the second closest point
-    MatrixXf closest_2;
-    bool found;
-    find_opposite_closest(starting_pt, pts, closest_1, closest_2, found);
-    bool true_start = false;
-    if (!found) {
-        true_start = true;
-    }
-
-    while (pts.rows() != 0) {
-        MatrixXf cur_target = sorted_pts_vec[sorted_pts_vec.size() - 1];
-        MatrixXf cur_direction = sorted_pts_vec[sorted_pts_vec.size() - 2];
-        MatrixXf cur_closest;
-        bool found;
-        find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
-
-        if (!found) {
-            std::cout << "not found!" << std::endl;
-        }
-
-        sorted_pts_vec.push_back(cur_closest);
-        
-        // really dumb method
-        int row_num = 0;
-        for (int i = 0; i < pts.rows(); i ++) {
-            if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
-                row_num = i;
-                break;
-            }
-        }
-        removeRow(pts, row_num);
-    }
-
-    if (!true_start) {
-        sorted_pts_vec.insert(sorted_pts_vec.begin(), closest_2);
-
-        int row_num = 0;
-        for (int i = 0; i < pts.rows(); i ++) {
-            if (pt2pt_dis(pts.row(i), closest_2) < 0.00001) {
-                row_num = i;
-                break;
-            }
-        }
-        removeRow(pts, row_num);
-
-        while (pts.rows() != 0) {
-            MatrixXf cur_target = sorted_pts_vec[0];
-            MatrixXf cur_direction = sorted_pts_vec[1];
-            MatrixXf cur_closest;
-            bool found;
-            find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
-        
-            if (!found) {
-                std::cout << "not found!" << std::endl;
-                break;
-            }
-
-            sorted_pts_vec.insert(sorted_pts_vec.begin(), cur_closest);
-
-            int row_num = 0;
-            for (int i = 0; i < pts.rows(); i ++) {
-                if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
-                    row_num = i;
-                    break;
-                }
-            }
-            removeRow(pts, row_num);
-        }
-    }
-
-    // fill the eigen matrix
-    for (int i = 0; i < sorted_pts.rows(); i ++) {
-        sorted_pts.row(i) = sorted_pts_vec[i];
-    }
-
-    return sorted_pts;
-}
+MatrixXf Y;
+bool initialized = false;
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
@@ -265,32 +106,45 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // now create objects for cur_pc
         pcl::PCLPointCloud2* cur_pc = new pcl::PCLPointCloud2;
         pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
+        pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
 
         // MatrixXf Y_0 = MatrixXf::Zero(keypoints.size(), 3);
         // for (int i = 0; i < keypoints.size(); i ++) {
         //     Y_0(i, 0) = 
         // }
 
-        // // filter point cloud from mask
-        // for (int i = 0; i < cloud->height; i ++) {
-        //     for (int j = 0; j < cloud->width; j ++) {
-        //         if (mask.at<uchar>(i, j) != 0) {
-        //             cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
-        //         }
-        //     }
-        // }
+        // filter point cloud from mask
+        for (int i = 0; i < cloud->height; i ++) {
+            for (int j = 0; j < cloud->width; j ++) {
+                if (mask.at<uchar>(i, j) != 0) {
+                    cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
+                }
+            }
+        }
+        MatrixXf X = cur_pc_xyz.getMatrixXfMap().topRows(3).transpose();
 
         for (cv::KeyPoint key_point : keypoints) {
-            cur_pc_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
         }
 
-        MatrixXf Y_0 = cur_pc_xyz.getMatrixXfMap().topRows(3).transpose();
+        MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
         MatrixXf Y_0_sorted = sort_pts(Y_0);
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
-        Y_0_sorted.conservativeResize(Y_0_sorted.rows(), Y_0_sorted.cols()+1);
-        Y_0_sorted.col(Y_0_sorted.cols()-1) = MatrixXf::Ones(Y_0_sorted.rows(), 1);
-        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
+        if (!initialized) {
+            Y = Y_0_sorted.replicate(1, 1);
+            initialized = true;
+        } 
+        else {
+            Y = cpd(X, Y, 1, 1, 1, 0.05, 100);
+        }
+
+        std::cout << Y.rows() << ", " << Y.cols() << std::endl;
+        std::cout << Y << std::endl;
+
+        MatrixXf nodes_h = Y.replicate(1, 1);
+        nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+        nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
         // std::cout << Y_0 << std::endl;
         // std::cout << Y_0_sorted << std::endl;
 
@@ -301,7 +155,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                        0.0, 0.0, 1.0, 0.0;
         // std::cout << proj_matrix.rows() << ", " << proj_matrix.cols() << std::endl;
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
-        MatrixXf image_coords = (proj_matrix * Y_0_sorted.transpose()).transpose();
+        MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
         // draw points
         Mat tracking_img;
         cur_image.copyTo(tracking_img);
@@ -322,7 +176,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
 
         // convert back to pointcloud2 message
-        pcl::toPCLPointCloud2(cur_pc_xyz, *cur_pc);
+        pcl::toPCLPointCloud2(cur_nodes_xyz, *cur_pc);
 
         // fill in header
         cur_pc->header.frame_id = "camera_color_optical_frame";

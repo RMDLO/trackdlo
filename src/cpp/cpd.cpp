@@ -255,7 +255,7 @@ MatrixXf calc_LLE_weights (int k, MatrixXf X) {
 }
 
 MatrixXf cpd (MatrixXf X_orig,
-              MatrixXf Y_0,
+              MatrixXf& Y_0,
               double beta,
               double alpha,
               double gamma,
@@ -357,7 +357,7 @@ MatrixXf cpd (MatrixXf X_orig,
     // initialize sigma2
     double sigma2 = 0;
     if (!use_prev_sigma2) {
-        sigma2 = diff_xy.sum() / (static_cast<double>(D * M * N));
+        sigma2 = diff_xy.sum() / (static_cast<double>(D * M * N) / 1000);
     }
     else {
         sigma2 = sigma2_0;
@@ -455,41 +455,41 @@ MatrixXf cpd (MatrixXf X_orig,
     return Y;
 }
 
-int main(int argc, char **argv) {
-    ros::init (argc, argv, "test");
-    ros::NodeHandle nh;
+// int main(int argc, char **argv) {
+//     ros::init (argc, argv, "test");
+//     ros::NodeHandle nh;
 
-    MatrixXf m1 = MatrixXf::Zero(5, 3);
-    for (int i = 0; i < m1.rows(); i ++) {
-        for (int j = 0; j < m1.cols(); j ++) {
-            m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
-            // m1(i, j) *= m1(i, j);
-        }
-    }
+//     MatrixXf m1 = MatrixXf::Zero(5, 3);
+//     for (int i = 0; i < m1.rows(); i ++) {
+//         for (int j = 0; j < m1.cols(); j ++) {
+//             m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
+//             // m1(i, j) *= m1(i, j);
+//         }
+//     }
 
-    MatrixXf m2 = MatrixXf::Zero(10, 3);
-    for (int i = 0; i < m2.rows(); i ++) {
-        for (int j = 0; j < m2.cols(); j ++) {
-            m2(i, j) = (static_cast<float>(i)*m2.cols() + static_cast<float>(j))/200;
-            // m1(i, j) *= m1(i, j);
-        }
-    }
+//     MatrixXf m2 = MatrixXf::Zero(10, 3);
+//     for (int i = 0; i < m2.rows(); i ++) {
+//         for (int j = 0; j < m2.cols(); j ++) {
+//             m2(i, j) = (static_cast<float>(i)*m2.cols() + static_cast<float>(j))/200;
+//             // m1(i, j) *= m1(i, j);
+//         }
+//     }
 
-    std::cout << m1 << std::endl;
-    std::cout << m2 << std::endl;
+//     std::cout << m1 << std::endl;
+//     std::cout << m2 << std::endl;
 
-    // // ----- test LLE weights -----
-    // clock_t cur_time = clock();
-    // MatrixXf out = calc_LLE_weights(2, m1);
-    // std::cout << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
-    // // std::cout << out << std::endl;
+//     // // ----- test LLE weights -----
+//     // clock_t cur_time = clock();
+//     // MatrixXf out = calc_LLE_weights(2, m1);
+//     // std::cout << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
+//     // // std::cout << out << std::endl;
 
-    // // ----- test pt2pt_dis_sq -----
-    // MatrixXf m3 = m2.array() + 0.5;
-    // std::cout << m3 << std::endl;
-    // std::cout << pt2pt_dis_sq(m2, m3) << std::endl;
+//     // // ----- test pt2pt_dis_sq -----
+//     // MatrixXf m3 = m2.array() + 0.5;
+//     // std::cout << m3 << std::endl;
+//     // std::cout << pt2pt_dis_sq(m2, m3) << std::endl;
 
-    // ----- test ecpd -----
-    std::cout << cpd(m2, m1, 0.3, 1, 1, 0.1, 30, 0.00001, true, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian") << std::endl;
-    // print_1d_vector(cpd(m2, m1, 0.3, 1, 1, 0.05, 1, 0.00001, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian"));
-}
+//     // ----- test ecpd -----
+//     std::cout << cpd(m2, m1, 0.3, 1, 1, 0.1, 30, 0.00001, true, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian") << std::endl;
+//     // print_1d_vector(cpd(m2, m1, 0.3, 1, 1, 0.05, 1, 0.00001, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian"));
+// }
