@@ -30,10 +30,11 @@ sensor_msgs::PointCloud2 imageCallback(const sensor_msgs::ImageConstPtr& image_m
 
     sensor_msgs::ImagePtr mask_msg = nullptr;
 
+    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
+
     try {
         Mat cur_image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
         Mat cur_image_hsv;
-        Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
 
         // convert color
         cv::cvtColor(cur_image, cur_image_hsv, cv::COLOR_BGR2HSV);
@@ -80,24 +81,54 @@ sensor_msgs::PointCloud2 imageCallback(const sensor_msgs::ImageConstPtr& image_m
     }
 
     // pcl test
-    // Container for original & filtered data
+    sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
-    pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
-    pcl::PCLPointCloud2 cloud_filtered;
 
     // Convert to PCL data type
-    pcl_conversions::toPCL(*pc_msg, *cloud);
+    pcl_conversions::toPCL(*pc_msg, *cloud);   // cloud is 720*1280 (height*width) now, however is a ros pointcloud2 message. 
+                                               // see message definition here: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointCloud2.html
 
-    // Perform the actual filtering
-    pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloudPtr);
-    sor.setLeafSize (0.004, 0.004, 0.004);
-    sor.filter (cloud_filtered);
+    if (cloud->width != 0 && cloud->height != 0) {
+        // convert to xyz point
+        pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz;
+        pcl::fromPCLPointCloud2(*cloud, cloud_xyz);
+        // now create objects for cur_pc
+        pcl::PCLPointCloud2* cur_pc = new pcl::PCLPointCloud2;
+        pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
 
-    // Convert to ROS data type
-    sensor_msgs::PointCloud2 output;
-    pcl_conversions::moveFromPCL(cloud_filtered, output);
+        // filter point cloud from mask
+        for (int i = 0; i < cloud->height; i ++) {
+            for (int j = 0; j < cloud->width; j ++) {
+                if (mask.at<uchar>(i, j) != 0) {
+                    cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
+                }
+            }
+        }
 
+        // convert back to pointcloud2 message
+        pcl::toPCLPointCloud2(cur_pc_xyz, *cur_pc);
+
+        // fill in header
+        cur_pc->header.frame_id = "camera_color_optical_frame";
+        cur_pc->header.seq = cloud->header.seq;
+        cur_pc->fields = cloud->fields;
+
+        // Perform downsampling
+        pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
+        pcl::PCLPointCloud2 cur_pc_downsampled;
+        pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+        sor.setInputCloud (cloudPtr);
+        sor.setLeafSize (0.004, 0.004, 0.004);
+        sor.filter (cur_pc_downsampled);
+
+        // Convert to ROS data type
+        // pcl_conversions::moveFromPCL(cloud_filtered, output);
+        pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
+    }
+    else {
+        ROS_ERROR("empty pointcloud!");
+    }
+    
     return output;
 }
 
