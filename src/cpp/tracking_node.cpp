@@ -16,6 +16,10 @@
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
 
+#include <ctime>
+#include <chrono>
+#include <thread>
+
 // #include "../../include/cpd.h"
 
 using cv::Mat;
@@ -190,6 +194,9 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
 }
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
+    
+    std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
+    
     std::vector<int> lower_blue = {90, 60, 40};
     std::vector<int> upper_blue = {130, 255, 255};
 
@@ -277,37 +284,39 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cur_pc_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
         }
 
-        MatrixXf Y_0 = cur_pc_xyz.getMatrixXfMap().topRows(3);
+        MatrixXf Y_0 = cur_pc_xyz.getMatrixXfMap().topRows(3).transpose();
         MatrixXf Y_0_sorted = sort_pts(Y_0);
+        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
         Y_0_sorted.conservativeResize(Y_0_sorted.rows(), Y_0_sorted.cols()+1);
         Y_0_sorted.col(Y_0_sorted.cols()-1) = MatrixXf::Ones(Y_0_sorted.rows(), 1);
-        std::cout << Y_0 << std::endl;
-        std::cout << Y_0_sorted << std::endl;
+        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
+        // std::cout << Y_0 << std::endl;
+        // std::cout << Y_0_sorted << std::endl;
 
         // project and pub image
         MatrixXf proj_matrix(3, 4);
         proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                        0.0, 916.265869140625, 354.02392578125, 0.0,
                        0.0, 0.0, 1.0, 0.0;
-        std::cout << proj_matrix.rows() << ", " << proj_matrix.cols() << std::endl;
-        std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
-        // MatrixXf image_coords = (proj_matrix * Y_0_sorted.transpose()).transpose();
-        // // draw points
+        // std::cout << proj_matrix.rows() << ", " << proj_matrix.cols() << std::endl;
+        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
+        MatrixXf image_coords = (proj_matrix * Y_0_sorted.transpose()).transpose();
+        // draw points
         Mat tracking_img;
-        // cur_image.copyTo(tracking_img);
-        // for (int i = 0; i < 1; i ++) { // image_coords.rows()
-        //     cv::circle(tracking_img, cv::Point(static_cast<int>(image_coords(i, 1)/image_coords(i, 2)), 
-        //                                        static_cast<int>(image_coords(i, 0)/image_coords(i, 2))), 
-        //                              5, cv::Scalar(0, 150, 255), -1);
-        //     if (i != image_coords.rows()-1) {
-        //         cv::line(tracking_img, cv::Point(static_cast<int>(image_coords(i, 1)/image_coords(i, 2)), 
-        //                                          static_cast<int>(image_coords(i, 0)/image_coords(i, 2))),
-        //                                cv::Point(static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2)), 
-        //                                          static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2))),
-        //                                cv::Scalar(0, 255, 0), 2);
-        //     }
-        // }
+        cur_image.copyTo(tracking_img);
+        for (int i = 0; i < image_coords.rows(); i ++) { // image_coords.rows()
+            cv::circle(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
+                                               static_cast<int>(image_coords(i, 1)/image_coords(i, 2))), 
+                                     5, cv::Scalar(0, 150, 255), -1);
+            if (i != image_coords.rows()-1) {
+                cv::line(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
+                                                 static_cast<int>(image_coords(i, 1)/image_coords(i, 2))),
+                                       cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                 static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                       cv::Scalar(0, 255, 0), 2);
+            }
+        }
 
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
@@ -336,7 +345,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_ERROR("empty pointcloud!");
     }
 
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
     pc_pub.publish(output);
+
+    std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
     
     return tracking_img_msg;
 }
