@@ -107,6 +107,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2* cur_pc = new pcl::PCLPointCloud2;
         pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
+        pcl::PointCloud<pcl::PointXYZRGB> downsampled_xyz;
 
         // MatrixXf Y_0 = MatrixXf::Zero(keypoints.size(), 3);
         // for (int i = 0; i < keypoints.size(); i ++) {
@@ -121,7 +122,20 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
             }
         }
-        MatrixXf X = cur_pc_xyz.getMatrixXfMap().topRows(3).transpose();
+
+        // convert back to pointcloud2 message
+        pcl::toPCLPointCloud2(cur_pc_xyz, *cur_pc);
+        // Perform downsampling
+        pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
+        pcl::PCLPointCloud2 cur_pc_downsampled;
+        pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+        sor.setInputCloud (cloudPtr);
+        sor.setLeafSize (0.004, 0.004, 0.004);
+        sor.filter (cur_pc_downsampled);
+
+        pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
+        MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
+        std::cout << "num of points: " << X.rows() << std::endl;
 
         for (cv::KeyPoint key_point : keypoints) {
             cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
@@ -175,21 +189,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
 
-        // convert back to pointcloud2 message
-        pcl::toPCLPointCloud2(cur_nodes_xyz, *cur_pc);
-
         // fill in header
         cur_pc->header.frame_id = "camera_color_optical_frame";
         cur_pc->header.seq = cloud->header.seq;
         cur_pc->fields = cloud->fields;
-
-        // // Perform downsampling
-        // pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
-        // pcl::PCLPointCloud2 cur_pc_downsampled;
-        // pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-        // sor.setInputCloud (cloudPtr);
-        // sor.setLeafSize (0.004, 0.004, 0.004);
-        // sor.filter (cur_pc_downsampled);
 
         // Convert to ROS data type
         pcl_conversions::moveFromPCL(*cur_pc, output);
