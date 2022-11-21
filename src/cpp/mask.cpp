@@ -13,10 +13,12 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/point_cloud.h>
+#include <pcl/filters/voxel_grid.h>
 
 using cv::Mat;
 
-sensor_msgs::ImagePtr imageCallback(const sensor_msgs::ImageConstPtr& msg, const sensor_msgs::PointCloud2ConstPtr& _) {
+sensor_msgs::PointCloud2 imageCallback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     std::vector<int> lower_blue = {90, 60, 40};
     std::vector<int> upper_blue = {130, 255, 255};
 
@@ -29,7 +31,7 @@ sensor_msgs::ImagePtr imageCallback(const sensor_msgs::ImageConstPtr& msg, const
     sensor_msgs::ImagePtr mask_msg = nullptr;
 
     try {
-        Mat cur_image = cv_bridge::toCvShare(msg, "bgr8")->image;
+        Mat cur_image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
         Mat cur_image_hsv;
         Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
 
@@ -74,10 +76,29 @@ sensor_msgs::ImagePtr imageCallback(const sensor_msgs::ImageConstPtr& msg, const
         mask_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", mask_rgb).toImageMsg();
     }
     catch (cv_bridge::Exception& e) {
-        ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
+        ROS_ERROR("Could not convert from '%s' to 'bgr8'.", image_msg->encoding.c_str());
     }
 
-    return mask_msg;
+    // pcl test
+    // Container for original & filtered data
+    pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
+    pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
+    pcl::PCLPointCloud2 cloud_filtered;
+
+    // Convert to PCL data type
+    pcl_conversions::toPCL(*pc_msg, *cloud);
+
+    // Perform the actual filtering
+    pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+    sor.setInputCloud (cloudPtr);
+    sor.setLeafSize (0.004, 0.004, 0.004);
+    sor.filter (cloud_filtered);
+
+    // Convert to ROS data type
+    sensor_msgs::PointCloud2 output;
+    pcl_conversions::moveFromPCL(cloud_filtered, output);
+
+    return output;
 }
 
 int main(int argc, char **argv) {
@@ -87,6 +108,7 @@ int main(int argc, char **argv) {
 
     image_transport::ImageTransport it(nh);
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
+    ros::Publisher pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
@@ -107,8 +129,8 @@ int main(int argc, char **argv) {
                                              const boost::shared_ptr<const message_filters::NullType>,
                                              const boost::shared_ptr<const message_filters::NullType>)>>
     (
-        [&](const sensor_msgs::ImageConstPtr& msg, 
-            const sensor_msgs::PointCloud2ConstPtr& _,
+        [&](const sensor_msgs::ImageConstPtr& img_msg, 
+            const sensor_msgs::PointCloud2ConstPtr& pc_msg,
             const boost::shared_ptr<const message_filters::NullType> var1,
             const boost::shared_ptr<const message_filters::NullType> var2,
             const boost::shared_ptr<const message_filters::NullType> var3,
@@ -117,8 +139,10 @@ int main(int argc, char **argv) {
             const boost::shared_ptr<const message_filters::NullType> var6,
             const boost::shared_ptr<const message_filters::NullType> var7)
         {
-            sensor_msgs::ImagePtr test_image = imageCallback(msg, _);
-            mask_pub.publish(test_image);
+            // sensor_msgs::ImagePtr test_image = imageCallback(msg, _);
+            // mask_pub.publish(test_image);
+            sensor_msgs::PointCloud2 test_pc = imageCallback(img_msg, pc_msg);
+            pc_pub.publish(test_pc);
         }
     );
     
