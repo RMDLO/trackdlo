@@ -4,9 +4,19 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/features2d.hpp>
 
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/filters/conditional_removal.h>
+#include <pcl/io/pcd_io.h>
+
 using cv::Mat;
 
-sensor_msgs::ImagePtr imageCallback(const sensor_msgs::ImageConstPtr& msg) {
+sensor_msgs::ImagePtr imageCallback(const sensor_msgs::ImageConstPtr& msg, const sensor_msgs::PointCloud2ConstPtr& _) {
     std::vector<int> lower_blue = {90, 60, 40};
     std::vector<int> upper_blue = {130, 255, 255};
 
@@ -77,10 +87,40 @@ int main(int argc, char **argv) {
 
     image_transport::ImageTransport it(nh);
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
-    image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [=](const sensor_msgs::ImageConstPtr& msg){
-        sensor_msgs::ImagePtr test_image = imageCallback(msg);
-        mask_pub.publish(test_image);
-    });
+
+    // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
+    //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
+    //     mask_pub.publish(test_image);
+    // });
+
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 1);
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 1);
+
+    sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
+                                             const sensor_msgs::PointCloud2ConstPtr&,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>,
+                                             const boost::shared_ptr<const message_filters::NullType>)>>
+    (
+        [&](const sensor_msgs::ImageConstPtr& msg, 
+            const sensor_msgs::PointCloud2ConstPtr& _,
+            const boost::shared_ptr<const message_filters::NullType> var1,
+            const boost::shared_ptr<const message_filters::NullType> var2,
+            const boost::shared_ptr<const message_filters::NullType> var3,
+            const boost::shared_ptr<const message_filters::NullType> var4,
+            const boost::shared_ptr<const message_filters::NullType> var5,
+            const boost::shared_ptr<const message_filters::NullType> var6,
+            const boost::shared_ptr<const message_filters::NullType> var7)
+        {
+            sensor_msgs::ImagePtr test_image = imageCallback(msg, _);
+            mask_pub.publish(test_image);
+        }
+    );
     
     ros::spin();
     cv::destroyWindow("view");
