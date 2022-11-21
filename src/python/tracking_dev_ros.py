@@ -116,7 +116,7 @@ def find_opposite_closest (pt, arr, direction_pt):
         vec1 = np.array(cur_closest) - np.array(pt)
         vec2 = np.array(direction_pt) - np.array(pt)
 
-        # threshold: 0.04m
+        # threshold: 0.07m
         if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
             opposite_closest_found = True
             opposite_closest = cur_closest.copy()
@@ -553,12 +553,12 @@ def ecpd_lle (X_orig,                      # input point cloud
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
             Y = Y_0 + np.matmul(G, W)
-            rospy.loginfo('Iteration until covnergence: ' + str(i) + '. Kernel used: ' + kernel)
+            rospy.loginfo('Iteration until covnergence: ' + str(it) + '. Kernel used: ' + kernel)
             break
         else:
             Y = Y_0 + np.matmul(G, W)
 
-        if i == max_iter - 1:
+        if it == max_iter - 1:
             # print error messages if optimization did not compile
             rospy.logerr('Optimization did not converge! ' + 'Kernel used: ' + kernel)
 
@@ -628,13 +628,20 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     #     correspondence_priors = []
     #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
     #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
+
+    # log time
+    cur_time = time.time()
     
     # elif head_visible and tail_visible:
     if head_visible and tail_visible: # but length condition not met - middle part is occluded
+        
+        if abs(cur_total_len - total_len) < params["initialization_params"]["max_total_len_change"]:
+            rospy.loginfo("Total length unchanged, state = 0")
+            state = 0
+        else:
+            rospy.loginfo("Both ends visible but total length changed, state = 2")
+            state = 2
 
-        rospy.loginfo("Both ends visible but total length changed, state = 2")
-
-        state = 2
         # print('head and tail visible but total length changed')
 
         # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
@@ -911,6 +918,8 @@ def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, gui
     # if none of the above condition is satisfied
     else:
         print('error!')
+
+    rospy.logwarn('Pre-processing fit spline: ' + str((time.time() - cur_time)*1000) + ' ms')
 
     return guide_nodes, guide_nodes_sigma2_0, np.array(correspondence_priors), occluded_nodes, state
 

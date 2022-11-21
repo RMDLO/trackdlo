@@ -70,7 +70,7 @@ def callback (rgb, pc):
 
     # process opencv mask
     if occlusion_mask_rgb is None:
-        occlusion_mask_rgb = np.ones(cur_image.shape).astype('uint8')
+        occlusion_mask_rgb = np.ones(cur_image.shape).astype('uint8')*255
     occlusion_mask = cv2.cvtColor(occlusion_mask_rgb.copy(), cv2.COLOR_RGB2GRAY)
 
     # color thresholding
@@ -84,7 +84,7 @@ def callback (rgb, pc):
     upper = (255, 255, 255)
     mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
     lower = (0, 60, 40)
-    upper = (30, 255, 255)
+    upper = (10, 255, 255)
     mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
     mask_marker = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy()).astype('uint8')
 

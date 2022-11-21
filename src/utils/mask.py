@@ -60,7 +60,7 @@ def callback (rgb, depth, pc):
     upper = (255, 255, 255)
     mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
     lower = (0, 60, 40)
-    upper = (30, 255, 255)
+    upper = (10, 255, 255)
     mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
     mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())
 
@@ -68,7 +68,7 @@ def callback (rgb, depth, pc):
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
 
     # test
-    mask = cv2.bitwise_or(mask.copy(), mask_red.copy()) # mask_green.copy()
+    mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
 
     # blob detection

@@ -23,12 +23,12 @@ CPD_LLE_params:
 
 # params_1 will be used for bounded situation
 ECPD_params_1:
-  beta: 1
+  beta: 2
   alpha: 1
   gamma: 1
   mu: 0
   max_iter: 30
-  tolerance: 0.001
+  tolerance: 0.00001
   include_lle: true
   use_geodesic: true
   use_prev_sigma2: true
@@ -42,7 +42,7 @@ ECPD_params_2:
   gamma: 1
   mu: 0
   max_iter: 30
-  tolerance: 0.0001
+  tolerance: 0.00001
   include_lle: true
   use_geodesic: true
   use_prev_sigma2: true
