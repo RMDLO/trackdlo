@@ -6,7 +6,14 @@
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include<ctime>
+#include <ctime>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/filters/conditional_removal.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 // typedef Eigen::Matrix<double, 1, Eigen::Dynamic> RowVector;
 // typedef Eigen::Matrix<double, Eigen::Dynamic, 1> ColumnVector;

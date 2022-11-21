@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.0.2)
 project(TrackDLO)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11 -O2)
+add_compile_options(-O2)   # -std=c++11
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -13,18 +16,19 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   cv_bridge
   image_transport
-  # abb_egm_hardware_interface
-  # abb_egm_state_controller
-  # abb_rws_service_provider
-  # abb_rws_state_publisher
-  # controller_manager
-  # joint_state_controller
-  # velocity_controllers
+  pcl_conversions
+	pcl_ros
 )
 
+add_definitions(${PCL_DEFINITIONS})
+
 find_package(OpenCV 4 REQUIRED)
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
-include_directories(${Eigen_INCLUDE_DIRS})
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(PCL 1.8 REQUIRED COMPONENTS common io filters visualization features kdtree)
+include_directories(
+  ${Eigen_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -130,6 +134,7 @@ catkin_package(
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
+  ${PCL_LIBRARY_DIRS}
 )
 
 ## Declare a C++ library
@@ -145,7 +150,13 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(cpp_test src/cpp/test.cpp)
+add_executable(
+  cpd src/cpp/cpd.cpp
+)
+
+add_executable(
+  mask src/cpp/mask.cpp
+)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -158,9 +169,16 @@ add_executable(cpp_test src/cpp/test.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(cpp_test
+target_link_libraries(cpd
   ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
   Eigen3::Eigen
+)
+
+target_link_libraries(mask
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 #############
