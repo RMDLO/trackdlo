@@ -152,7 +152,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             initialized = true;
         } 
         else {
-            cpd (X, Y, sigma2, 2, 1, 1, 0.05, 50, 0.00001, true, false, true, false);
+            cpd (X, Y, sigma2, 2, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
         }
 
         // std::cout << Y.rows() << ", " << Y.cols() << std::endl;

@@ -303,6 +303,8 @@ bool cpd (MatrixXf X_orig,
 
     MatrixXf converted_node_dis = MatrixXf::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
     MatrixXf converted_node_dis_sq = MatrixXf::Zero(M, M);
+    std::vector<double> converted_node_coord = {0.0};   // this is not squared
+
     MatrixXf G = MatrixXf::Zero(M, M);
     if (!use_geodesic) {
         if (kernel == "Gaussian") {
@@ -322,7 +324,6 @@ bool cpd (MatrixXf X_orig,
         }
     }
     else {
-        std::vector<double> converted_node_coord = {0.0};
         double cur_sum = 0;
         for (int i = 0; i < M-1; i ++) {
             cur_sum += (Y_0.row(i+1) - Y_0.row(i)).norm();
@@ -378,32 +379,66 @@ bool cpd (MatrixXf X_orig,
         P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
         std::vector<int> max_p_nodes(P.cols(), 0);
-        for (int i = 0; i < N; i ++) {
-            P.col(i).maxCoeff(&max_p_nodes[i]);
-        }
+        // for (int i = 0; i < N; i ++) {
+        //     P.col(i).maxCoeff(&max_p_nodes[i]);
+        // }
+
+        // print_1d_vector(max_p_nodes);
 
         // TODO: implement geodesic dists
-        // if (use_geodesic) {
-        //     std::vector<int> potential_2nd_max_p_nodes_1(P.cols(), 0);   // -1
-        //     std::vector<int> potential_2nd_max_p_nodes_2(P.cols(), 0);   // +1
-        //     for (int i = 0; i < N; i ++) {
-        //         // potential_2nd_max_p_nodes_1 = max_p_nodes - 1
-        //         if (max_p_nodes[i] == 0) {
-        //             potential_2nd_max_p_nodes_1[i] = 1;
-        //         }
-        //         else {
-        //             potential_2nd_max_p_nodes_1[i] = max_p_nodes[i] - 1;
-        //         }
+        if (use_geodesic) {
+            MatrixXf pts_dis_sq_geodesic = MatrixXf::Zero(M, N);
 
-        //         // potential_2nd_max_p_nodes_2 = max_p_nodes + 1
-        //         if (max_p_nodes[i] == M - 1) {
-        //             potential_2nd_max_p_nodes_2[i] = M - 2;
-        //         }
-        //         else {
-        //             potential_2nd_max_p_nodes_2[i] = max_p_nodes[i] + 1;
-        //         }
-        //     }
-        // }
+            // loop through all points
+            for (int i = 0; i < N; i ++) {
+                
+                P.col(i).maxCoeff(&max_p_nodes[i]);
+                int max_p_node = max_p_nodes[i];
+
+                int potential_2nd_max_p_node_1 = max_p_node - 1;
+                if (potential_2nd_max_p_node_1 == -1) {
+                    potential_2nd_max_p_node_1 = 2;
+                }
+
+                int potential_2nd_max_p_node_2 = max_p_node + 1;
+                if (potential_2nd_max_p_node_2 == M) {
+                    potential_2nd_max_p_node_2 = M - 3;
+                }
+
+                int next_max_p_node;
+                if (pt2pt_dis(Y.row(potential_2nd_max_p_node_1), X.row(i)) < pt2pt_dis(Y.row(potential_2nd_max_p_node_2), X.row(i))) {
+                    next_max_p_node = potential_2nd_max_p_node_1;
+                } 
+                else {
+                    next_max_p_node = potential_2nd_max_p_node_2;
+                }
+
+                // fill the current column of pts_dis_sq_geodesic
+                pts_dis_sq_geodesic(max_p_node, i) = pt2pt_dis_sq(Y.row(max_p_node), X.row(i));
+                pts_dis_sq_geodesic(next_max_p_node, i) = pt2pt_dis_sq(Y.row(next_max_p_node), X.row(i));
+
+                if (max_p_node < next_max_p_node) {
+                    for (int j = 0; j < max_p_node; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                    }
+                    for (int j = next_max_p_node; j < M; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                    }
+                }
+                else {
+                    for (int j = 0; j < next_max_p_node; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                    }
+                    for (int j = max_p_node; j < M; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                    }
+                }
+            }
+
+            // update P
+            P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
 
         MatrixXf Pt1 = P.colwise().sum();
         MatrixXf P1 = P.rowwise().sum();
