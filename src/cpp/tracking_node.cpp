@@ -131,7 +131,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.004, 0.004, 0.004);
+        sor.setLeafSize (0.01, 0.01, 0.01);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
@@ -142,17 +142,29 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
         }
 
-        MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-        MatrixXf Y_0_sorted = sort_pts(Y_0);
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
         if (!initialized) {
+            MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
+            MatrixXf Y_0_sorted = sort_pts(Y_0);
             Y = Y_0_sorted.replicate(1, 1);
             sigma2 = 0;
+
+            // use ecpd to help initialize
+            MatrixXf priors = MatrixXf::Zero(Y_0.rows(), 4);
+            for (int i = 0; i < Y_0_sorted.rows(); i ++) {
+                priors(i, 0) = i;
+                priors(i, 1) = Y_0_sorted(i, 0);
+                priors(i, 2) = Y_0_sorted(i, 1);
+                priors(i, 3) = Y_0_sorted(i, 2);
+            }
+
+            cpd(X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, false, true, priors, 0.00001);
+
             initialized = true;
         } 
         else {
-            cpd (X, Y, sigma2, 2, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
+            cpd (X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false);
         }
 
         // std::cout << Y.rows() << ", " << Y.cols() << std::endl;

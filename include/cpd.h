@@ -23,7 +23,7 @@ bool cpd (MatrixXf X_orig,
           bool use_geodesic = false,
           bool use_prev_sigma2 = false,
           bool use_ecpd = false,
-          MatrixXf correspondence_priors = MatrixXf::Zero(0, 0),
+          MatrixXf correspondence_priors = MatrixXf::Zero(0, 4),
           double omega = 0,
           std::string kernel = "Gaussian",
           std::vector<int> occluded_nodes = {});

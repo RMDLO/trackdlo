@@ -40,7 +40,7 @@ double pt2pt_dis (MatrixXf pt1, MatrixXf pt2) {
 }
 
 // link to original code: https://stackoverflow.com/a/46303314
-void removeRow(MatrixXf& matrix, unsigned int rowToRemove) {
+void remove_row(MatrixXf& matrix, unsigned int rowToRemove) {
     unsigned int numRows = matrix.rows()-1;
     unsigned int numCols = matrix.cols();
 
@@ -74,7 +74,7 @@ void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, Ma
         MatrixXf cur_closest;
         int cur_index;
         find_closest(pt, arr_copy, cur_closest, cur_index);
-        removeRow(arr_copy, cur_index);
+        remove_row(arr_copy, cur_index);
 
         RowVectorXf vec1 = cur_closest - pt;
         RowVectorXf vec2 = direction_pt - pt;
@@ -93,7 +93,7 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
 
     MatrixXf pts = pts_orig.replicate(1, 1);
     MatrixXf starting_pt = pts.row(start_idx).replicate(1, 1);
-    removeRow(pts, start_idx);
+    remove_row(pts, start_idx);
 
     // starting point will be the current first point in the new list
     MatrixXf sorted_pts = MatrixXf::Zero(pts_orig.rows(), pts_orig.cols());
@@ -105,7 +105,7 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
     int min_idx;
     find_closest(starting_pt, pts, closest_1, min_idx);
     sorted_pts_vec.push_back(closest_1);
-    removeRow(pts, min_idx);
+    remove_row(pts, min_idx);
 
     // get the second closest point
     MatrixXf closest_2;
@@ -137,7 +137,7 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
                 break;
             }
         }
-        removeRow(pts, row_num);
+        remove_row(pts, row_num);
     }
 
     if (!true_start) {
@@ -150,7 +150,7 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
                 break;
             }
         }
-        removeRow(pts, row_num);
+        remove_row(pts, row_num);
 
         while (pts.rows() != 0) {
             MatrixXf cur_target = sorted_pts_vec[0];
@@ -173,7 +173,7 @@ MatrixXf sort_pts (MatrixXf pts_orig) {
                     break;
                 }
             }
-            removeRow(pts, row_num);
+            remove_row(pts, row_num);
         }
     }
 
@@ -267,7 +267,7 @@ bool cpd (MatrixXf X_orig,
           bool use_geodesic = false,
           bool use_prev_sigma2 = false,
           bool use_ecpd = false,
-          MatrixXf correspondence_priors = MatrixXf::Zero(0, 0),
+          MatrixXf correspondence_priors = MatrixXf::Zero(0, 4),
           double omega = 0,
           std::string kernel = "Gaussian",
           std::vector<int> occluded_nodes = {}) {
@@ -290,14 +290,6 @@ bool cpd (MatrixXf X_orig,
         for (int j = 0; j < M; j ++) {
             diff_yy(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
             diff_yy_sqrt(i, j) = (Y_0.row(i) - Y_0.row(j)).norm();
-        }
-    }
-
-    // diff_xy should be a (M * N) matrix
-    MatrixXf diff_xy = MatrixXf::Zero(M, N);
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < N; j ++) {
-            diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
         }
     }
 
@@ -354,23 +346,52 @@ bool cpd (MatrixXf X_orig,
         }
     }
 
+    // get the LLE matrix
+    MatrixXf L = calc_LLE_weights(6, Y_0);
+    MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
+
+    // TODO: implement node deletion from the original point cloud
+
+    int N_orig = X.rows();
+
+    // add correspondence priors to the set
+    // this is different from the Python implementation; here the additional points are being appended at the end
+    if (correspondence_priors.rows() != 0) {
+        int num_of_correspondence_priors = correspondence_priors.rows();
+
+        for (int i = 0; i < num_of_correspondence_priors; i ++) {
+            MatrixXf temp = MatrixXf::Zero(1, 3);
+            temp(0, 0) = correspondence_priors(i, 1);
+            temp(0, 1) = correspondence_priors(i, 2);
+            temp(0, 2) = correspondence_priors(i, 3);
+
+            X.conservativeResize(X.rows() + 1, Eigen::NoChange);
+            X.row(X.rows()-1) = temp;
+        }
+    }
+
+    // update N
+    N = X.rows();
+
+    // diff_xy should be a (M * N) matrix
+    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    for (int i = 0; i < M; i ++) {
+        for (int j = 0; j < N; j ++) {
+            diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
+        }
+    }
+
     // initialize sigma2
     if (!use_prev_sigma2 || sigma2 == 0) {
         sigma2 = diff_xy.sum() / (static_cast<double>(D * M * N) / 1000);
     }
-
-    // get the LLE matrix
-    MatrixXf L = calc_LLE_weights(2, Y_0);
-    MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
-
-    // TODO: implement node deletion from the original point cloud
 
     for (int it = 0; it < max_iter; it ++) {
 
         // update diff_xy
         for (int i = 0; i < M; i ++) {
             for (int j = 0; j < N; j ++) {
-                diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
+                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
             }
         }
 
@@ -383,9 +404,6 @@ bool cpd (MatrixXf X_orig,
         //     P.col(i).maxCoeff(&max_p_nodes[i]);
         // }
 
-        // print_1d_vector(max_p_nodes);
-
-        // TODO: implement geodesic dists
         if (use_geodesic) {
             MatrixXf pts_dis_sq_geodesic = MatrixXf::Zero(M, N);
 
@@ -449,12 +467,44 @@ bool cpd (MatrixXf X_orig,
         MatrixXf A_matrix;
         MatrixXf B_matrix;
         if (include_lle) {
-            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M) + sigma2 * gamma * H * G;
-            B_matrix = PX - P1.asDiagonal() * Y_0 - sigma2 * gamma * H * Y_0;
+            if (use_ecpd) {
+                MatrixXf P_tilde = MatrixXf::Zero(M, N);
+                // correspondence priors: index, x, y, z
+                for (int i = 0; i < correspondence_priors.rows(); i ++) {
+                    int index = static_cast<int>(correspondence_priors(i, 0));
+                    P_tilde(index, i + N_orig) = 1;
+                }
+
+                MatrixXf P_tilde_1 = P_tilde.rowwise().sum();
+                MatrixXf P_tilde_X = P_tilde * X;
+
+                A_matrix = P1.asDiagonal()*G + alpha*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + sigma2/omega * P_tilde_1.asDiagonal()*G;
+                B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0 + sigma2/omega * (P_tilde_X - (P_tilde_1.asDiagonal() * Y_0 + sigma2*gamma*H * Y_0));
+            }
+            else {
+                A_matrix = P1.asDiagonal()*G + alpha*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G;
+                B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0;
+            }
         }
         else {
-            A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M);
-            B_matrix = PX - P1.asDiagonal() * Y_0;
+            if (use_ecpd) {
+                MatrixXf P_tilde = MatrixXf::Zero(M, N);
+                // correspondence priors: index, x, y, z
+                for (int i = 0; i < correspondence_priors.rows(); i ++) {
+                    int index = static_cast<int>(correspondence_priors(i, 0));
+                    P_tilde(index, i + N_orig) = 1;
+                }
+
+                MatrixXf P_tilde_1 = P_tilde.rowwise().sum();
+                MatrixXf P_tilde_X = P_tilde * X;
+
+                A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M) + sigma2/omega * P_tilde_1.asDiagonal()*G;
+                B_matrix = PX - P1.asDiagonal() * Y_0 + sigma2/omega * (P_tilde_X - P_tilde_1.asDiagonal()*Y_0);
+            }
+            else {
+                A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M);
+                B_matrix = PX - P1.asDiagonal() * Y_0;
+            }
         }
 
         MatrixXf W = (A_matrix).householderQr().solve(B_matrix);
