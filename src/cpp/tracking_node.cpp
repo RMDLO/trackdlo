@@ -3,6 +3,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -110,11 +111,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> downsampled_xyz;
 
-        // MatrixXf Y_0 = MatrixXf::Zero(keypoints.size(), 3);
-        // for (int i = 0; i < keypoints.size(); i ++) {
-        //     Y_0(i, 0) = 
-        // }
-
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
@@ -144,31 +140,45 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
+        std::vector<double> converted_node_coord = {0.0};
+
         if (!initialized) {
             MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
             MatrixXf Y_0_sorted = sort_pts(Y_0);
             Y = Y_0_sorted.replicate(1, 1);
             sigma2 = 0;
 
-            // use ecpd to help initialize
-            MatrixXf priors = MatrixXf::Zero(Y_0.rows(), 4);
-            for (int i = 0; i < Y_0_sorted.rows(); i ++) {
-                priors(i, 0) = i;
-                priors(i, 1) = Y_0_sorted(i, 0);
-                priors(i, 2) = Y_0_sorted(i, 1);
-                priors(i, 3) = Y_0_sorted(i, 2);
+            // record geodesic coord
+            double cur_sum = 0;
+            for (int i = 0; i < Y_0_sorted.rows()-1; i ++) {
+                cur_sum += (Y_0.row(i+1) - Y_0.row(i)).norm();
+                converted_node_coord.push_back(cur_sum);
             }
 
-            cpd(X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, false, true, priors, 0.00001);
+            // use ecpd to help initialize
+            std::vector<MatrixXf> priors_vec;
+            for (int i = 0; i < Y_0_sorted.rows(); i ++) {
+                MatrixXf temp = MatrixXf::Zero(1, 4);
+                temp(0, 0) = i;
+                temp(0, 1) = Y_0_sorted(i, 0);
+                temp(0, 2) = Y_0_sorted(i, 1);
+                temp(0, 3) = Y_0_sorted(i, 2);
+                priors_vec.push_back(temp);
+            }
+
+            ecpd_lle(X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.00001);
 
             initialized = true;
         } 
         else {
-            cpd (X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false);
+            // ecpd_lle (X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false);
+            tracking_step(X, Y, sigma2, converted_node_coord, 0, mask);
         }
 
-        // std::cout << Y.rows() << ", " << Y.cols() << std::endl;
-        // std::cout << Y << std::endl;
+        // distance transform
+        Mat bmask_transformed;
+        cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, cv::DIST_MASK_PRECISE, CV_32F);
+        int mask_dist_threshold = 10;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -181,27 +191,51 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                        0.0, 916.265869140625, 354.02392578125, 0.0,
                        0.0, 0.0, 1.0, 0.0;
-        // std::cout << proj_matrix.rows() << ", " << proj_matrix.cols() << std::endl;
-        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
         MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
         // draw points
         Mat tracking_img;
         cur_image.copyTo(tracking_img);
-        for (int i = 0; i < image_coords.rows(); i ++) { // image_coords.rows()
-            cv::circle(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
-                                               static_cast<int>(image_coords(i, 1)/image_coords(i, 2))), 
-                                     5, cv::Scalar(0, 150, 255), -1);
+        for (int i = 0; i < image_coords.rows(); i ++) {
+
+            int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+            int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+            cv::Scalar point_color;
+            cv::Scalar line_color;
+
+            // std::cout << "bmask dist = " << static_cast<float>(bmask_transformed.at<uchar>(col, row)) << std::endl;
+            // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
+            
+            if (static_cast<int>(mask.at<uchar>(col, row)) == 255) {
+                point_color = cv::Scalar(0, 150, 255);
+                line_color = cv::Scalar(0, 255, 0);
+            }
+            else {
+                point_color = cv::Scalar(0, 0, 255);
+                line_color = cv::Scalar(0, 0, 255);
+            }
+
+            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+
             if (i != image_coords.rows()-1) {
-                cv::line(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
-                                                 static_cast<int>(image_coords(i, 1)/image_coords(i, 2))),
+                cv::line(tracking_img, cv::Point(row, col),
                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                  static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                       cv::Scalar(0, 255, 0), 2);
+                                       line_color, 2);
             }
         }
 
+        // visualize distance transform result
+        double mat_min, mat_max;
+        cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
+        // std::cout << mat_min << ", " << mat_max << std::endl;
+
+        // cv::imshow("frame", bmask_transformed/mat_max*255);
+        // cv::waitKey(3);
+
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
+        // tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bmask_transformed_rgb).toImageMsg();
 
         // fill in header
         cur_pc->header.frame_id = "camera_color_optical_frame";

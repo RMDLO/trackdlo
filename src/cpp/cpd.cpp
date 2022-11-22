@@ -22,6 +22,7 @@ using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
+using cv::Mat;
 
 template <typename T>
 void print_1d_vector (std::vector<T> vec) {
@@ -254,23 +255,23 @@ MatrixXf calc_LLE_weights (int k, MatrixXf X) {
     return W;
 }
 
-bool cpd (MatrixXf X_orig,
-          MatrixXf& Y,
-          double& sigma2,
-          double beta,
-          double alpha,
-          double gamma,
-          double mu,
-          int max_iter = 30,
-          double tol = 0.00001,
-          bool include_lle = true,
-          bool use_geodesic = false,
-          bool use_prev_sigma2 = false,
-          bool use_ecpd = false,
-          MatrixXf correspondence_priors = MatrixXf::Zero(0, 4),
-          double omega = 0,
-          std::string kernel = "Gaussian",
-          std::vector<int> occluded_nodes = {}) {
+bool ecpd_lle (MatrixXf X_orig,
+               MatrixXf& Y,
+               double& sigma2,
+               double beta,
+               double alpha,
+               double gamma,
+               double mu,
+               int max_iter = 30,
+               double tol = 0.00001,
+               bool include_lle = true,
+               bool use_geodesic = false,
+               bool use_prev_sigma2 = false,
+               bool use_ecpd = false,
+               std::vector<MatrixXf> correspondence_priors = {},
+               double omega = 0,
+               std::string kernel = "Gaussian",
+               std::vector<int> occluded_nodes = {}) {
 
     // log time            
     clock_t cur_time = clock();
@@ -356,14 +357,14 @@ bool cpd (MatrixXf X_orig,
 
     // add correspondence priors to the set
     // this is different from the Python implementation; here the additional points are being appended at the end
-    if (correspondence_priors.rows() != 0) {
-        int num_of_correspondence_priors = correspondence_priors.rows();
+    if (correspondence_priors.size() != 0) {
+        int num_of_correspondence_priors = correspondence_priors.size();
 
         for (int i = 0; i < num_of_correspondence_priors; i ++) {
             MatrixXf temp = MatrixXf::Zero(1, 3);
-            temp(0, 0) = correspondence_priors(i, 1);
-            temp(0, 1) = correspondence_priors(i, 2);
-            temp(0, 2) = correspondence_priors(i, 3);
+            temp(0, 0) = correspondence_priors[i](0, 1);
+            temp(0, 1) = correspondence_priors[i](0, 2);
+            temp(0, 2) = correspondence_priors[i](0, 3);
 
             X.conservativeResize(X.rows() + 1, Eigen::NoChange);
             X.row(X.rows()-1) = temp;
@@ -458,6 +459,13 @@ bool cpd (MatrixXf X_orig,
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
 
+        // // temp
+        // if (occluded_nodes.size() != 0) {
+        //     for (int i = 0; i < occluded_nodes.size(); i ++) {
+        //         P.row(occluded_nodes[i]) = MatrixXf::Zero(1, N);
+        //     }
+        // }
+
         MatrixXf Pt1 = P.colwise().sum();
         MatrixXf P1 = P.rowwise().sum();
         double Np = P1.sum();
@@ -470,8 +478,8 @@ bool cpd (MatrixXf X_orig,
             if (use_ecpd) {
                 MatrixXf P_tilde = MatrixXf::Zero(M, N);
                 // correspondence priors: index, x, y, z
-                for (int i = 0; i < correspondence_priors.rows(); i ++) {
-                    int index = static_cast<int>(correspondence_priors(i, 0));
+                for (int i = 0; i < correspondence_priors.size(); i ++) {
+                    int index = static_cast<int>(correspondence_priors[i](0, 0));
                     P_tilde(index, i + N_orig) = 1;
                 }
 
@@ -490,8 +498,8 @@ bool cpd (MatrixXf X_orig,
             if (use_ecpd) {
                 MatrixXf P_tilde = MatrixXf::Zero(M, N);
                 // correspondence priors: index, x, y, z
-                for (int i = 0; i < correspondence_priors.rows(); i ++) {
-                    int index = static_cast<int>(correspondence_priors(i, 0));
+                for (int i = 0; i < correspondence_priors.size(); i ++) {
+                    int index = static_cast<int>(correspondence_priors[i](0, 0));
                     P_tilde(index, i + N_orig) = 1;
                 }
 
@@ -534,6 +542,186 @@ bool cpd (MatrixXf X_orig,
     
     std::cout << "time taken:" << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
     return converged;
+}
+
+void tracking_step (MatrixXf X_orig,
+                    MatrixXf& Y,
+                    double& sigma2,
+                    std::vector<double> geodesic_coord,
+                    double total_len,
+                    Mat bmask) {
+
+    MatrixXf guide_nodes = Y.replicate(1, 1);
+    double sigma2_pre_proc = 0;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 1, 1, 2, 0.05, 50, 0.00001, true, true);
+
+    bool head_visible = false;
+    bool tail_visible = false;
+
+    if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) < 0.01) {
+        head_visible = true;
+    }
+    if (pt2pt_dis(guide_nodes.row(guide_nodes.rows()-1), Y.row(guide_nodes.rows()-1)) < 0.01) {
+        tail_visible = true;
+    }
+
+    MatrixXf priors;
+    std::vector<MatrixXf> priors_vec;
+    std::vector<int> occluded_nodes;
+
+    MatrixXf nodes_h = Y.replicate(1, 1);
+    nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+    nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+    MatrixXf proj_matrix(3, 4);
+    proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+                    0.0, 916.265869140625, 354.02392578125, 0.0,
+                    0.0, 0.0, 1.0, 0.0;
+    MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+
+    std::vector<int> valid_guide_nodes_indices;
+    for (int i = 0; i < image_coords.rows(); i ++) {
+        int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+        int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+        // not currently using the distance transform because I can't figure it out
+        if (static_cast<int>(bmask.at<uchar>(y, x)) == 255) {
+            valid_guide_nodes_indices.push_back(i);
+        }
+    }
+
+    // print_1d_vector(valid_guide_nodes_indices);
+
+    if (head_visible && tail_visible) {
+
+        std::vector<MatrixXf> valid_head_nodes;
+        std::vector<int> valid_head_node_indices;
+        for (int i = 0; i < guide_nodes.rows(); i ++) {
+            if (i == valid_guide_nodes_indices[i]) {
+                valid_head_nodes.push_back(guide_nodes.row(i));
+                valid_head_node_indices.push_back(i);
+            }
+            else {
+                break;
+            }
+
+            if (i == valid_guide_nodes_indices.size()-1) {
+                break;
+            }
+        }
+
+        std::vector<MatrixXf> valid_tail_nodes;
+        std::vector<int> valid_tail_node_indices;
+        for (int i = 0; i < guide_nodes.rows(); i ++) {
+            if (guide_nodes.rows()-1-i == valid_guide_nodes_indices[valid_guide_nodes_indices.size()-1-i]) {
+                valid_tail_nodes.insert(valid_tail_nodes.begin(), guide_nodes.row(guide_nodes.rows()-1-i));
+                valid_tail_node_indices.insert(valid_tail_node_indices.begin(), guide_nodes.rows()-1-i);
+            }
+            else {
+                break;
+            }
+
+            if (valid_guide_nodes_indices.size()-1-i == 0) {
+                break;
+            }
+        }
+
+        std::cout << "got here" << std::endl;
+        // print_1d_vector(valid_head_node_indices);
+        // print_1d_vector(valid_tail_node_indices);
+
+        // ---- head visible part -----
+        double total_dist_Y = 0;
+        double total_dist_guide_nodes = 0;
+        int it_gn = 0;
+        int last_visible_index_head = -1;
+        int last_visible_index_tail = -1;
+
+        if (valid_head_nodes.size() != 0) {
+            MatrixXf temp(1, 4);
+            temp << 0, valid_head_nodes[0](0, 0), valid_head_nodes[0](0, 1), valid_head_nodes[0](0, 2);
+            priors_vec.push_back(temp);
+        }
+
+        for (int it_y0 = 0; it_y0 < valid_head_nodes.size(); it_y0 ++) {
+            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0+1]);
+            while (total_dist_guide_nodes < total_dist_Y) {
+                total_dist_guide_nodes += pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
+                if (total_dist_guide_nodes >= total_dist_Y) {
+                    total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
+                    MatrixXf new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])
+                                            * (valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn]);
+                    MatrixXf temp(1, 4);
+                    temp << it_y0+1, new_y0_coord(0, 0), new_y0_coord(0, 1), new_y0_coord(0, 2);
+                    priors_vec.push_back(temp);
+                    break;
+                }
+                // if at the end of guide nodes
+                if (it_gn == valid_head_nodes.size() - 2) {
+                    last_visible_index_head = it_y0;
+                    break;
+                }
+                it_gn += 1;
+            }
+
+            if (last_visible_index_head != -1) {
+                break;
+            }
+        }
+        if (last_visible_index_head == -1) {
+            last_visible_index_head = valid_head_nodes.size() - 1;
+        }
+
+        std::cout << "got here" << std::endl;
+
+        // ----- tail visible part -----
+        total_dist_Y = 0;
+        total_dist_guide_nodes = 0;
+        it_gn = valid_tail_nodes.size() - 1;
+
+        if (valid_tail_nodes.size() != 0) {
+            MatrixXf temp(1, 4);
+            temp << valid_tail_nodes.size()-1 + valid_tail_node_indices[0], valid_tail_nodes[valid_tail_nodes.size()-1](0, 0), valid_tail_nodes[valid_tail_nodes.size()-1](0, 1), valid_tail_nodes[valid_tail_nodes.size()-1](0, 2);
+            priors_vec.push_back(temp);
+        }
+
+        for (int it_y0 = valid_tail_nodes.size()-1; it_y0 > 0; it_y0 --) {
+            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0-1]);
+            while (total_dist_guide_nodes < total_dist_Y) {
+                total_dist_guide_nodes += pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
+                if (total_dist_guide_nodes >= total_dist_Y) {
+                    total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
+                    MatrixXf new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])
+                                            * (valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn]);
+                    MatrixXf temp(1, 4);
+                    temp << it_y0-1 + valid_tail_node_indices[0], valid_tail_nodes[it_y0-1 + valid_tail_node_indices[0]](0, 0), valid_tail_nodes[it_y0-1 + valid_tail_node_indices[0]](0, 1), valid_tail_nodes[it_y0-1 + valid_tail_node_indices[0]](0, 2);
+                    priors_vec.push_back(temp);
+                    break;
+                }
+                // if at the end of guide nodes
+                if (it_gn == 1) {
+                    last_visible_index_tail = it_y0 + valid_tail_node_indices[0];
+                    break;
+                }
+                it_gn -= 1;
+            }
+            if (last_visible_index_tail != -1) {
+                break;
+            }
+        }
+        if (last_visible_index_tail == -1) {
+            last_visible_index_tail = 0;
+        }
+
+        for (int i = last_visible_index_head+1; i < last_visible_index_tail; i ++) {
+            occluded_nodes.push_back(i);
+        }
+    }
+
+    std::cout << "got here" << std::endl;
+    std::cout << priors_vec.size() << std::endl;
+    print_1d_vector(priors_vec);
+
+    ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
 }
 
 // int main(int argc, char **argv) {
