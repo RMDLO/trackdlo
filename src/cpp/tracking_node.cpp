@@ -32,6 +32,7 @@ using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
 MatrixXf Y;
+double sigma2;
 bool initialized = false;
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
@@ -147,14 +148,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         if (!initialized) {
             Y = Y_0_sorted.replicate(1, 1);
+            sigma2 = 0;
             initialized = true;
         } 
         else {
-            Y = cpd(X, Y, 1, 1, 1, 0.05, 100);
+            cpd (X, Y, sigma2, 2, 1, 1, 0.05, 50, 0.00001, true, false, true, false);
         }
 
-        std::cout << Y.rows() << ", " << Y.cols() << std::endl;
-        std::cout << Y << std::endl;
+        // std::cout << Y.rows() << ", " << Y.cols() << std::endl;
+        // std::cout << Y << std::endl;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);

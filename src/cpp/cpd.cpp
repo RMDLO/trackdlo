@@ -254,34 +254,35 @@ MatrixXf calc_LLE_weights (int k, MatrixXf X) {
     return W;
 }
 
-MatrixXf cpd (MatrixXf X_orig,
-              MatrixXf& Y_0,
-              double beta,
-              double alpha,
-              double gamma,
-              double mu,
-              int max_iter = 30,
-              double tol = 0.00001,
-              bool include_lle = true,
-              bool use_geodesic = false,
-              bool use_prev_sigma2 = false,
-              double sigma2_0 = 0,
-              bool use_ecpd = false,
-              MatrixXf correspondence_priors = MatrixXf::Zero(0, 0),
-              double omega = 0,
-              std::string kernel = "Gaussian",
-              std::vector<int> occluded_nodes = {}) {
+bool cpd (MatrixXf X_orig,
+          MatrixXf& Y,
+          double& sigma2,
+          double beta,
+          double alpha,
+          double gamma,
+          double mu,
+          int max_iter = 30,
+          double tol = 0.00001,
+          bool include_lle = true,
+          bool use_geodesic = false,
+          bool use_prev_sigma2 = false,
+          bool use_ecpd = false,
+          MatrixXf correspondence_priors = MatrixXf::Zero(0, 0),
+          double omega = 0,
+          std::string kernel = "Gaussian",
+          std::vector<int> occluded_nodes = {}) {
 
     // log time            
     clock_t cur_time = clock();
+    bool converged = true;
 
     MatrixXf X = X_orig.replicate(1, 1);
 
-    int M = Y_0.rows();
+    int M = Y.rows();
     int N = X.rows();
     int D = 3;
 
-    std::cout << "---" << std::endl;
+    MatrixXf Y_0 = Y.replicate(1, 1);
 
     MatrixXf diff_yy = MatrixXf::Zero(M, M);
     MatrixXf diff_yy_sqrt = MatrixXf::Zero(M, M);
@@ -352,15 +353,9 @@ MatrixXf cpd (MatrixXf X_orig,
         }
     }
 
-    MatrixXf Y = Y_0.replicate(1, 1);
-
     // initialize sigma2
-    double sigma2 = 0;
-    if (!use_prev_sigma2) {
+    if (!use_prev_sigma2 || sigma2 == 0) {
         sigma2 = diff_xy.sum() / (static_cast<double>(D * M * N) / 1000);
-    }
-    else {
-        sigma2 = sigma2_0;
     }
 
     // get the LLE matrix
@@ -446,13 +441,14 @@ MatrixXf cpd (MatrixXf X_orig,
         }
 
         if (it == max_iter - 1) {
-            std::cout << "optimization did not converge!" << std::endl;
+            ROS_ERROR("optimization did not converge!");
+            converged = false;
             break;
         }
     }
     
     std::cout << "time taken:" << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
-    return Y;
+    return converged;
 }
 
 // int main(int argc, char **argv) {
