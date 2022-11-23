@@ -5,7 +5,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
 #include <ctime>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -643,7 +646,7 @@ void tracking_step (MatrixXf X_orig,
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 1, 1, 2, 0.05, 50, 0.00001, true, true);
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.3, 1, 2, 0.05, 50, 0.00001, true, true);
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -661,7 +664,7 @@ void tracking_step (MatrixXf X_orig,
 
     int state = 0;
 
-    MatrixXf nodes_h = Y.replicate(1, 1);
+    MatrixXf nodes_h = guide_nodes.replicate(1, 1);
     nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
     nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
     MatrixXf proj_matrix(3, 4);
@@ -955,59 +958,46 @@ void tracking_step (MatrixXf X_orig,
         for (int i = 0; i < last_visible_index_tail; i ++) {
             occluded_nodes.push_back(i);
         }
-
     }
 
     else {
         ROS_ERROR("Neither tip visible!");
     }
 
+    // // visualization for debug
+    // Mat mask_rgb;
+    // cv::cvtColor(bmask, mask_rgb, cv::COLOR_GRAY2BGR);
+    // std::cout << "before draw image" << std::endl;
+    // for (MatrixXf prior : priors_vec) {
+    //     MatrixXf proj_matrix(3, 4);
+    //     proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+    //                     0.0, 916.265869140625, 354.02392578125, 0.0,
+    //                     0.0, 0.0, 1.0, 0.0;
+    //     MatrixXf prior_h(1, 4);
+    //     prior_h << prior(0, 1), prior(0, 2), prior(0, 3), 1.0;
+    //     std::cout << prior_h << std::endl;
+
+    //     MatrixXf image_coord = (proj_matrix * prior_h.transpose()).transpose();
+    //     std::cout << image_coord << std::endl;
+
+    //     int x = static_cast<int>(image_coord(0, 0)/image_coord(0, 2));
+    //     int y = static_cast<int>(image_coord(0, 1)/image_coord(0, 2));
+    //     std::cout << x << ", " << y << std::endl;
+
+    //     cv::circle(mask_rgb, cv::Point(x, y), 5, cv::Scalar(0, 200, 0), -1);
+    // }
+    // std::cout << "after draw image" << std::endl;
+
+    // cv::imshow("frame", mask_rgb);
+    // cv::waitKey(3);
+
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 1, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 5, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
     }  
     else {
         ROS_ERROR("Not a valid state!");
     }
 }
-
-// int main(int argc, char **argv) {
-//     ros::init (argc, argv, "test");
-//     ros::NodeHandle nh;
-
-//     MatrixXf m1 = MatrixXf::Zero(5, 3);
-//     for (int i = 0; i < m1.rows(); i ++) {
-//         for (int j = 0; j < m1.cols(); j ++) {
-//             m1(i, j) = (static_cast<float>(i)*m1.cols() + static_cast<float>(j))/100;
-//             // m1(i, j) *= m1(i, j);
-//         }
-//     }
-
-//     MatrixXf m2 = MatrixXf::Zero(10, 3);
-//     for (int i = 0; i < m2.rows(); i ++) {
-//         for (int j = 0; j < m2.cols(); j ++) {
-//             m2(i, j) = (static_cast<float>(i)*m2.cols() + static_cast<float>(j))/200;
-//             // m1(i, j) *= m1(i, j);
-//         }
-//     }
-
-//     std::cout << m1 << std::endl;
-//     std::cout << m2 << std::endl;
-
-//     // // ----- test LLE weights -----
-//     // clock_t cur_time = clock();
-//     // MatrixXf out = calc_LLE_weights(2, m1);
-//     // std::cout << static_cast<double>(clock() - cur_time) / static_cast<double>(CLOCKS_PER_SEC) << std::endl;
-//     // // std::cout << out << std::endl;
-
-//     // // ----- test pt2pt_dis_sq -----
-//     // MatrixXf m3 = m2.array() + 0.5;
-//     // std::cout << m3 << std::endl;
-//     // std::cout << pt2pt_dis_sq(m2, m3) << std::endl;
-
-//     // ----- test ecpd -----
-//     std::cout << cpd(m2, m1, 0.3, 1, 1, 0.1, 30, 0.00001, true, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian") << std::endl;
-//     // print_1d_vector(cpd(m2, m1, 0.3, 1, 1, 0.05, 1, 0.00001, false, false, 0, false, MatrixXf(0, 0), 0, "Gaussian"));
-// }

@@ -297,7 +297,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
-    cv::namedWindow("view");
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 1, update_opencv_mask);
@@ -342,5 +341,4 @@ int main(int argc, char **argv) {
     );
     
     ros::spin();
-    cv::destroyWindow("view");
 }
