@@ -35,6 +35,7 @@ using Eigen::RowVectorXd;
 MatrixXf Y;
 double sigma2;
 bool initialized = false;
+std::vector<double> converted_node_coord = {0.0};
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
@@ -140,8 +141,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
-        std::vector<double> converted_node_coord = {0.0};
-
         if (!initialized) {
             MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
             MatrixXf Y_0_sorted = sort_pts(Y_0);
@@ -151,7 +150,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             // record geodesic coord
             double cur_sum = 0;
             for (int i = 0; i < Y_0_sorted.rows()-1; i ++) {
-                cur_sum += (Y_0.row(i+1) - Y_0.row(i)).norm();
+                cur_sum += (Y_0_sorted.row(i+1) - Y_0_sorted.row(i)).norm();
                 converted_node_coord.push_back(cur_sum);
             }
 
@@ -171,7 +170,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false);
+            // ecpd_lle (X, Y, sigma2, 1, 1, 2, 0.1, 50, 0.00001, true, true, false, false);
             tracking_step(X, Y, sigma2, converted_node_coord, 0, mask);
         }
 
@@ -242,9 +241,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cur_pc->header.seq = cloud->header.seq;
         cur_pc->fields = cloud->fields;
 
+        cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
+        cur_pc_downsampled.header.seq = cloud->header.seq;
+        cur_pc_downsampled.fields = cloud->fields;
+
         // Convert to ROS data type
-        pcl_conversions::moveFromPCL(*cur_pc, output);
-        // pcl_conversions::moveFromPCL(cur_pc_downsample1d, output);
+        // pcl_conversions::moveFromPCL(*cur_pc, output);
+        pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
     }
     else {
         ROS_ERROR("empty pointcloud!");
