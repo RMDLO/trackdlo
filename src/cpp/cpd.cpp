@@ -351,7 +351,43 @@ bool ecpd_lle (MatrixXf X_orig,
     MatrixXf L = calc_LLE_weights(6, Y_0);
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
-    // TODO: implement node deletion from the original point cloud
+    // point deletion from the original point cloud
+    MatrixXf X_temp = MatrixXf::Zero(N, 3);
+    if (occluded_nodes.size() != 0) {
+        std::vector<int> max_p_nodes(N, 0);
+        MatrixXf diff_xy = MatrixXf::Zero(M, N);
+
+        // update diff_xy
+        for (int i = 0; i < M; i ++) {
+            for (int j = 0; j < N; j ++) {
+                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+            }
+        }
+
+        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
+        double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
+        P = P.array().rowwise() / (P.colwise().sum().array() + c);
+
+        int M_head = occluded_nodes[0];
+        int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
+
+        int X_temp_counter = 0;
+
+        for (int i = 0; i < N; i ++) {
+            P.col(i).maxCoeff(&max_p_nodes[i]);
+            int max_p_node = max_p_nodes[i];
+
+            // critical nodes: M_head and M-M_tail-1
+            if (max_p_node != M_head && max_p_node != (M-M_tail-1)) {
+                X_temp.row(X_temp_counter) = X.row(i);
+                X_temp_counter += 1;
+            }
+        }
+
+        std::cout << "X original len: " << X.rows() << std::endl;
+        X = X_temp.topRows(X_temp_counter);
+        std::cout << "X after deletion len: " << X.rows() << std::endl;
+    }
 
     int N_orig = X.rows();
 
@@ -454,7 +490,7 @@ bool ecpd_lle (MatrixXf X_orig,
 
             // update P
             P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
-            // P = P.array().rowwise() / (P.colwise().sum().array() + c);
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
         else {
             P = P_stored.replicate(1, 1);
@@ -475,13 +511,13 @@ bool ecpd_lle (MatrixXf X_orig,
 
             for (int i = 0; i < M; i ++) {
                 if (i < M_head) {
-                    P_vis_fill_head(i, 0) = 1 / M_head;
+                    P_vis_fill_head(i, 0) = 1.0 / static_cast<double>(M_head);
                 }
                 else if (M_head <= i && i < (M - M_tail)) {
-                    P_vis_fill_floating(i, 0) = (M - M_head - M_tail);
+                    P_vis_fill_floating(i, 0) = 1.0 / static_cast<double>(M - M_head - M_tail);
                 }
                 else {
-                    P_vis_fill_tail(i, 0) = 1 / M_tail;
+                    P_vis_fill_tail(i, 0) = 1.0 / static_cast<double>(M_tail);
                 }
             }
 
@@ -647,6 +683,21 @@ void tracking_step (MatrixXf X_orig,
         //     if (i == 0) {head_visible = false;}
         //     if (i == image_coords.rows()-1) {tail_visible = false;}
         // }
+    }
+
+    if (!head_visible && !tail_visible) {
+        // if head node is within the mask threshold
+        if (valid_guide_nodes_indices[0] == 0) {
+            if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) < pt2pt_dis(guide_nodes.row(Y.rows()-1), Y.row(Y.rows()-1))) {
+                head_visible = true;
+            }
+        }
+        // if tail node is within the mask threshold
+        if (valid_guide_nodes_indices[valid_guide_nodes_indices.size()-1] == Y.rows()-1) {
+            if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) > pt2pt_dis(guide_nodes.row(Y.rows()-1), Y.row(Y.rows()-1))) {
+                tail_visible = true;
+            }
+        }
     }
 
     // print_1d_vector(valid_guide_nodes_indices);
@@ -912,7 +963,7 @@ void tracking_step (MatrixXf X_orig,
     }
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
     }
     else if (state == 1) {
         ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
