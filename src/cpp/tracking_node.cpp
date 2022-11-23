@@ -36,6 +36,13 @@ MatrixXf Y;
 double sigma2;
 bool initialized = false;
 std::vector<double> converted_node_coord = {0.0};
+Mat occlusion_mask;
+bool updated_opencv_mask = false;
+
+void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
+    occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
+    updated_opencv_mask = true;
+}
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
@@ -53,7 +60,17 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
     Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
-    Mat cur_image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+    Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+
+    // combine with cur image
+    Mat cur_image;
+    if (updated_opencv_mask) {
+        cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    }
+    else {
+        cur_image_orig.copyTo(cur_image);
+    }
+
     Mat cur_image_hsv;
 
     // convert color
@@ -128,7 +145,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.01, 0.01, 0.01);
+        sor.setLeafSize (0.008, 0.008, 0.008);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
@@ -268,6 +285,7 @@ int main(int argc, char **argv) {
     cv::namedWindow("view");
 
     image_transport::ImageTransport it(nh);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 1, update_opencv_mask);
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
