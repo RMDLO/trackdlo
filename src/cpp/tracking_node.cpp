@@ -41,7 +41,9 @@ bool updated_opencv_mask = false;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
-    updated_opencv_mask = true;
+    if (!occlusion_mask.empty()) {
+        updated_opencv_mask = true;
+    }
 }
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
@@ -80,16 +82,17 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     Mat mask_without_occlusion_block;
     cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
 
-    Mat occlusion_mask_gray;
-    cv::cvtColor(occlusion_mask, occlusion_mask_gray, cv::COLOR_BGR2GRAY);
-    if (updated_opencv_mask) {
-        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask_gray, mask);
-    }
-
     // update cur image for visualization
     Mat cur_image;
+    Mat occlusion_mask_gray;
     if (updated_opencv_mask) {
+        cv::cvtColor(occlusion_mask, occlusion_mask_gray, cv::COLOR_BGR2GRAY);
+        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask_gray, mask);
         cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    }
+    else {
+        mask_without_occlusion_block.copyTo(mask);
+        cur_image_orig.copyTo(cur_image);
     }
 
     // if (updated_opencv_mask) {
@@ -112,6 +115,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     detector->detect(mask_red, keypoints);
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
+
+    // distance transform
+    Mat bmask_transformed;
+    cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
+    double mat_min, mat_max;
+    cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
+    std::cout << mat_min << ", " << mat_max << std::endl;
+    Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
+    bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
+    double mask_dist_threshold = 10 / mat_max * 255;
 
     // Mat tracking_img;
     // cur_image.copyTo(tracking_img);
@@ -199,19 +212,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 1, 1, 2, 0.1, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, converted_node_coord, 0, mask);
+            tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
         }
-
-        // distance transform
-        Mat bmask_transformed;
-        cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, cv::DIST_MASK_PRECISE, CV_32F);
-        int mask_dist_threshold = 10;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-        // std::cout << Y_0 << std::endl;
-        // std::cout << Y_0_sorted << std::endl;
 
         // project and pub image
         MatrixXf proj_matrix(3, 4);
@@ -222,6 +228,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // draw points
         Mat tracking_img;
         cur_image.copyTo(tracking_img);
+
         for (int i = 0; i < image_coords.rows(); i ++) {
 
             int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
@@ -230,10 +237,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::Scalar point_color;
             cv::Scalar line_color;
 
-            // std::cout << "bmask dist = " << static_cast<float>(bmask_transformed.at<uchar>(col, row)) << std::endl;
+            
+            // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
             // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
             
-            if (static_cast<int>(mask.at<uchar>(col, row)) == 255) {
+            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold) {
                 point_color = cv::Scalar(0, 150, 255);
                 line_color = cv::Scalar(0, 255, 0);
             }
@@ -252,12 +260,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
         }
 
-        // visualize distance transform result
-        double mat_min, mat_max;
-        cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
-        // std::cout << mat_min << ", " << mat_max << std::endl;
-
-        // cv::imshow("frame", bmask_transformed/mat_max*255);
+        // // visualize distance transform result
+        // cv::imshow("frame", bmask_transformed_normalized);
         // cv::waitKey(3);
 
         // publish image

@@ -601,7 +601,9 @@ void tracking_step (MatrixXf X_orig,
                     double& sigma2,
                     std::vector<double> geodesic_coord,
                     double total_len,
-                    Mat bmask) {
+                    Mat bmask,
+                    Mat bmask_transformed_normalized,
+                    double mask_dist_threshold) {
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
@@ -638,13 +640,13 @@ void tracking_step (MatrixXf X_orig,
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
         // not currently using the distance transform because I can't figure it out
-        if (static_cast<int>(bmask.at<uchar>(y, x)) == 255) {
+        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold) {
             valid_guide_nodes_indices.push_back(i);
         }
-        else {
-            if (i == 0) {head_visible = false;}
-            if (i == image_coords.rows()-1) {tail_visible = false;}
-        }
+        // else {
+        //     if (i == 0) {head_visible = false;}
+        //     if (i == image_coords.rows()-1) {tail_visible = false;}
+        // }
     }
 
     // print_1d_vector(valid_guide_nodes_indices);
