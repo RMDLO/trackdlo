@@ -454,21 +454,62 @@ bool ecpd_lle (MatrixXf X_orig,
 
             // update P
             P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
+            // P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
+        else {
+            P = P_stored.replicate(1, 1);
+        }
+
+        if (occluded_nodes.size() != 0) {
+
+            ROS_INFO("modified membership probability");
+
+            MatrixXf P_vis = MatrixXf::Zero(M, N);
+
+            int M_head = occluded_nodes[0];
+            int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
+
+            MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
+            MatrixXf P_vis_fill_tail = MatrixXf::Zero(M, 1);
+            MatrixXf P_vis_fill_floating = MatrixXf::Zero(M, 1);
+
+            for (int i = 0; i < M; i ++) {
+                if (i < M_head) {
+                    P_vis_fill_head(i, 0) = 1 / M_head;
+                }
+                else if (M_head <= i && i < (M - M_tail)) {
+                    P_vis_fill_floating(i, 0) = (M - M_head - M_tail);
+                }
+                else {
+                    P_vis_fill_tail(i, 0) = 1 / M_tail;
+                }
+            }
+
+            // fill in P_vis
+            for (int i = 0; i < N; i ++) {
+                int cur_max_p_node = max_p_nodes[i];
+
+                if (cur_max_p_node >= 0 && cur_max_p_node < M_head) {
+                    P_vis.col(i) = P_vis_fill_head;
+                }
+                else if (cur_max_p_node >= M_head && cur_max_p_node < (M-M_tail)) {
+                    P_vis.col(i) = P_vis_fill_floating;
+                }
+                else {
+                    P_vis.col(i) = P_vis_fill_tail;
+                }
+            }
+
+            // modify P
+            P = P.cwiseProduct(P_vis);
+
+            // modify c
+            c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
-        // else {
-        //     P = P_stored.replicate(1, 1);
-        // }
-
-        // if (occluded_nodes.size() != 0) {
-        //     MatrixXf P_vis = MatrixXf::Zero(M, N);
-
-        //     int M_head = occluded_nodes[0];
-        //     int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
-
-        //     MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
-        //     MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
-        // }
+        else {
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
 
         // // old
         // if (occluded_nodes.size() != 0) {

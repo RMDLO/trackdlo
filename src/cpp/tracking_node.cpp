@@ -62,19 +62,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
     Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
-    // combine with cur image
-    Mat cur_image;
-    if (updated_opencv_mask) {
-        cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
-    }
-    else {
-        cur_image_orig.copyTo(cur_image);
-    }
-
     Mat cur_image_hsv;
 
     // convert color
-    cv::cvtColor(cur_image, cur_image_hsv, cv::COLOR_BGR2HSV);
+    cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
     // filter blue
     cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
@@ -86,7 +77,27 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // combine red mask
     cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
     // combine overall mask
-    cv::bitwise_or(mask_red, mask_blue, mask);
+    Mat mask_without_occlusion_block;
+    cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
+
+    Mat occlusion_mask_gray;
+    cv::cvtColor(occlusion_mask, occlusion_mask_gray, cv::COLOR_BGR2GRAY);
+    if (updated_opencv_mask) {
+        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask_gray, mask);
+    }
+
+    // update cur image for visualization
+    Mat cur_image;
+    if (updated_opencv_mask) {
+        cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    }
+
+    // if (updated_opencv_mask) {
+    //     cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    // }
+    // else {
+    //     cur_image_orig.copyTo(cur_image);
+    // }
 
     // simple blob detector
     cv::SimpleBlobDetector::Params blob_params;
