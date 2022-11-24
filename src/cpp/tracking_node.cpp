@@ -16,6 +16,8 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <ctime>
 #include <chrono>
@@ -26,6 +28,8 @@
 using cv::Mat;
 
 ros::Publisher pc_pub;
+ros::Publisher node_results_pub;
+ros::Publisher line_results_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -280,6 +284,68 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // Convert to ROS data type
         // pcl_conversions::moveFromPCL(*cur_pc, output);
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
+
+        // // publish the results as a line strip
+        // visualization_msgs::Marker line_results = visualization_msgs::Marker();
+        // line_results.type = visualization_msgs::Marker::LINE_STRIP;
+        // line_results.scale.x = 0.008;
+        // line_results.color.g = 1.0f;
+        // line_results.color.a = 1.0;
+
+        // // set headers
+        // line_results.header.frame_id = "camera_color_optical_frame";
+        // line_results.header.stamp = ros::Time::now();
+        // line_results.ns = "results";
+        // line_results.action = visualization_msgs::Marker::ADD;
+
+        // publish the results as a marker array
+        visualization_msgs::MarkerArray node_results = visualization_msgs::MarkerArray();
+        for (int i = 0; i < Y.rows(); i ++) {
+            visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
+
+            // add header
+            cur_node_result.header.frame_id = "camera_color_optical_frame";
+            // cur_node_result.header.stamp = ros::Time::now();
+            cur_node_result.type = visualization_msgs::Marker::SPHERE;
+            cur_node_result.action = visualization_msgs::Marker::ADD;
+            cur_node_result.ns = "results" + std::to_string(i);
+            cur_node_result.id = i;
+
+            // add position
+            cur_node_result.pose.position.x = Y(i, 0);
+            cur_node_result.pose.position.y = Y(i, 1);
+            cur_node_result.pose.position.z = Y(i, 2);
+
+            // add orientation
+            cur_node_result.pose.orientation.w = 1.0;
+            cur_node_result.pose.orientation.x = 0.0;
+            cur_node_result.pose.orientation.y = 0.0;
+            cur_node_result.pose.orientation.z = 0.0;
+
+            // set scale
+            cur_node_result.scale.x = 0.01;
+            cur_node_result.scale.y = 0.01;
+            cur_node_result.scale.z = 0.01;
+
+            // set color
+            cur_node_result.color.r = 1.0f;
+            cur_node_result.color.g = 150.0 / 255.0;
+            cur_node_result.color.b = 0.0f;
+            cur_node_result.color.a = 1.0;
+
+            node_results.markers.push_back(cur_node_result);
+
+            // // line result
+            // geometry_msgs::Point p;
+            // p.x = Y(i, 0);
+            // p.y = Y(i, 1);
+            // p.z = Y(i, 2);
+
+            // line_results.points.push_back(p);
+        }
+
+        // line_results_pub.publish(line_results);
+        node_results_pub.publish(node_results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -303,6 +369,8 @@ int main(int argc, char **argv) {
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
+    node_results_pub = nh.advertise<visualization_msgs::MarkerArray>("/node_results", 1);
+    line_results_pub = nh.advertise<visualization_msgs::Marker>("/line_results", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
