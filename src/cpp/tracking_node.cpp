@@ -28,8 +28,7 @@
 using cv::Mat;
 
 ros::Publisher pc_pub;
-ros::Publisher node_results_pub;
-ros::Publisher line_results_pub;
+ros::Publisher results_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -285,30 +284,17 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // pcl_conversions::moveFromPCL(*cur_pc, output);
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
-        // // publish the results as a line strip
-        // visualization_msgs::Marker line_results = visualization_msgs::Marker();
-        // line_results.type = visualization_msgs::Marker::LINE_STRIP;
-        // line_results.scale.x = 0.008;
-        // line_results.color.g = 1.0f;
-        // line_results.color.a = 1.0;
-
-        // // set headers
-        // line_results.header.frame_id = "camera_color_optical_frame";
-        // line_results.header.stamp = ros::Time::now();
-        // line_results.ns = "results";
-        // line_results.action = visualization_msgs::Marker::ADD;
-
         // publish the results as a marker array
-        visualization_msgs::MarkerArray node_results = visualization_msgs::MarkerArray();
+        visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
         for (int i = 0; i < Y.rows(); i ++) {
             visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
-
+        
             // add header
             cur_node_result.header.frame_id = "camera_color_optical_frame";
             // cur_node_result.header.stamp = ros::Time::now();
             cur_node_result.type = visualization_msgs::Marker::SPHERE;
             cur_node_result.action = visualization_msgs::Marker::ADD;
-            cur_node_result.ns = "results" + std::to_string(i);
+            cur_node_result.ns = "node_results" + std::to_string(i);
             cur_node_result.id = i;
 
             // add position
@@ -331,21 +317,56 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cur_node_result.color.r = 1.0f;
             cur_node_result.color.g = 150.0 / 255.0;
             cur_node_result.color.b = 0.0f;
-            cur_node_result.color.a = 1.0;
+            cur_node_result.color.a = 0.75;
 
-            node_results.markers.push_back(cur_node_result);
+            results.markers.push_back(cur_node_result);
 
-            // // line result
-            // geometry_msgs::Point p;
-            // p.x = Y(i, 0);
-            // p.y = Y(i, 1);
-            // p.z = Y(i, 2);
+            // don't add line if at the last node
+            if (i == Y.rows()-1) {
+                break;
+            }
 
-            // line_results.points.push_back(p);
+            visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
+
+            // add header
+            cur_line_result.header.frame_id = "camera_color_optical_frame";
+            cur_line_result.type = visualization_msgs::Marker::CYLINDER;
+            cur_line_result.action = visualization_msgs::Marker::ADD;
+            cur_line_result.ns = "line_results" + std::to_string(i);
+            cur_line_result.id = i;
+
+            // add position
+            cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
+            cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
+            cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
+
+            // add orientation
+            Eigen::Quaternionf q;
+            Eigen::Vector3f vec1(0.0, 0.0, 1.0);
+            Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
+            q.setFromTwoVectors(vec1, vec2);
+
+            cur_line_result.pose.orientation.w = q.w();
+            cur_line_result.pose.orientation.x = q.x();
+            cur_line_result.pose.orientation.y = q.y();
+            cur_line_result.pose.orientation.z = q.z();
+
+            // set scale
+            cur_line_result.scale.x = 0.005;
+            cur_line_result.scale.y = 0.005;
+            cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
+
+            // set color
+            cur_line_result.color.r = 0.0f;
+            cur_line_result.color.g = 1.0f;
+            cur_line_result.color.b = 0.0f;
+            cur_line_result.color.a = 0.75;
+
+            results.markers.push_back(cur_line_result);
         }
 
         // line_results_pub.publish(line_results);
-        node_results_pub.publish(node_results);
+        results_pub.publish(results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -369,8 +390,7 @@ int main(int argc, char **argv) {
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
-    node_results_pub = nh.advertise<visualization_msgs::MarkerArray>("/node_results", 1);
-    line_results_pub = nh.advertise<visualization_msgs::Marker>("/line_results", 1);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);

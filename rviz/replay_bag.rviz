@@ -6,8 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /PointCloud21
-        - /MarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 178
   - Class: rviz/Selection
@@ -27,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -95,27 +93,10 @@ Visualization Manager:
       Value: false
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /node_results
+      Marker Topic: /results
       Name: MarkerArray
       Namespaces:
-        results0: true
-        results1: true
-        results10: true
-        results11: true
-        results12: true
-        results13: true
-        results14: true
-        results15: true
-        results16: true
-        results17: true
-        results2: true
-        results3: true
-        results4: true
-        results5: true
-        results6: true
-        results7: true
-        results8: true
-        results9: true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -174,7 +155,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.768295168876648
+      Distance: 0.6901631355285645
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -190,9 +171,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5647963285446167
+      Pitch: 0.5747969746589661
       Target Frame: <Fixed Frame>
-      Yaw: 3.4203903675079346
+      Yaw: 3.3753867149353027
     Saved: ~
 Window Geometry:
   Displays:

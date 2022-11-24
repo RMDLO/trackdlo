@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <vector>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -32,6 +33,7 @@ bool ecpd_lle (MatrixXf X_orig,
                std::vector<int> occluded_nodes = {});
 
 MatrixXf sort_pts (MatrixXf pts_orig);
+double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
 
 void tracking_step (MatrixXf X_orig,
                     MatrixXf& Y,
