@@ -6,6 +6,21 @@ This is the TrackDLO ROS package for tracking deformable linear objects under oc
   <img src="images/ours.png" width="500" title="hover text">
 </p>
 
+----------------------
+## C++:
+
+Note: The C++ implementation is only compatible with ropes with ground truth markers on at the moment.
+
+### Usage:
+
+1. Run ```catkin build``` to get the executable file. Make sure to do this every time after modifying the cpp files!
+2. Open a new terminal and run ```roslaunch TrackDLO replay_bag.launch```.
+3. In another terminal, run ```rosrun TrackDLO trackdlo_node```. This will start the tracking algorithm.
+4. Finally, open another ternimal and run ```rosbag play <name_of_the_bag_file>.bag```. This will replay the bag file and all results will be published in rviz.
+
+----------------------
+## Python:
+
 ### To test the most recent version of TrackDLO with RGB-D camera stream:
 
 1. Run ```roslaunch TrackDLO realsense_node.launch```. This will bring up the rviz window with color image, mask, and tracking result (2D and 3D) visualized.
