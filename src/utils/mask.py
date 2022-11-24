@@ -21,7 +21,7 @@ from sklearn.neighbors import NearestNeighbors
 import open3d as o3d
 from scipy import ndimage
 
-def callback (rgb, depth, pc):
+def callback (rgb, pc):
 
     proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                             [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -69,7 +69,17 @@ def callback (rgb, depth, pc):
 
     # test
     mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
+    bmask = mask.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
+
+    # test distance transform
+    bmask_transformed = cv2.distanceTransform(255-bmask, cv2.DIST_L2, cv2.DIST_MASK_3)
+    print(np.amax(bmask_transformed))
+    print(bmask_transformed)
+    bmask_transformed[bmask_transformed > 255] = 255
+    bmask_transformed_rgb = cv2.cvtColor(bmask_transformed.copy().astype('uint8'), cv2.COLOR_GRAY2RGB)
+    # cv2.imshow('frame', bmask_transformed)
+    # cv2.waitKey(3)
 
     # blob detection
     params = cv2.SimpleBlobDetector_Params()
@@ -108,7 +118,8 @@ def callback (rgb, depth, pc):
     tracking_img_pub.publish(tracking_img_msg)
 
     # publish mask
-    mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
+    # mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
+    mask_img_msg = ros_numpy.msgify(Image, bmask_transformed_rgb, 'rgb8')
     mask_img_pub.publish(mask_img_msg)
 
 
@@ -116,7 +127,6 @@ if __name__=='__main__':
     rospy.init_node('test', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
 
     # header
@@ -134,7 +144,7 @@ if __name__=='__main__':
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
-    ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub, pc_sub], 10)
+    ts = message_filters.TimeSynchronizer([rgb_sub, pc_sub], 10)
     ts.registerCallback(callback)
 
     rospy.spin()

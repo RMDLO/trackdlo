@@ -3,6 +3,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -15,6 +16,8 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <ctime>
 #include <chrono>
@@ -25,6 +28,7 @@
 using cv::Mat;
 
 ros::Publisher pc_pub;
+ros::Publisher results_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -32,7 +36,18 @@ using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
 MatrixXf Y;
+double sigma2;
 bool initialized = false;
+std::vector<double> converted_node_coord = {0.0};
+Mat occlusion_mask;
+bool updated_opencv_mask = false;
+
+void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
+    occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
+    if (!occlusion_mask.empty()) {
+        updated_opencv_mask = true;
+    }
+}
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
@@ -50,11 +65,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
     Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
-    Mat cur_image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+    Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+
     Mat cur_image_hsv;
 
     // convert color
-    cv::cvtColor(cur_image, cur_image_hsv, cv::COLOR_BGR2HSV);
+    cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
     // filter blue
     cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
@@ -66,7 +82,28 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // combine red mask
     cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
     // combine overall mask
-    cv::bitwise_or(mask_red, mask_blue, mask);
+    Mat mask_without_occlusion_block;
+    cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
+
+    // update cur image for visualization
+    Mat cur_image;
+    Mat occlusion_mask_gray;
+    if (updated_opencv_mask) {
+        cv::cvtColor(occlusion_mask, occlusion_mask_gray, cv::COLOR_BGR2GRAY);
+        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask_gray, mask);
+        cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    }
+    else {
+        mask_without_occlusion_block.copyTo(mask);
+        cur_image_orig.copyTo(cur_image);
+    }
+
+    // if (updated_opencv_mask) {
+    //     cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+    // }
+    // else {
+    //     cur_image_orig.copyTo(cur_image);
+    // }
 
     // simple blob detector
     cv::SimpleBlobDetector::Params blob_params;
@@ -81,6 +118,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     detector->detect(mask_red, keypoints);
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
+
+    // distance transform
+    Mat bmask_transformed;
+    cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
+    double mat_min, mat_max;
+    cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
+    std::cout << mat_min << ", " << mat_max << std::endl;
+    Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
+    bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
+    double mask_dist_threshold = 10 / mat_max * 255;
 
     // Mat tracking_img;
     // cur_image.copyTo(tracking_img);
@@ -107,11 +154,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2* cur_pc = new pcl::PCLPointCloud2;
         pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
-
-        // MatrixXf Y_0 = MatrixXf::Zero(keypoints.size(), 3);
-        // for (int i = 0; i < keypoints.size(); i ++) {
-        //     Y_0(i, 0) = 
-        // }
+        pcl::PointCloud<pcl::PointXYZRGB> downsampled_xyz;
 
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
@@ -121,79 +164,209 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
             }
         }
-        MatrixXf X = cur_pc_xyz.getMatrixXfMap().topRows(3).transpose();
+
+        // convert back to pointcloud2 message
+        pcl::toPCLPointCloud2(cur_pc_xyz, *cur_pc);
+        // Perform downsampling
+        pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
+        pcl::PCLPointCloud2 cur_pc_downsampled;
+        pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+        sor.setInputCloud (cloudPtr);
+        sor.setLeafSize (0.008, 0.008, 0.008);
+        sor.filter (cur_pc_downsampled);
+
+        pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
+        MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
+        std::cout << "num of points: " << X.rows() << std::endl;
 
         for (cv::KeyPoint key_point : keypoints) {
             cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
         }
 
-        MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-        MatrixXf Y_0_sorted = sort_pts(Y_0);
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
         if (!initialized) {
+            MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
+            MatrixXf Y_0_sorted = sort_pts(Y_0);
             Y = Y_0_sorted.replicate(1, 1);
+            sigma2 = 0;
+
+            // record geodesic coord
+            double cur_sum = 0;
+            for (int i = 0; i < Y_0_sorted.rows()-1; i ++) {
+                cur_sum += (Y_0_sorted.row(i+1) - Y_0_sorted.row(i)).norm();
+                converted_node_coord.push_back(cur_sum);
+            }
+
+            // use ecpd to help initialize
+            std::vector<MatrixXf> priors_vec;
+            for (int i = 0; i < Y_0_sorted.rows(); i ++) {
+                MatrixXf temp = MatrixXf::Zero(1, 4);
+                temp(0, 0) = i;
+                temp(0, 1) = Y_0_sorted(i, 0);
+                temp(0, 2) = Y_0_sorted(i, 1);
+                temp(0, 3) = Y_0_sorted(i, 2);
+                priors_vec.push_back(temp);
+            }
+
+            ecpd_lle(X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.00001);
+
             initialized = true;
         } 
         else {
-            Y = cpd(X, Y, 1, 1, 1, 0.05, 100);
+            // ecpd_lle (X, Y, sigma2, 1, 1, 2, 0.1, 50, 0.00001, true, true, false, false);
+            tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
         }
-
-        std::cout << Y.rows() << ", " << Y.cols() << std::endl;
-        std::cout << Y << std::endl;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-        // std::cout << Y_0 << std::endl;
-        // std::cout << Y_0_sorted << std::endl;
 
         // project and pub image
         MatrixXf proj_matrix(3, 4);
         proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                        0.0, 916.265869140625, 354.02392578125, 0.0,
                        0.0, 0.0, 1.0, 0.0;
-        // std::cout << proj_matrix.rows() << ", " << proj_matrix.cols() << std::endl;
-        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
         MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
         // draw points
         Mat tracking_img;
         cur_image.copyTo(tracking_img);
-        for (int i = 0; i < image_coords.rows(); i ++) { // image_coords.rows()
-            cv::circle(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
-                                               static_cast<int>(image_coords(i, 1)/image_coords(i, 2))), 
-                                     5, cv::Scalar(0, 150, 255), -1);
+
+        for (int i = 0; i < image_coords.rows(); i ++) {
+
+            int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+            int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+            cv::Scalar point_color;
+            cv::Scalar line_color;
+
+            
+            // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
+            // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
+            
+            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold) {
+                point_color = cv::Scalar(0, 150, 255);
+                line_color = cv::Scalar(0, 255, 0);
+            }
+            else {
+                point_color = cv::Scalar(0, 0, 255);
+                line_color = cv::Scalar(0, 0, 255);
+            }
+
+            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+
             if (i != image_coords.rows()-1) {
-                cv::line(tracking_img, cv::Point(static_cast<int>(image_coords(i, 0)/image_coords(i, 2)), 
-                                                 static_cast<int>(image_coords(i, 1)/image_coords(i, 2))),
+                cv::line(tracking_img, cv::Point(row, col),
                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                  static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                       cv::Scalar(0, 255, 0), 2);
+                                       line_color, 2);
             }
         }
 
+        // // visualize distance transform result
+        // cv::imshow("frame", bmask_transformed_normalized);
+        // cv::waitKey(3);
+
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
-
-        // convert back to pointcloud2 message
-        pcl::toPCLPointCloud2(cur_nodes_xyz, *cur_pc);
+        // tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bmask_transformed_rgb).toImageMsg();
 
         // fill in header
         cur_pc->header.frame_id = "camera_color_optical_frame";
         cur_pc->header.seq = cloud->header.seq;
         cur_pc->fields = cloud->fields;
 
-        // // Perform downsampling
-        // pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
-        // pcl::PCLPointCloud2 cur_pc_downsampled;
-        // pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-        // sor.setInputCloud (cloudPtr);
-        // sor.setLeafSize (0.004, 0.004, 0.004);
-        // sor.filter (cur_pc_downsampled);
+        cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
+        cur_pc_downsampled.header.seq = cloud->header.seq;
+        cur_pc_downsampled.fields = cloud->fields;
 
         // Convert to ROS data type
-        pcl_conversions::moveFromPCL(*cur_pc, output);
-        // pcl_conversions::moveFromPCL(cur_pc_downsample1d, output);
+        // pcl_conversions::moveFromPCL(*cur_pc, output);
+        pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
+
+        // publish the results as a marker array
+        visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
+        for (int i = 0; i < Y.rows(); i ++) {
+            visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
+        
+            // add header
+            cur_node_result.header.frame_id = "camera_color_optical_frame";
+            // cur_node_result.header.stamp = ros::Time::now();
+            cur_node_result.type = visualization_msgs::Marker::SPHERE;
+            cur_node_result.action = visualization_msgs::Marker::ADD;
+            cur_node_result.ns = "node_results" + std::to_string(i);
+            cur_node_result.id = i;
+
+            // add position
+            cur_node_result.pose.position.x = Y(i, 0);
+            cur_node_result.pose.position.y = Y(i, 1);
+            cur_node_result.pose.position.z = Y(i, 2);
+
+            // add orientation
+            cur_node_result.pose.orientation.w = 1.0;
+            cur_node_result.pose.orientation.x = 0.0;
+            cur_node_result.pose.orientation.y = 0.0;
+            cur_node_result.pose.orientation.z = 0.0;
+
+            // set scale
+            cur_node_result.scale.x = 0.01;
+            cur_node_result.scale.y = 0.01;
+            cur_node_result.scale.z = 0.01;
+
+            // set color
+            cur_node_result.color.r = 1.0f;
+            cur_node_result.color.g = 150.0 / 255.0;
+            cur_node_result.color.b = 0.0f;
+            cur_node_result.color.a = 0.75;
+
+            results.markers.push_back(cur_node_result);
+
+            // don't add line if at the last node
+            if (i == Y.rows()-1) {
+                break;
+            }
+
+            visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
+
+            // add header
+            cur_line_result.header.frame_id = "camera_color_optical_frame";
+            cur_line_result.type = visualization_msgs::Marker::CYLINDER;
+            cur_line_result.action = visualization_msgs::Marker::ADD;
+            cur_line_result.ns = "line_results" + std::to_string(i);
+            cur_line_result.id = i;
+
+            // add position
+            cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
+            cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
+            cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
+
+            // add orientation
+            Eigen::Quaternionf q;
+            Eigen::Vector3f vec1(0.0, 0.0, 1.0);
+            Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
+            q.setFromTwoVectors(vec1, vec2);
+
+            cur_line_result.pose.orientation.w = q.w();
+            cur_line_result.pose.orientation.x = q.x();
+            cur_line_result.pose.orientation.y = q.y();
+            cur_line_result.pose.orientation.z = q.z();
+
+            // set scale
+            cur_line_result.scale.x = 0.005;
+            cur_line_result.scale.y = 0.005;
+            cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
+
+            // set color
+            cur_line_result.color.r = 0.0f;
+            cur_line_result.color.g = 1.0f;
+            cur_line_result.color.b = 0.0f;
+            cur_line_result.color.a = 0.75;
+
+            results.markers.push_back(cur_line_result);
+        }
+
+        // line_results_pub.publish(line_results);
+        results_pub.publish(results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -211,12 +384,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
-    cv::namedWindow("view");
 
     image_transport::ImageTransport it(nh);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 1, update_opencv_mask);
     image_transport::Publisher mask_pub = it.advertise("/mask", 1);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
@@ -255,5 +429,4 @@ int main(int argc, char **argv) {
     );
     
     ros::spin();
-    cv::destroyWindow("view");
 }

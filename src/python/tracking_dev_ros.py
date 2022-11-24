@@ -385,11 +385,11 @@ def ecpd_lle (X_orig,                      # input point cloud
         additional_pc = correspondence_priors[:, 1:4]
         X = np.vstack((additional_pc, X))
 
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(X), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # # add color
+    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    # pc_rgba_arr = np.full((len(X), 1), pc_rgba)
+    # filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
+    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
     N = len(X)
     
@@ -1063,6 +1063,8 @@ def callback (rgb, pc):
     pcd.points = o3d.utility.Vector3dVector(filtered_pc)
     downpcd = pcd.voxel_down_sample(voxel_size=0.005)
     filtered_pc = np.asarray(downpcd.points)
+
+    rospy.loginfo("Downsampled point cloud size: " + str(len(filtered_pc)))
 
     # # add color
     # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
