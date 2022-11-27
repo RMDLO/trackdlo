@@ -7,8 +7,8 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#ifndef CPD_H
-#define CPD_H
+#ifndef TRACKDLO_H
+#define TRACKDLO_H
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(TrackDLO)
+project(trackdlo)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-O2)   # -std=c++11
@@ -155,7 +155,7 @@ include_directories(
 # )
 
 add_executable(
-  trackdlo_node src/cpp/tracking_node.cpp src/cpp/cpd.cpp
+  trackdlo_node cpp/src/tracking_node.cpp cpp/src/trackdlo.cpp
 )
 
 ## Rename C++ executable without prefix
