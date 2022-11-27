@@ -1066,16 +1066,16 @@ def callback (rgb, pc):
 
     rospy.loginfo("Downsampled point cloud size: " + str(len(filtered_pc)))
 
-    # add color
-    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # # add color
+    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    pc_pub.publish(converted_points)
+    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    # header.stamp = rospy.Time.now()
+    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    # pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
@@ -1130,8 +1130,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        # guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
-        nodes, sigma2 = ecpd_lle(filtered_pc, init_nodes, 0.5, 1, 1, 0.05, 50, 0.00001, True, True, False)
+        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
@@ -1145,14 +1144,14 @@ def callback (rgb, pc):
         converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
         nodes_pub.publish(converted_nodes)
 
-        # # add color for guide nodes
-        # guide_nodes_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
-        # guide_nodes_rgba_arr = np.full((len(guide_nodes), 1), guide_nodes_rgba)
-        # guide_nodes_colored = np.hstack((guide_nodes, guide_nodes_rgba_arr)).astype('O')
-        # guide_nodes_colored[:, 3] = guide_nodes_colored[:, 3].astype(int)
-        # header.stamp = rospy.Time.now()
-        # converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
-        # guide_nodes_pub.publish(converted_guide_nodes)
+        # add color for guide nodes
+        guide_nodes_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
+        guide_nodes_rgba_arr = np.full((len(guide_nodes), 1), guide_nodes_rgba)
+        guide_nodes_colored = np.hstack((guide_nodes, guide_nodes_rgba_arr)).astype('O')
+        guide_nodes_colored[:, 3] = guide_nodes_colored[:, 3].astype(int)
+        header.stamp = rospy.Time.now()
+        converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
+        guide_nodes_pub.publish(converted_guide_nodes)
 
         if params["initialization_params"]["pub_tracking_image"]:
             # project and pub tracking image

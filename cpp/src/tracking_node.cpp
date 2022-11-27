@@ -389,20 +389,17 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 priors_vec.push_back(temp);
             }
 
-            ecpd_lle(X, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.00001);
+            ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
 
             initialized = true;
             priors = priors_vec;
         } 
         else {
-            ecpd_lle (X, Y, sigma2, 1, 1, 2, 0.1, 50, 0.00001, true, true, true, false);
-            // priors = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
+            // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
+            priors = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
         }
 
         std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
-
-        // temp test
-        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "priors_results");
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -471,7 +468,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
         // publish the results as a marker array
-        // visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results");
+        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results");
 
         // line_results_pub.publish(line_results);
         results_pub.publish(results);
@@ -480,7 +477,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_ERROR("empty pointcloud!");
     }
 
-    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
     pc_pub.publish(output);
 

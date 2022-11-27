@@ -2,6 +2,8 @@
 
   <node name="realsense_tf" pkg="trackdlo" type="pub_camera_tf.py"/>
   <!-- <node name="tracking_method_ours" pkg="trackdlo" type="trackdlo_node"/> -->
+
+  <!-- To create occlusion manually -->
   <!-- <node name="opencv_interaction" pkg="trackdlo" type="opencv_interactive.py"/> -->
 
   <!-- tracking rviz file -->

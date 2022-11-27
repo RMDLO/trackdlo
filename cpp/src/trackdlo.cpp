@@ -322,7 +322,7 @@ bool ecpd_lle (MatrixXf X_orig,
     else {
         double cur_sum = 0;
         for (int i = 0; i < M-1; i ++) {
-            cur_sum += (Y_0.row(i+1) - Y_0.row(i)).norm();
+            cur_sum += pt2pt_dis(Y_0.row(i+1), Y_0.row(i));
             converted_node_coord.push_back(cur_sum);
         }
 
@@ -388,7 +388,7 @@ bool ecpd_lle (MatrixXf X_orig,
         }
 
         // std::cout << "X original len: " << X.rows() << std::endl;
-        // X = X_temp.topRows(X_temp_counter);
+        X = X_temp.topRows(X_temp_counter);
         // std::cout << "X after deletion len: " << X.rows() << std::endl;
     }
 
@@ -423,7 +423,7 @@ bool ecpd_lle (MatrixXf X_orig,
 
     // initialize sigma2
     if (!use_prev_sigma2 || sigma2 == 0) {
-        sigma2 = diff_xy.sum() / (static_cast<double>(D * M * N) / 1000);
+        sigma2 = diff_xy.sum() / static_cast<double>(D * M * N);
     }
 
     for (int it = 0; it < max_iter; it ++) {
@@ -447,116 +447,116 @@ bool ecpd_lle (MatrixXf X_orig,
             P.col(i).maxCoeff(&max_p_nodes[i]);
         }
 
-        // if (use_geodesic) {
-        //     MatrixXf pts_dis_sq_geodesic = MatrixXf::Zero(M, N);
+        if (use_geodesic) {
+            MatrixXf pts_dis_sq_geodesic = MatrixXf::Zero(M, N);
 
-        //     // loop through all points
-        //     for (int i = 0; i < N; i ++) {
+            // loop through all points
+            for (int i = 0; i < N; i ++) {
                 
-        //         P.col(i).maxCoeff(&max_p_nodes[i]);
-        //         int max_p_node = max_p_nodes[i];
+                P.col(i).maxCoeff(&max_p_nodes[i]);
+                int max_p_node = max_p_nodes[i];
 
-        //         int potential_2nd_max_p_node_1 = max_p_node - 1;
-        //         if (potential_2nd_max_p_node_1 == -1) {
-        //             potential_2nd_max_p_node_1 = 2;
-        //         }
+                int potential_2nd_max_p_node_1 = max_p_node - 1;
+                if (potential_2nd_max_p_node_1 == -1) {
+                    potential_2nd_max_p_node_1 = 2;
+                }
 
-        //         int potential_2nd_max_p_node_2 = max_p_node + 1;
-        //         if (potential_2nd_max_p_node_2 == M) {
-        //             potential_2nd_max_p_node_2 = M - 3;
-        //         }
+                int potential_2nd_max_p_node_2 = max_p_node + 1;
+                if (potential_2nd_max_p_node_2 == M) {
+                    potential_2nd_max_p_node_2 = M - 3;
+                }
 
-        //         int next_max_p_node;
-        //         if (pt2pt_dis(Y.row(potential_2nd_max_p_node_1), X.row(i)) < pt2pt_dis(Y.row(potential_2nd_max_p_node_2), X.row(i))) {
-        //             next_max_p_node = potential_2nd_max_p_node_1;
-        //         } 
-        //         else {
-        //             next_max_p_node = potential_2nd_max_p_node_2;
-        //         }
+                int next_max_p_node;
+                if (pt2pt_dis(Y.row(potential_2nd_max_p_node_1), X.row(i)) < pt2pt_dis(Y.row(potential_2nd_max_p_node_2), X.row(i))) {
+                    next_max_p_node = potential_2nd_max_p_node_1;
+                } 
+                else {
+                    next_max_p_node = potential_2nd_max_p_node_2;
+                }
 
-        //         // fill the current column of pts_dis_sq_geodesic
-        //         pts_dis_sq_geodesic(max_p_node, i) = pt2pt_dis_sq(Y.row(max_p_node), X.row(i));
-        //         pts_dis_sq_geodesic(next_max_p_node, i) = pt2pt_dis_sq(Y.row(next_max_p_node), X.row(i));
+                // fill the current column of pts_dis_sq_geodesic
+                pts_dis_sq_geodesic(max_p_node, i) = pt2pt_dis_sq(Y.row(max_p_node), X.row(i));
+                pts_dis_sq_geodesic(next_max_p_node, i) = pt2pt_dis_sq(Y.row(next_max_p_node), X.row(i));
 
-        //         if (max_p_node < next_max_p_node) {
-        //             for (int j = 0; j < max_p_node; j ++) {
-        //                 pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
-        //             }
-        //             for (int j = next_max_p_node; j < M; j ++) {
-        //                 pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
-        //             }
-        //         }
-        //         else {
-        //             for (int j = 0; j < next_max_p_node; j ++) {
-        //                 pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
-        //             }
-        //             for (int j = max_p_node; j < M; j ++) {
-        //                 pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
-        //             }
-        //         }
-        //     }
+                if (max_p_node < next_max_p_node) {
+                    for (int j = 0; j < max_p_node; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                    }
+                    for (int j = next_max_p_node; j < M; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                    }
+                }
+                else {
+                    for (int j = 0; j < next_max_p_node; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                    }
+                    for (int j = max_p_node; j < M; j ++) {
+                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                    }
+                }
+            }
 
-        //     // update P
-        //     P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
-        //     // P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // }
-        // else {
-        //     P = P_stored.replicate(1, 1);
-        // }
+            // update P
+            P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
+            // P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
+        else {
+            P = P_stored.replicate(1, 1);
+        }
 
         // // temp test
         // P = P_stored.replicate(1, 1);
 
-        // if (occluded_nodes.size() != 0) {
+        if (occluded_nodes.size() != 0) {
 
-        //     ROS_INFO("modified membership probability");
+            ROS_INFO("modified membership probability");
 
-        //     MatrixXf P_vis = MatrixXf::Zero(M, N);
+            MatrixXf P_vis = MatrixXf::Zero(M, N);
 
-        //     int M_head = occluded_nodes[0];
-        //     int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
+            int M_head = occluded_nodes[0];
+            int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
 
-        //     MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
-        //     MatrixXf P_vis_fill_tail = MatrixXf::Zero(M, 1);
-        //     MatrixXf P_vis_fill_floating = MatrixXf::Zero(M, 1);
+            MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
+            MatrixXf P_vis_fill_tail = MatrixXf::Zero(M, 1);
+            MatrixXf P_vis_fill_floating = MatrixXf::Zero(M, 1);
 
-        //     for (int i = 0; i < M; i ++) {
-        //         if (i < M_head) {
-        //             P_vis_fill_head(i, 0) = 1.0 / static_cast<double>(M_head);
-        //         }
-        //         else if (M_head <= i && i < (M - M_tail)) {
-        //             P_vis_fill_floating(i, 0) = 1.0 / static_cast<double>(M - M_head - M_tail);
-        //         }
-        //         else {
-        //             P_vis_fill_tail(i, 0) = 1.0 / static_cast<double>(M_tail);
-        //         }
-        //     }
+            for (int i = 0; i < M; i ++) {
+                if (i < M_head) {
+                    P_vis_fill_head(i, 0) = 1.0 / static_cast<double>(M_head);
+                }
+                else if (M_head <= i && i < (M - M_tail)) {
+                    P_vis_fill_floating(i, 0) = 1.0 / static_cast<double>(M - M_head - M_tail);
+                }
+                else {
+                    P_vis_fill_tail(i, 0) = 1.0 / static_cast<double>(M_tail);
+                }
+            }
 
-        //     // fill in P_vis
-        //     for (int i = 0; i < N; i ++) {
-        //         int cur_max_p_node = max_p_nodes[i];
+            // fill in P_vis
+            for (int i = 0; i < N; i ++) {
+                int cur_max_p_node = max_p_nodes[i];
 
-        //         if (cur_max_p_node >= 0 && cur_max_p_node < M_head) {
-        //             P_vis.col(i) = P_vis_fill_head;
-        //         }
-        //         else if (cur_max_p_node >= M_head && cur_max_p_node < (M-M_tail)) {
-        //             P_vis.col(i) = P_vis_fill_floating;
-        //         }
-        //         else {
-        //             P_vis.col(i) = P_vis_fill_tail;
-        //         }
-        //     }
+                if (cur_max_p_node >= 0 && cur_max_p_node < M_head) {
+                    P_vis.col(i) = P_vis_fill_head;
+                }
+                else if (cur_max_p_node >= M_head && cur_max_p_node < (M-M_tail)) {
+                    P_vis.col(i) = P_vis_fill_floating;
+                }
+                else {
+                    P_vis.col(i) = P_vis_fill_tail;
+                }
+            }
 
-        //     // modify P
-        //     P = P.cwiseProduct(P_vis);
+            // modify P
+            P = P.cwiseProduct(P_vis);
 
-        //     // modify c
-        //     c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
-        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // }
-        // else {
-        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // }
+            // modify c
+            c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
+        else {
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
 
         // // old
         // if (occluded_nodes.size() != 0) {
@@ -565,7 +565,7 @@ bool ecpd_lle (MatrixXf X_orig,
         //     }
         // }
 
-        MatrixXf Pt1 = P.colwise().sum();
+        MatrixXf Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
         MatrixXf P1 = P.rowwise().sum();
         double Np = P1.sum();
         MatrixXf PX = P * X;
@@ -614,7 +614,8 @@ bool ecpd_lle (MatrixXf X_orig,
             }
         }
 
-        MatrixXf W = (A_matrix).householderQr().solve(B_matrix);
+        // MatrixXf W = A_matrix.householderQr().solve(B_matrix);
+        MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
 
         MatrixXf T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
@@ -654,7 +655,7 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.3, 1, 2, 0.05, 50, 0.00001, true, true);
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.2, 1, 2, 0.05, 50, 0.00001, true, true);
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -1000,10 +1001,10 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 1, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 5, 1, 2, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
     }  
     else {
         ROS_ERROR("Not a valid state!");

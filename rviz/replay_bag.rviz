@@ -122,9 +122,9 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 1
-      Size (m): 0.009999999776482582
-      Style: Points
-      Topic: /camera/depth/color/points
+      Size (m): 0.0020000000949949026
+      Style: Spheres
+      Topic: /pts
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -185,7 +185,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.4759075343608856
+      Distance: 2.224889039993286
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -193,17 +193,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.24840117990970612
-        Y: 0.09731842577457428
-        Z: 0.04652620106935501
+        X: 0.4169823229312897
+        Y: 0.06894825398921967
+        Z: 0.055961769074201584
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4147970974445343
+      Pitch: 0.5647971630096436
       Target Frame: <Fixed Frame>
-      Yaw: 3.270383834838867
+      Yaw: 3.300379753112793
     Saved: ~
 Window Geometry:
   Displays:
