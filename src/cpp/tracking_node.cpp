@@ -49,9 +49,95 @@ void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     }
 }
 
+visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns) {
+    // publish the results as a marker array
+    visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
+    for (int i = 0; i < Y.rows(); i ++) {
+        visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
+    
+        // add header
+        cur_node_result.header.frame_id = marker_frame;
+        // cur_node_result.header.stamp = ros::Time::now();
+        cur_node_result.type = visualization_msgs::Marker::SPHERE;
+        cur_node_result.action = visualization_msgs::Marker::ADD;
+        cur_node_result.ns = marker_ns + std::to_string(i);
+        cur_node_result.id = i;
+
+        // add position
+        cur_node_result.pose.position.x = Y(i, 0);
+        cur_node_result.pose.position.y = Y(i, 1);
+        cur_node_result.pose.position.z = Y(i, 2);
+
+        // add orientation
+        cur_node_result.pose.orientation.w = 1.0;
+        cur_node_result.pose.orientation.x = 0.0;
+        cur_node_result.pose.orientation.y = 0.0;
+        cur_node_result.pose.orientation.z = 0.0;
+
+        // set scale
+        cur_node_result.scale.x = 0.01;
+        cur_node_result.scale.y = 0.01;
+        cur_node_result.scale.z = 0.01;
+
+        // set color
+        cur_node_result.color.r = 1.0f;
+        cur_node_result.color.g = 150.0 / 255.0;
+        cur_node_result.color.b = 0.0f;
+        cur_node_result.color.a = 0.75;
+
+        results.markers.push_back(cur_node_result);
+
+        // don't add line if at the last node
+        if (i == Y.rows()-1) {
+            break;
+        }
+
+        visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
+
+        // add header
+        cur_line_result.header.frame_id = "camera_color_optical_frame";
+        cur_line_result.type = visualization_msgs::Marker::CYLINDER;
+        cur_line_result.action = visualization_msgs::Marker::ADD;
+        cur_line_result.ns = "line_results" + std::to_string(i);
+        cur_line_result.id = i;
+
+        // add position
+        cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
+        cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
+        cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
+
+        // add orientation
+        Eigen::Quaternionf q;
+        Eigen::Vector3f vec1(0.0, 0.0, 1.0);
+        Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
+        q.setFromTwoVectors(vec1, vec2);
+
+        cur_line_result.pose.orientation.w = q.w();
+        cur_line_result.pose.orientation.x = q.x();
+        cur_line_result.pose.orientation.y = q.y();
+        cur_line_result.pose.orientation.z = q.z();
+
+        // set scale
+        cur_line_result.scale.x = 0.005;
+        cur_line_result.scale.y = 0.005;
+        cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
+
+        // set color
+        cur_line_result.color.r = 0.0f;
+        cur_line_result.color.g = 1.0f;
+        cur_line_result.color.b = 0.0f;
+        cur_line_result.color.a = 0.75;
+
+        results.markers.push_back(cur_line_result);
+    }
+
+    return results;
+}
+
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
-    std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
+    // log time
+    std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
     
     std::vector<int> lower_blue = {90, 60, 40};
     std::vector<int> upper_blue = {130, 255, 255};
@@ -124,7 +210,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
     double mat_min, mat_max;
     cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
-    std::cout << mat_min << ", " << mat_max << std::endl;
+    // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
     double mask_dist_threshold = 10 / mat_max * 255;
@@ -185,6 +271,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
+        // log time
+        std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
+
         if (!initialized) {
             MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
             MatrixXf Y_0_sorted = sort_pts(Y_0);
@@ -217,6 +306,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             // ecpd_lle (X, Y, sigma2, 1, 1, 2, 0.1, 50, 0.00001, true, true, false, false);
             tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
         }
+
+        std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -285,85 +376,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
         // publish the results as a marker array
-        visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
-        for (int i = 0; i < Y.rows(); i ++) {
-            visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
-        
-            // add header
-            cur_node_result.header.frame_id = "camera_color_optical_frame";
-            // cur_node_result.header.stamp = ros::Time::now();
-            cur_node_result.type = visualization_msgs::Marker::SPHERE;
-            cur_node_result.action = visualization_msgs::Marker::ADD;
-            cur_node_result.ns = "node_results" + std::to_string(i);
-            cur_node_result.id = i;
-
-            // add position
-            cur_node_result.pose.position.x = Y(i, 0);
-            cur_node_result.pose.position.y = Y(i, 1);
-            cur_node_result.pose.position.z = Y(i, 2);
-
-            // add orientation
-            cur_node_result.pose.orientation.w = 1.0;
-            cur_node_result.pose.orientation.x = 0.0;
-            cur_node_result.pose.orientation.y = 0.0;
-            cur_node_result.pose.orientation.z = 0.0;
-
-            // set scale
-            cur_node_result.scale.x = 0.01;
-            cur_node_result.scale.y = 0.01;
-            cur_node_result.scale.z = 0.01;
-
-            // set color
-            cur_node_result.color.r = 1.0f;
-            cur_node_result.color.g = 150.0 / 255.0;
-            cur_node_result.color.b = 0.0f;
-            cur_node_result.color.a = 0.75;
-
-            results.markers.push_back(cur_node_result);
-
-            // don't add line if at the last node
-            if (i == Y.rows()-1) {
-                break;
-            }
-
-            visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
-
-            // add header
-            cur_line_result.header.frame_id = "camera_color_optical_frame";
-            cur_line_result.type = visualization_msgs::Marker::CYLINDER;
-            cur_line_result.action = visualization_msgs::Marker::ADD;
-            cur_line_result.ns = "line_results" + std::to_string(i);
-            cur_line_result.id = i;
-
-            // add position
-            cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
-            cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
-            cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
-
-            // add orientation
-            Eigen::Quaternionf q;
-            Eigen::Vector3f vec1(0.0, 0.0, 1.0);
-            Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
-            q.setFromTwoVectors(vec1, vec2);
-
-            cur_line_result.pose.orientation.w = q.w();
-            cur_line_result.pose.orientation.x = q.x();
-            cur_line_result.pose.orientation.y = q.y();
-            cur_line_result.pose.orientation.z = q.z();
-
-            // set scale
-            cur_line_result.scale.x = 0.005;
-            cur_line_result.scale.y = 0.005;
-            cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
-
-            // set color
-            cur_line_result.color.r = 0.0f;
-            cur_line_result.color.g = 1.0f;
-            cur_line_result.color.b = 0.0f;
-            cur_line_result.color.a = 0.75;
-
-            results.markers.push_back(cur_line_result);
-        }
+        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results");
 
         // line_results_pub.publish(line_results);
         results_pub.publish(results);
@@ -376,7 +389,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     pc_pub.publish(output);
 
-    std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
+    std::cout << "total time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count() << "[ms]" << std::endl;
     
     return tracking_img_msg;
 }

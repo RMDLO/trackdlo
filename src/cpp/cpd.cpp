@@ -387,9 +387,9 @@ bool ecpd_lle (MatrixXf X_orig,
             }
         }
 
-        std::cout << "X original len: " << X.rows() << std::endl;
-        X = X_temp.topRows(X_temp_counter);
-        std::cout << "X after deletion len: " << X.rows() << std::endl;
+        // std::cout << "X original len: " << X.rows() << std::endl;
+        // X = X_temp.topRows(X_temp_counter);
+        // std::cout << "X after deletion len: " << X.rows() << std::endl;
     }
 
     int N_orig = X.rows();
@@ -827,7 +827,7 @@ void tracking_step (MatrixXf X_orig,
             occluded_nodes.push_back(i);
         }
 
-        std::cout << last_visible_index_head << ", " << last_visible_index_tail << std::endl;
+        // std::cout << last_visible_index_head << ", " << last_visible_index_tail << std::endl;
     }
     
     else if (head_visible && (!tail_visible)) {
