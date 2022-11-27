@@ -1,10 +1,10 @@
 <launch>
 
-  <node name="realsense_tf" pkg="TrackDLO" type="pub_camera_tf.py"/>
-  <!-- <node name="tracking_method_ours" pkg="TrackDLO" type="trackdlo_node"/> -->
-  <!-- <node name="opencv_interaction" pkg="TrackDLO" type="opencv_interactive.py"/> -->
+  <node name="realsense_tf" pkg="trackdlo" type="pub_camera_tf.py"/>
+  <!-- <node name="tracking_method_ours" pkg="trackdlo" type="trackdlo_node"/> -->
+  <!-- <node name="opencv_interaction" pkg="trackdlo" type="opencv_interactive.py"/> -->
 
   <!-- tracking rviz file -->
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find TrackDLO)/rviz/replay_bag.rviz" />
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/replay_bag.rviz" />
 
 </launch>
