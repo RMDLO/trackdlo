@@ -655,7 +655,7 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.2, 1, 2, 0.05, 50, 0.00001, true, true);
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.2, 1, 2, 0.05, 50, 0.00001, true, true, true);
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -687,14 +687,14 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
         int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-        // not currently using the distance transform because I can't figure it out
+        // not currently using the original distance transform because I can't figure it out
         if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold) {
             valid_guide_nodes_indices.push_back(i);
         }
-        // else {
-        //     if (i == 0) {head_visible = false;}
-        //     if (i == image_coords.rows()-1) {tail_visible = false;}
-        // }
+        else {
+            if (i == 0) {head_visible = false;}
+            if (i == image_coords.rows()-1) {tail_visible = false;}
+        }
     }
 
     if (!head_visible && !tail_visible) {
@@ -715,6 +715,8 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
     // print_1d_vector(valid_guide_nodes_indices);
 
     if (head_visible && tail_visible) {
+
+        ROS_INFO("Both ends visible but length changed");
 
         state = 2;
 
@@ -841,6 +843,8 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
     
     else if (head_visible && (!tail_visible)) {
 
+        ROS_INFO("Head visible");
+
         state = 1;
 
         std::vector<MatrixXf> valid_head_nodes;
@@ -906,6 +910,8 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
     }
 
     else if ((!head_visible) && tail_visible) {
+
+        ROS_INFO("Tail visible");
 
         state = 1;
 
