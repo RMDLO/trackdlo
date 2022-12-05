@@ -272,13 +272,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cur_image_orig.copyTo(cur_image);
     }
 
-    // if (updated_opencv_mask) {
-    //     cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
-    // }
-    // else {
-    //     cur_image_orig.copyTo(cur_image);
-    // }
-
     // simple blob detector
     cv::SimpleBlobDetector::Params blob_params;
     blob_params.filterByColor = false;
@@ -411,10 +404,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                        0.0, 916.265869140625, 354.02392578125, 0.0,
                        0.0, 0.0, 1.0, 0.0;
         MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
-        // draw points
-        Mat tracking_img;
-        cur_image.copyTo(tracking_img);
 
+        Mat tracking_img;
+        tracking_img = 0.5*cur_image_orig + 0.5*cur_image;
+
+        // cur_image.copyTo(tracking_img);
+
+        // draw points
         for (int i = 0; i < image_coords.rows(); i ++) {
 
             int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));

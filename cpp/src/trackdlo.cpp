@@ -716,7 +716,7 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
 
     if (head_visible && tail_visible) {
 
-        ROS_INFO("Both ends visible but length changed");
+        ROS_INFO("Both ends visible");
 
         state = 2;
 
@@ -979,6 +979,13 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
         ROS_ERROR("Neither tip visible!");
     }
 
+    // // TEMP TEST
+    // if (state == 1) {
+    //     priors_vec = {priors_vec[0], priors_vec[priors_vec.size()-1]};
+    // }
+
+    std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
+
     // // visualization for debug
     // Mat mask_rgb;
     // cv::cvtColor(bmask, mask_rgb, cv::COLOR_GRAY2BGR);
@@ -1011,6 +1018,7 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
     }
     else if (state == 1) {
         ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
+        // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
     }  
     else {
         ROS_ERROR("Not a valid state!");
