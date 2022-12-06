@@ -599,10 +599,10 @@ bool ecpd_lle (MatrixXf X_orig,
                 P_vis.row(i) = P_vis_i * P_vis.row(i);
             }
 
-            // std::cout << P_vis.col(0).transpose() << std::endl;
-
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
+
+            std::cout << P_vis.col(0).transpose() << std::endl;
 
             // modify P
             P = P.cwiseProduct(P_vis);
@@ -755,19 +755,21 @@ bool ecpd_lle (MatrixXf X_orig,
     return converged;
 }
 
-MatrixXf tracking_step (MatrixXf X_orig,
-                        MatrixXf& Y,
-                        double& sigma2,
-                        std::vector<double> geodesic_coord,
-                        double total_len,
-                        Mat bmask,
-                        Mat bmask_transformed_normalized,
-                        double mask_dist_threshold,
-                        double mat_max) {
+void tracking_step (MatrixXf X_orig,
+                    MatrixXf& Y,
+                    double& sigma2,
+                    MatrixXf& guide_nodes,
+                    std::vector<MatrixXf>& priors_vec,
+                    std::vector<double> geodesic_coord,
+                    double total_len,
+                    Mat bmask,
+                    Mat bmask_transformed_normalized,
+                    double mask_dist_threshold,
+                    double mat_max) {
 
-    MatrixXf guide_nodes = Y.replicate(1, 1);
+    guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 1, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.7, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -780,7 +782,7 @@ MatrixXf tracking_step (MatrixXf X_orig,
     }
 
     MatrixXf priors;
-    std::vector<MatrixXf> priors_vec = {};
+    // std::vector<MatrixXf> priors_vec = {};
     std::vector<int> occluded_nodes = {};
 
     int state = 0;
@@ -1129,12 +1131,12 @@ MatrixXf tracking_step (MatrixXf X_orig,
         ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 5, bmask_transformed_normalized, mat_max);
-        // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
+        // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
     }  
     else {
         ROS_ERROR("Not a valid state!");
     }
 
-    return guide_nodes;
+    // return guide_nodes;
 }

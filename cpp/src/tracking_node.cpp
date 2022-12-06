@@ -30,6 +30,7 @@ using cv::Mat;
 ros::Publisher pc_pub;
 ros::Publisher results_pub;
 ros::Publisher guide_nodes_pub;
+ros::Publisher priors_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -372,7 +373,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // log time
         std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
 
-        MatrixXf guide_ndoes;
+        MatrixXf guide_nodes;
+        std::vector<MatrixXf> priors;
 
         if (!initialized) {
             if (use_eval_rope) {
@@ -402,7 +404,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
             }
             else {
-                reg(X, Y, sigma2, 25, 0.05, 50);
+                reg(X, Y, sigma2, 18, 0.05, 50);
                 Y = sort_pts(Y);
                 // record geodesic coord
                 double cur_sum = 0;
@@ -416,7 +418,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            guide_ndoes = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
@@ -465,7 +467,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::line(tracking_img, cv::Point(row, col),
                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                  static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                       line_color, 2);
+                                                 line_color, 2);
             }
         }
 
@@ -492,10 +494,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // publish the results as a marker array
         visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
-        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_ndoes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
+        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
+        visualization_msgs::MarkerArray priors_results = MatrixXf2MarkerArray(priors, "camera_color_optical_frame", "priors_results", {1.0, 1.0, 1.0, 0.5}, {1.0, 1.0, 0.0, 0.5});
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
+        priors_pub.publish(priors_results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -521,6 +525,7 @@ int main(int argc, char **argv) {
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
+    priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/priors", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
