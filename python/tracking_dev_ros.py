@@ -999,7 +999,7 @@ def callback (rgb, pc):
     global params, read_params
 
     if not read_params:
-        setting_path = join(dirname(dirname(dirname(abspath(__file__)))), "settings/TrackDLO_params.yaml")
+        setting_path = join(dirname(dirname(abspath(__file__))), "settings/TrackDLO_params.yaml")
         with open(setting_path, 'r') as file:
             params = yaml.safe_load(file)
         read_params = True

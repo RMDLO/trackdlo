@@ -1,7 +1,7 @@
 <launch>
 
   <include file="$(find realsense2_camera)/launch/rs_camera.launch">
-    <arg name="json_file_path" value="$(find TrackDLO)/settings/preset_decimation_4.0_depth_step_100.json" />
+    <arg name="json_file_path" value="$(find trackdlo)/settings/preset_decimation_4.0_depth_step_100.json" />
     <arg name="publish_tf" value="false" />
     <arg name="filters" value="pointcloud,temporal,decimation" />
     <arg name="depth_fps" value="15" />
@@ -14,9 +14,10 @@
     <arg name="ordered_pc" value="true" />
   </include>
 
-  <node name="realsense_tf" pkg="TrackDLO" type="pub_camera_tf.py"/>
+  <node name="realsense_tf" pkg="trackdlo" type="pub_camera_tf.py"/>
 
   <!-- tracking rviz file -->
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find TrackDLO)/rviz/tracking_test.rviz" />
+  <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking_test.rviz" /> -->
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/replay_bag.rviz" />
 
 </launch>

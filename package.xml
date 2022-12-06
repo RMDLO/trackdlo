@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>TrackDLO</name>
+  <name>trackdlo</name>
   <version>1.0.0</version>
   <description>TrackDLO ROS package</description>
   <maintainer email="jingyix4@illinois.edu">Jingyi Xiang</maintainer>
