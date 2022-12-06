@@ -296,7 +296,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 10 / mat_max * 255;
+    double mask_dist_threshold = 10;
 
     // Mat tracking_img;
     // cur_image.copyTo(tracking_img);
@@ -389,7 +389,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            guide_ndoes = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
+            guide_ndoes = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
@@ -423,7 +423,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
             // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
             
-            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold) {
+            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
                 point_color = cv::Scalar(0, 150, 255);
                 line_color = cv::Scalar(0, 255, 0);
             }

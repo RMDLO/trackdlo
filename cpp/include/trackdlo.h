@@ -33,7 +33,10 @@ bool ecpd_lle (MatrixXf X_orig,
                std::vector<MatrixXf> correspondence_priors = {},
                double omega = 0,
                std::string kernel = "Gaussian",
-               std::vector<int> occluded_nodes = {});
+               std::vector<int> occluded_nodes = {},
+               double k_vis = 0,
+               Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
+               double mat_max = 0);
 
 MatrixXf sort_pts (MatrixXf pts_orig);
 double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
@@ -45,6 +48,7 @@ MatrixXf tracking_step (MatrixXf X_orig,
                         double total_len,
                         Mat bmask,
                         Mat bmask_transformed_normalized,
-                        double mask_dist_threshold);
+                        double mask_dist_threshold,
+                        double mat_max);
 
 #endif

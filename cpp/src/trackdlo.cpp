@@ -274,7 +274,10 @@ bool ecpd_lle (MatrixXf X_orig,
                std::vector<MatrixXf> correspondence_priors = {},
                double omega = 0,
                std::string kernel = "Gaussian",
-               std::vector<int> occluded_nodes = {}) {
+               std::vector<int> occluded_nodes = {},
+               double k_vis = 0,
+               Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
+               double mat_max = 0) {
 
     // log time            
     clock_t cur_time = clock();
@@ -354,43 +357,43 @@ bool ecpd_lle (MatrixXf X_orig,
     MatrixXf L = calc_LLE_weights(6, Y_0);
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
-    // point deletion from the original point cloud
-    MatrixXf X_temp = MatrixXf::Zero(N, 3);
-    if (occluded_nodes.size() != 0) {
-        std::vector<int> max_p_nodes(N, 0);
-        MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    // // point deletion from the original point cloud
+    // MatrixXf X_temp = MatrixXf::Zero(N, 3);
+    // if (occluded_nodes.size() != 0) {
+    //     std::vector<int> max_p_nodes(N, 0);
+    //     MatrixXf diff_xy = MatrixXf::Zero(M, N);
 
-        // update diff_xy
-        for (int i = 0; i < M; i ++) {
-            for (int j = 0; j < N; j ++) {
-                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
-            }
-        }
+    //     // update diff_xy
+    //     for (int i = 0; i < M; i ++) {
+    //         for (int j = 0; j < N; j ++) {
+    //             diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+    //         }
+    //     }
 
-        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
-        double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
-        P = P.array().rowwise() / (P.colwise().sum().array() + c);
+    //     MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
+    //     double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
+    //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
-        int M_head = occluded_nodes[0];
-        int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
+    //     int M_head = occluded_nodes[0];
+    //     int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
 
-        int X_temp_counter = 0;
+    //     int X_temp_counter = 0;
 
-        for (int i = 0; i < N; i ++) {
-            P.col(i).maxCoeff(&max_p_nodes[i]);
-            int max_p_node = max_p_nodes[i];
+    //     for (int i = 0; i < N; i ++) {
+    //         P.col(i).maxCoeff(&max_p_nodes[i]);
+    //         int max_p_node = max_p_nodes[i];
 
-            // critical nodes: M_head and M-M_tail-1
-            if (max_p_node != M_head && max_p_node != (M-M_tail-1)) {
-                X_temp.row(X_temp_counter) = X.row(i);
-                X_temp_counter += 1;
-            }
-        }
+    //         // critical nodes: M_head and M-M_tail-1
+    //         if (max_p_node != M_head && max_p_node != (M-M_tail-1)) {
+    //             X_temp.row(X_temp_counter) = X.row(i);
+    //             X_temp_counter += 1;
+    //         }
+    //     }
 
-        // std::cout << "X original len: " << X.rows() << std::endl;
-        X = X_temp.topRows(X_temp_counter);
-        // std::cout << "X after deletion len: " << X.rows() << std::endl;
-    }
+    //     // std::cout << "X original len: " << X.rows() << std::endl;
+    //     X = X_temp.topRows(X_temp_counter);
+    //     // std::cout << "X after deletion len: " << X.rows() << std::endl;
+    // }
 
     int N_orig = X.rows();
 
@@ -504,48 +507,39 @@ bool ecpd_lle (MatrixXf X_orig,
             P = P_stored.replicate(1, 1);
         }
 
-        // // temp test
-        // P = P_stored.replicate(1, 1);
+        if (occluded_nodes.size() != 0 && mat_max != 0) {
+            // project onto the bmask to find distance to closest none zero pixel
+            MatrixXf nodes_h = Y.replicate(1, 1);
+            nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+            nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+            MatrixXf proj_matrix(3, 4);
+            proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+                            0.0, 916.265869140625, 354.02392578125, 0.0,
+                            0.0, 0.0, 1.0, 0.0;
+            MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
-        if (occluded_nodes.size() != 0) {
+            MatrixXf P_vis = MatrixXf::Ones(P.rows(), P.cols());
+            double total_P_vis = 0;
+            for (int i = 0; i < image_coords.rows(); i ++) {
+                int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+                int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-            ROS_INFO("modified membership probability");
+                double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
+                double P_vis_i = exp(-k_vis*pixel_dist);
+                total_P_vis += P_vis_i;
 
-            MatrixXf P_vis = MatrixXf::Zero(M, N);
+                // // test
+                // if (P_vis_i < 1e-10) {
+                //     P_vis_i = 0;
+                // }
 
-            int M_head = occluded_nodes[0];
-            int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
-
-            MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
-            MatrixXf P_vis_fill_tail = MatrixXf::Zero(M, 1);
-            MatrixXf P_vis_fill_floating = MatrixXf::Zero(M, 1);
-
-            for (int i = 0; i < M; i ++) {
-                if (i < M_head) {
-                    P_vis_fill_head(i, 0) = 1.0 / static_cast<double>(M_head);
-                }
-                else if (M_head <= i && i < (M - M_tail)) {
-                    P_vis_fill_floating(i, 0) = 1.0 / static_cast<double>(M - M_head - M_tail);
-                }
-                else {
-                    P_vis_fill_tail(i, 0) = 1.0 / static_cast<double>(M_tail);
-                }
+                P_vis.row(i) = P_vis_i * P_vis.row(i);
             }
 
-            // fill in P_vis
-            for (int i = 0; i < N; i ++) {
-                int cur_max_p_node = max_p_nodes[i];
+            std::cout << P_vis.col(0).transpose() << std::endl;
 
-                if (cur_max_p_node >= 0 && cur_max_p_node < M_head) {
-                    P_vis.col(i) = P_vis_fill_head;
-                }
-                else if (cur_max_p_node >= M_head && cur_max_p_node < (M-M_tail)) {
-                    P_vis.col(i) = P_vis_fill_floating;
-                }
-                else {
-                    P_vis.col(i) = P_vis_fill_tail;
-                }
-            }
+            // normalize P_vis
+            P_vis = P_vis / total_P_vis;
 
             // modify P
             P = P.cwiseProduct(P_vis);
@@ -558,7 +552,61 @@ bool ecpd_lle (MatrixXf X_orig,
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
 
+
+        // if (occluded_nodes.size() != 0) {
+
+        //     ROS_INFO("modified membership probability");
+
+        //     MatrixXf P_vis = MatrixXf::Zero(M, N);
+
+        //     int M_head = occluded_nodes[0];
+        //     int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
+
+        //     MatrixXf P_vis_fill_head = MatrixXf::Zero(M, 1);
+        //     MatrixXf P_vis_fill_tail = MatrixXf::Zero(M, 1);
+        //     MatrixXf P_vis_fill_floating = MatrixXf::Zero(M, 1);
+
+        //     for (int i = 0; i < M; i ++) {
+        //         if (i < M_head) {
+        //             P_vis_fill_head(i, 0) = 1.0 / static_cast<double>(M_head);
+        //         }
+        //         else if (M_head <= i && i < (M - M_tail)) {
+        //             P_vis_fill_floating(i, 0) = 1.0 / static_cast<double>(M - M_head - M_tail);
+        //         }
+        //         else {
+        //             P_vis_fill_tail(i, 0) = 1.0 / static_cast<double>(M_tail);
+        //         }
+        //     }
+
+        //     // fill in P_vis
+        //     for (int i = 0; i < N; i ++) {
+        //         int cur_max_p_node = max_p_nodes[i];
+
+        //         if (cur_max_p_node >= 0 && cur_max_p_node < M_head) {
+        //             P_vis.col(i) = P_vis_fill_head;
+        //         }
+        //         else if (cur_max_p_node >= M_head && cur_max_p_node < (M-M_tail)) {
+        //             P_vis.col(i) = P_vis_fill_floating;
+        //         }
+        //         else {
+        //             P_vis.col(i) = P_vis_fill_tail;
+        //         }
+        //     }
+
+        //     // modify P
+        //     P = P.cwiseProduct(P_vis);
+
+        //     // modify c
+        //     c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
+        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        // }
+        // else {
+        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        // }
+
+
         // // old
+        // P = P.array().rowwise() / (P.colwise().sum().array() + c);
         // if (occluded_nodes.size() != 0) {
         //     for (int i = 0; i < occluded_nodes.size(); i ++) {
         //         P.row(occluded_nodes[i]) = MatrixXf::Zero(1, N);
@@ -651,11 +699,12 @@ MatrixXf tracking_step (MatrixXf X_orig,
                         double total_len,
                         Mat bmask,
                         Mat bmask_transformed_normalized,
-                        double mask_dist_threshold) {
+                        double mask_dist_threshold,
+                        double mat_max) {
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.2, 1, 2, 0.05, 50, 0.00001, true, true, true);
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -688,7 +737,7 @@ MatrixXf tracking_step (MatrixXf X_orig,
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
         // not currently using the original distance transform because I can't figure it out
-        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold) {
+        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold / mat_max * 255) {
             valid_guide_nodes_indices.push_back(i);
         }
         else {
@@ -1014,11 +1063,11 @@ MatrixXf tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes);
-        // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.0, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
+        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "1st order", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
+        // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
     }  
     else {
         ROS_ERROR("Not a valid state!");
