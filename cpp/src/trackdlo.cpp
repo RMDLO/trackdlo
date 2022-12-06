@@ -644,14 +644,14 @@ bool ecpd_lle (MatrixXf X_orig,
     return converged;
 }
 
-std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
-                                    MatrixXf& Y,
-                                    double& sigma2,
-                                    std::vector<double> geodesic_coord,
-                                    double total_len,
-                                    Mat bmask,
-                                    Mat bmask_transformed_normalized,
-                                    double mask_dist_threshold) {
+MatrixXf tracking_step (MatrixXf X_orig,
+                        MatrixXf& Y,
+                        double& sigma2,
+                        std::vector<double> geodesic_coord,
+                        double total_len,
+                        Mat bmask,
+                        Mat bmask_transformed_normalized,
+                        double mask_dist_threshold) {
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
@@ -1024,5 +1024,5 @@ std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
         ROS_ERROR("Not a valid state!");
     }
 
-    return priors_vec;
+    return guide_nodes;
 }

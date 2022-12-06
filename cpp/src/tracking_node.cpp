@@ -29,6 +29,7 @@ using cv::Mat;
 
 ros::Publisher pc_pub;
 ros::Publisher results_pub;
+ros::Publisher guide_nodes_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -49,7 +50,8 @@ void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     }
 }
 
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns) {
+// node color and object color are in rgba format and range from 0-1
+visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
     // publish the results as a marker array
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
     for (int i = 0; i < Y.rows(); i ++) {
@@ -80,10 +82,10 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string ma
         cur_node_result.scale.z = 0.01;
 
         // set color
-        cur_node_result.color.r = 1.0f;
-        cur_node_result.color.g = 150.0 / 255.0;
-        cur_node_result.color.b = 0.0f;
-        cur_node_result.color.a = 0.75;
+        cur_node_result.color.r = node_color[0];
+        cur_node_result.color.g = node_color[1];
+        cur_node_result.color.b = node_color[2];
+        cur_node_result.color.a = node_color[3];
 
         results.markers.push_back(cur_node_result);
 
@@ -123,10 +125,10 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string ma
         cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
 
         // set color
-        cur_line_result.color.r = 0.0f;
-        cur_line_result.color.g = 1.0f;
-        cur_line_result.color.b = 0.0f;
-        cur_line_result.color.a = 0.75;
+        cur_line_result.color.r = line_color[0];
+        cur_line_result.color.g = line_color[1];
+        cur_line_result.color.b = line_color[2];
+        cur_line_result.color.a = line_color[3];
 
         results.markers.push_back(cur_line_result);
     }
@@ -135,7 +137,7 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string ma
 }
 
 // overload function
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns) {
+visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
     // publish the results as a marker array
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
     for (int i = 0; i < Y.size(); i ++) {
@@ -168,10 +170,10 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, s
         cur_node_result.scale.z = 0.01;
 
         // set color
-        cur_node_result.color.r = 1.0f;
-        cur_node_result.color.g = 150.0 / 255.0;
-        cur_node_result.color.b = 0.0f;
-        cur_node_result.color.a = 0.75;
+        cur_node_result.color.r = node_color[0];
+        cur_node_result.color.g = node_color[1];
+        cur_node_result.color.b = node_color[2];
+        cur_node_result.color.a = node_color[3];
 
         results.markers.push_back(cur_node_result);
 
@@ -211,10 +213,10 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, s
         cur_line_result.scale.z = sqrt(pow(Y[i+1](0, dim-3) - Y[i](0, dim-3), 2) + pow(Y[i+1](0, dim-2) - Y[i](0, dim-2), 2) + pow(Y[i+1](0, dim-1) - Y[i](0, dim-1), 2));
 
         // set color
-        cur_line_result.color.r = 0.0f;
-        cur_line_result.color.g = 1.0f;
-        cur_line_result.color.b = 0.0f;
-        cur_line_result.color.a = 0.75;
+        cur_line_result.color.r = line_color[0];
+        cur_line_result.color.g = line_color[1];
+        cur_line_result.color.b = line_color[2];
+        cur_line_result.color.a = line_color[3];
 
         results.markers.push_back(cur_line_result);
     }
@@ -355,8 +357,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // log time
         std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
 
-        // temp test
-        std::vector<MatrixXf> priors = {};
+        MatrixXf guide_ndoes;
 
         if (!initialized) {
             MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
@@ -385,11 +386,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
 
             initialized = true;
-            priors = priors_vec;
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            priors = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
+            guide_ndoes = tracking_step(X, Y, sigma2, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold);
         }
 
         std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
@@ -464,10 +464,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
         // publish the results as a marker array
-        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results");
+        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
+        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_ndoes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
 
-        // line_results_pub.publish(line_results);
         results_pub.publish(results);
+        guide_nodes_pub.publish(guide_nodes_results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -492,6 +493,7 @@ int main(int argc, char **argv) {
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
+    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);

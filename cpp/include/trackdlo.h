@@ -38,13 +38,13 @@ bool ecpd_lle (MatrixXf X_orig,
 MatrixXf sort_pts (MatrixXf pts_orig);
 double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
 
-std::vector<MatrixXf> tracking_step (MatrixXf X_orig,
-                                    MatrixXf& Y,
-                                    double& sigma2,
-                                    std::vector<double> geodesic_coord,
-                                    double total_len,
-                                    Mat bmask,
-                                    Mat bmask_transformed_normalized,
-                                    double mask_dist_threshold);
+MatrixXf tracking_step (MatrixXf X_orig,
+                        MatrixXf& Y,
+                        double& sigma2,
+                        std::vector<double> geodesic_coord,
+                        double total_len,
+                        Mat bmask,
+                        Mat bmask_transformed_normalized,
+                        double mask_dist_threshold);
 
 #endif

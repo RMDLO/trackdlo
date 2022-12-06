@@ -6,8 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /PointCloud22
-        - /PointCloud23
       Splitter Ratio: 0.5
     Tree Height: 178
   - Class: rviz/Selection
@@ -27,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -157,6 +155,14 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /guide_nodes
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -185,7 +191,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.224889039993286
+      Distance: 0.8001469373703003
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -193,17 +199,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.4169823229312897
-        Y: 0.06894825398921967
-        Z: 0.055961769074201584
+        X: 0.40007179975509644
+        Y: -0.0030790152959525585
+        Z: 0.011637137271463871
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5647971630096436
+      Pitch: 0.3547973334789276
       Target Frame: <Fixed Frame>
-      Yaw: 3.300379753112793
+      Yaw: 3.295379638671875
     Saved: ~
 Window Geometry:
   Displays:
