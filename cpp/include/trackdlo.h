@@ -17,6 +17,8 @@ using cv::Mat;
 template <typename T>
 void print_1d_vector (std::vector<T> vec);
 
+void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu = 0, int max_iter = 50);
+
 bool ecpd_lle (MatrixXf X_orig,
                MatrixXf& Y,
                double& sigma2,

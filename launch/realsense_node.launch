@@ -17,6 +17,7 @@
   <node name="realsense_tf" pkg="trackdlo" type="pub_camera_tf.py"/>
 
   <!-- tracking rviz file -->
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking_test.rviz" />
+  <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking_test.rviz" /> -->
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/replay_bag.rviz" />
 
 </launch>

@@ -43,6 +43,69 @@ double pt2pt_dis (MatrixXf pt1, MatrixXf pt2) {
     return (pt1 - pt2).rowwise().norm().sum();
 }
 
+void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu = 0, int max_iter = 50) {
+    // initial guess
+    MatrixXf X = pts.replicate(1, 1);
+    Y = MatrixXf::Zero(M, 3);
+    for (int i = 0; i < M; i ++) {
+        Y(i, 0) = 0.1 / static_cast<double>(M) * static_cast<double>(i);
+        Y(i, 1) = 0;
+        Y(i, 2) = 0;
+    }
+    
+    int N = X.rows();
+    int D = 3;
+
+    // diff_xy should be a (M * N) matrix
+    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    for (int i = 0; i < M; i ++) {
+        for (int j = 0; j < N; j ++) {
+            diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+        }
+    }
+
+    // initialize sigma2
+    sigma2 = diff_xy.sum() / static_cast<double>(D * M * N);
+
+    for (int it = 0; it < max_iter; it ++) {
+        // update diff_xy
+        for (int i = 0; i < M; i ++) {
+            for (int j = 0; j < N; j ++) {
+                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+            }
+        }
+
+        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
+        MatrixXf P_stored = P.replicate(1, 1);
+        double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
+        P = P.array().rowwise() / (P.colwise().sum().array() + c);
+
+        MatrixXf Pt1 = P.colwise().sum(); 
+        MatrixXf P1 = P.rowwise().sum();
+        double Np = P1.sum();
+        MatrixXf PX = P * X;
+
+        MatrixXf P1_expanded = MatrixXf::Zero(M, D);
+        P1_expanded.col(0) = P1;
+        P1_expanded.col(1) = P1;
+        P1_expanded.col(2) = P1;
+
+        Y = PX.cwiseQuotient(P1_expanded);
+
+        double numerator = 0;
+        double denominator = 0;
+
+        for (int m = 0; m < M; m ++) {
+            for (int n = 0; n < N; n ++) {
+                numerator += P(m, n)*diff_xy(m, n);
+                denominator += P(m, n)*D;
+            }
+        }
+
+        sigma2 = numerator / denominator;
+    }
+}
+
 // link to original code: https://stackoverflow.com/a/46303314
 void remove_row(MatrixXf& matrix, unsigned int rowToRemove) {
     unsigned int numRows = matrix.rows()-1;
@@ -536,7 +599,7 @@ bool ecpd_lle (MatrixXf X_orig,
                 P_vis.row(i) = P_vis_i * P_vis.row(i);
             }
 
-            std::cout << P_vis.col(0).transpose() << std::endl;
+            // std::cout << P_vis.col(0).transpose() << std::endl;
 
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
@@ -704,7 +767,7 @@ MatrixXf tracking_step (MatrixXf X_orig,
 
     MatrixXf guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 1, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -1063,10 +1126,10 @@ MatrixXf tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "1st order", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 5, bmask_transformed_normalized, mat_max);
         // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes);
     }  
     else {
