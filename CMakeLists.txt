@@ -194,6 +194,13 @@ target_link_libraries(cpp_test
   Eigen3::Eigen
 )
 
+target_link_libraries(test_node
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
+  Eigen3::Eigen
+)
+
 #############
 ## Install ##
 #############

@@ -18,8 +18,6 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
-#define INF 1000000
-
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
@@ -47,8 +45,8 @@ void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu = 0, int m
     MatrixXf X = pts.replicate(1, 1);
     Y = MatrixXf::Zero(M, 3);
     for (int i = 0; i < M; i ++) {
-        Y(i, 0) = 0.1 / static_cast<double>(M) * static_cast<double>(i);
-        Y(i, 1) = 0;
+        Y(i, 1) = 0.1 / static_cast<double>(M) * static_cast<double>(i);
+        Y(i, 0) = 0;
         Y(i, 2) = 0;
     }
     

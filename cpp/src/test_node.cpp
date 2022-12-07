@@ -40,13 +40,13 @@ using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
 MatrixXf Y;
-double sigma2;
+double sigma2 = 0;
 bool initialized = false;
 std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-int num_of_nodes = 20;
+int num_of_nodes = 10;
 int num_of_dlos = 2;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
@@ -352,14 +352,27 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             X_1 = X_1.topRows(counter_1);
             X_2 = X_2.topRows(counter_2);
 
+            std::cout << X_1 << std::endl;
+            std::cout << X_2 << std::endl;
+
             MatrixXf Y_1;
             MatrixXf Y_2;
 
-            reg(X_1, Y_1, sigma2, num_of_nodes, 0.05, 50);
-            reg(X_2, Y_2, sigma2, num_of_nodes, 0.05, 50);
+            double temp1 = 0;
+            double temp2 = 0;
+
+            reg(X_1, Y_1, temp1, num_of_nodes, 0.05, 50);
+            reg(X_2, Y_2, temp2, num_of_nodes, 0.05, 50);
+
+            std::cout << Y_1 << std::endl;
+            std::cout << Y_2 << std::endl;
+            std::cout << "========" << std::endl;
 
             Y_1 = sort_pts(Y_1);
             Y_2 = sort_pts(Y_2);
+
+            std::cout << Y_1 << std::endl;
+            std::cout << Y_2 << std::endl;
 
             // record geodesic coord
             double cur_sum = 0;
@@ -367,6 +380,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cur_sum += (Y_1.row(i+1) - Y_1.row(i)).norm();
                 converted_node_coord.push_back(cur_sum);
             }
+            converted_node_coord.push_back(cur_sum + INF);
             for (int i = 0; i < Y_2.rows()-1; i ++) {
                 cur_sum += (Y_2.row(i+1) - Y_2.row(i)).norm();
                 converted_node_coord.push_back(cur_sum + INF);
@@ -376,10 +390,20 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             Y.topRows(Y_1.rows()) = Y_1;
             Y.bottomRows(Y_2.rows()) = Y_2;
 
+            std::cout << Y.rows() << std::endl;
+            std::cout << converted_node_coord.size() << std::endl;
+            for (int i = 0; i < converted_node_coord.size(); i ++) {
+                std::cout << converted_node_coord[i] << " ";
+            }
+            std::cout << std::endl;
+            ros::shutdown();
+
             initialized = true;
         } 
         else {
-            ecpd_lle (X, Y, sigma2, 0.7, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
+            ecpd_lle (X, Y, sigma2, 2, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
+            std::cout << Y.rows() << std::endl;
+            // ros::shutdown();
             // tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
@@ -409,7 +433,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             cv::Scalar point_color;
             cv::Scalar line_color;
-
             
             // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
             // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
