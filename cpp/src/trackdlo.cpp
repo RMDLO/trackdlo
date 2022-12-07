@@ -18,8 +18,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
-// typedef Eigen::Matrix<double, 1, Eigen::Dynamic> RowVector;
-// typedef Eigen::Matrix<double, Eigen::Dynamic, 1> ColumnVector;
+#define INF 1000000
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;

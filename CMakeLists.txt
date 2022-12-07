@@ -158,6 +158,10 @@ add_executable(
   trackdlo_node cpp/src/tracking_node.cpp cpp/src/trackdlo.cpp
 )
 
+add_executable(
+  test_node cpp/src/test_node.cpp cpp/src/trackdlo.cpp
+)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use

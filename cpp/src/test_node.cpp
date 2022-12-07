@@ -25,6 +25,8 @@
 
 #include "../include/trackdlo.h"
 
+#define INF 1000000.0
+
 using cv::Mat;
 
 ros::Publisher pc_pub;
@@ -44,8 +46,8 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = false;
 int num_of_nodes = 20;
+int num_of_dlos = 2;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -246,33 +248,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     std::vector<int> lower_blue = {90, 90, 90};
     std::vector<int> upper_blue = {130, 255, 255};
 
-    std::vector<int> lower_red_1 = {130, 60, 40};
-    std::vector<int> upper_red_1 = {255, 255, 255};
-
-    std::vector<int> lower_red_2 = {0, 60, 40};
-    std::vector<int> upper_red_2 = {10, 255, 255};
-
     Mat mask_without_occlusion_block;
 
-    if (use_eval_rope) {
-        // filter blue
-        cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
+    // filter blue
+    cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
 
-        // filter red
-        cv::inRange(cur_image_hsv, cv::Scalar(lower_red_1[0], lower_red_1[1], lower_red_1[2]), cv::Scalar(upper_red_1[0], upper_red_1[1], upper_red_1[2]), mask_red_1);
-        cv::inRange(cur_image_hsv, cv::Scalar(lower_red_2[0], lower_red_2[1], lower_red_2[2]), cv::Scalar(upper_red_2[0], upper_red_2[1], upper_red_2[2]), mask_red_2);
-
-        // combine red mask
-        cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
-        // combine overall mask
-        cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
-    }
-    else {
-        // filter blue
-        cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
-
-        mask_blue.copyTo(mask_without_occlusion_block);
-    }
+    mask_blue.copyTo(mask_without_occlusion_block);
 
     // update cur image for visualization
     Mat cur_image;
@@ -285,20 +266,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     else {
         mask_without_occlusion_block.copyTo(mask);
         cur_image_orig.copyTo(cur_image);
-    }
-
-    // simple blob detector
-    std::vector<cv::KeyPoint> keypoints;
-    if (use_eval_rope) {
-        cv::SimpleBlobDetector::Params blob_params;
-        blob_params.filterByColor = false;
-        blob_params.filterByArea = true;
-        blob_params.filterByCircularity = false;
-        blob_params.filterByInertia = true;
-        blob_params.filterByConvexity = false;
-        cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
-        // detect
-        detector->detect(mask_red, keypoints);
     }
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
@@ -363,63 +330,57 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         std::cout << "num of points: " << X.rows() << std::endl;
 
-        if (use_eval_rope) {
-            for (cv::KeyPoint key_point : keypoints) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-        }
-
-        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
-
         // log time
         std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
 
-        MatrixXf guide_nodes;
-        std::vector<MatrixXf> priors;
-
         if (!initialized) {
-            if (use_eval_rope) {
-                MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-                MatrixXf Y_0_sorted = sort_pts(Y_0);
-                Y = Y_0_sorted.replicate(1, 1);
-                sigma2 = 0;
-
-                // record geodesic coord
-                double cur_sum = 0;
-                for (int i = 0; i < Y_0_sorted.rows()-1; i ++) {
-                    cur_sum += (Y_0_sorted.row(i+1) - Y_0_sorted.row(i)).norm();
-                    converted_node_coord.push_back(cur_sum);
+            // separate point cloud based on x coordinates
+            MatrixXf X_1 = MatrixXf::Zero(X.rows(), 3);
+            MatrixXf X_2 = MatrixXf::Zero(X.rows(), 3);
+            int counter_1 = 0;
+            int counter_2 = 0;
+            for (int i = 0; i < X.rows(); i ++) {
+                if (X(i, 0) >= 0) {
+                    X_1.row(counter_1) = X.row(i);
+                    counter_1 += 1;
                 }
-
-                // use ecpd to help initialize
-                std::vector<MatrixXf> priors_vec;
-                for (int i = 0; i < Y_0_sorted.rows(); i ++) {
-                    MatrixXf temp = MatrixXf::Zero(1, 4);
-                    temp(0, 0) = i;
-                    temp(0, 1) = Y_0_sorted(i, 0);
-                    temp(0, 2) = Y_0_sorted(i, 1);
-                    temp(0, 3) = Y_0_sorted(i, 2);
-                    priors_vec.push_back(temp);
-                }
-
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
-            }
-            else {
-                reg(X, Y, sigma2, num_of_nodes, 0.05, 50);
-                Y = sort_pts(Y);
-                // record geodesic coord
-                double cur_sum = 0;
-                for (int i = 0; i < Y.rows()-1; i ++) {
-                    cur_sum += (Y.row(i+1) - Y.row(i)).norm();
-                    converted_node_coord.push_back(cur_sum);
+                else {
+                    X_2.row(counter_2) = X.row(i);
+                    counter_2 += 1;
                 }
             }
+            X_1 = X_1.topRows(counter_1);
+            X_2 = X_2.topRows(counter_2);
+
+            MatrixXf Y_1;
+            MatrixXf Y_2;
+
+            reg(X_1, Y_1, sigma2, num_of_nodes, 0.05, 50);
+            reg(X_2, Y_2, sigma2, num_of_nodes, 0.05, 50);
+
+            Y_1 = sort_pts(Y_1);
+            Y_2 = sort_pts(Y_2);
+
+            // record geodesic coord
+            double cur_sum = 0;
+            for (int i = 0; i < Y_1.rows()-1; i ++) {
+                cur_sum += (Y_1.row(i+1) - Y_1.row(i)).norm();
+                converted_node_coord.push_back(cur_sum);
+            }
+            for (int i = 0; i < Y_2.rows()-1; i ++) {
+                cur_sum += (Y_2.row(i+1) - Y_2.row(i)).norm();
+                converted_node_coord.push_back(cur_sum + INF);
+            }
+
+            Y = MatrixXf::Zero((Y_1.rows()+Y_2.rows()), 3);
+            Y.topRows(Y_1.rows()) = Y_1;
+            Y.bottomRows(Y_2.rows()) = Y_2;
 
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            ecpd_lle (X, Y, sigma2, 0.7, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
+            // tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
@@ -495,12 +456,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // publish the results as a marker array
         visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
-        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
-        visualization_msgs::MarkerArray priors_results = MatrixXf2MarkerArray(priors, "camera_color_optical_frame", "priors_results", {1.0, 1.0, 1.0, 0.5}, {1.0, 1.0, 0.0, 0.5});
 
         results_pub.publish(results);
-        guide_nodes_pub.publish(guide_nodes_results);
-        priors_pub.publish(priors_results);
     }
     else {
         ROS_ERROR("empty pointcloud!");
