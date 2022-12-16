@@ -44,7 +44,7 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = false;
+bool use_eval_rope = true;
 int num_of_nodes = 20;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {

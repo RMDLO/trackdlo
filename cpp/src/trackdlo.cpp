@@ -567,6 +567,7 @@ bool ecpd_lle (MatrixXf X_orig,
             P = P_stored.replicate(1, 1);
         }
 
+
         if (occluded_nodes.size() != 0 && mat_max != 0) {
             // project onto the bmask to find distance to closest none zero pixel
             MatrixXf nodes_h = Y.replicate(1, 1);
@@ -765,8 +766,8 @@ void tracking_step (MatrixXf X_orig,
                     double mat_max) {
 
     guide_nodes = Y.replicate(1, 1);
-    double sigma2_pre_proc = 0;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.7, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    double sigma2_pre_proc = sigma2*100;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -1128,7 +1129,7 @@ void tracking_step (MatrixXf X_orig,
         ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
         // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
     }  
     else {
