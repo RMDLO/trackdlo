@@ -567,10 +567,16 @@ bool ecpd_lle (MatrixXf X_orig,
             P = P_stored.replicate(1, 1);
         }
 
-
+        
+        // use cdcpd's pvis
         if (occluded_nodes.size() != 0 && mat_max != 0) {
-            // project onto the bmask to find distance to closest none zero pixel
+            // if has corresponding guide node, use that instead of the original position
             MatrixXf nodes_h = Y.replicate(1, 1);
+            for (auto entry : correspondence_priors) {
+                nodes_h.row(entry(0, 0)) = entry.rightCols(3);
+            }
+
+            // project onto the bmask to find distance to closest none zero pixel
             nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
             nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
             MatrixXf proj_matrix(3, 4);
@@ -614,6 +620,7 @@ bool ecpd_lle (MatrixXf X_orig,
         }
 
 
+        // change membership probablity for each section of the rope
         // if (occluded_nodes.size() != 0) {
 
         //     ROS_INFO("modified membership probability");
@@ -767,7 +774,7 @@ void tracking_step (MatrixXf X_orig,
 
     guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = sigma2*100;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;

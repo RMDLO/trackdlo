@@ -45,7 +45,7 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = true;
-int num_of_nodes = 20;
+int num_of_nodes = 40;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -422,7 +422,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
-        std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
+        std::cout << "Tracking step time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
