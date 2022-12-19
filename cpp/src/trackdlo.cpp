@@ -143,7 +143,7 @@ void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, Ma
         RowVectorXf vec1 = cur_closest - pt;
         RowVectorXf vec2 = direction_pt - pt;
 
-        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.07) {
+        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.02) {
             opposite_closest_found = true;
             opposite_closest = cur_closest.replicate(1, 1);
             break;
@@ -153,6 +153,7 @@ void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, Ma
 
 MatrixXf sort_pts (MatrixXf pts_orig) {
 
+    // int start_idx = 18; 
     int start_idx = 0;
 
     MatrixXf pts = pts_orig.replicate(1, 1);
@@ -1133,7 +1134,7 @@ void tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 0.6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
         ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);

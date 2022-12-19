@@ -288,7 +288,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     }
 
     // simple blob detector
-    std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::KeyPoint> keypoints_red;
+    std::vector<cv::KeyPoint> keypoints_blue;
     if (use_eval_rope) {
         cv::SimpleBlobDetector::Params blob_params;
         blob_params.filterByColor = false;
@@ -298,7 +299,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         blob_params.filterByConvexity = false;
         cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
         // detect
-        detector->detect(mask_red, keypoints);
+        detector->detect(mask_red, keypoints_red);
+        detector->detect(mask_blue, keypoints_blue);
     }
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
@@ -311,7 +313,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 10;
+    double mask_dist_threshold = 20;
 
     // Mat tracking_img;
     // cur_image.copyTo(tracking_img);
@@ -364,7 +366,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         std::cout << "num of points: " << X.rows() << std::endl;
 
         if (use_eval_rope) {
-            for (cv::KeyPoint key_point : keypoints) {
+            for (cv::KeyPoint key_point : keypoints_red) {
+                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            }
+            for (cv::KeyPoint key_point : keypoints_blue) {
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
         }
