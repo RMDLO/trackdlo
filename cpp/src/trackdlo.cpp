@@ -607,7 +607,7 @@ bool ecpd_lle (MatrixXf X_orig,
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
 
-            std::cout << P_vis.col(0).transpose() << std::endl;
+            // std::cout << P_vis.col(0).transpose() << std::endl;
 
             // modify P
             P = P.cwiseProduct(P_vis);
@@ -775,7 +775,8 @@ void tracking_step (MatrixXf X_orig,
 
     guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = sigma2*100;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    // ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.5, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -832,9 +833,20 @@ void tracking_step (MatrixXf X_orig,
         }
     }
 
-    // print_1d_vector(valid_guide_nodes_indices);
+    // calculate total length of the object
+    double cur_total_len = 0.0;
+    for (int i = 0; i < guide_nodes.rows() - 1; i ++) {
+        cur_total_len += pt2pt_dis(guide_nodes.row(i), guide_nodes.row(i+1));
+    }
 
-    if (head_visible && tail_visible) {
+    std::cout << "total_len: " << total_len << "; cur_total_len" << cur_total_len << std::endl;
+
+    if (fabs(total_len - cur_total_len) < 0.02) {
+        ROS_INFO("Total length unchanged");
+        state = 3;
+    }
+
+    else if (head_visible && tail_visible) {
 
         ROS_INFO("Both ends visible");
 
@@ -1104,7 +1116,7 @@ void tracking_step (MatrixXf X_orig,
     //     priors_vec = {priors_vec[0], priors_vec[priors_vec.size()-1]};
     // }
 
-    std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
+    // std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
 
     // // visualization for debug
     // Mat mask_rgb;
@@ -1139,6 +1151,10 @@ void tracking_step (MatrixXf X_orig,
     else if (state == 1) {
         ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
         // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
+    }
+    else if (state == 3) {
+        sigma2 *= 100;
+        ecpd_lle (X_orig, Y, sigma2, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
     }  
     else {
         ROS_ERROR("Not a valid state!");

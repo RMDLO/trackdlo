@@ -46,6 +46,7 @@ bool updated_opencv_mask = false;
 
 bool use_eval_rope = true;
 int num_of_nodes = 40;
+double total_len = 0;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -407,7 +408,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors_vec.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
+                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.01);
+
+                for (int i = 0; i < Y.rows() - 1; i ++) {
+                    total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
+                }
+
             }
             else {
                 reg(X, Y, sigma2, num_of_nodes, 0.05, 50);
@@ -424,7 +430,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, total_len, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         std::cout << "Tracking step time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
