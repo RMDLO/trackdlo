@@ -45,7 +45,8 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = true;
-int num_of_nodes = 20;
+int num_of_nodes = 40;
+double total_len = 0;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -288,7 +289,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     }
 
     // simple blob detector
-    std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::KeyPoint> keypoints_red;
+    std::vector<cv::KeyPoint> keypoints_blue;
     if (use_eval_rope) {
         cv::SimpleBlobDetector::Params blob_params;
         blob_params.filterByColor = false;
@@ -298,7 +300,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         blob_params.filterByConvexity = false;
         cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
         // detect
-        detector->detect(mask_red, keypoints);
+        detector->detect(mask_red, keypoints_red);
+        detector->detect(mask_blue, keypoints_blue);
     }
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
@@ -311,7 +314,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 10;
+    double mask_dist_threshold = 20;
 
     // Mat tracking_img;
     // cur_image.copyTo(tracking_img);
@@ -364,7 +367,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         std::cout << "num of points: " << X.rows() << std::endl;
 
         if (use_eval_rope) {
-            for (cv::KeyPoint key_point : keypoints) {
+            for (cv::KeyPoint key_point : keypoints_red) {
+                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            }
+            for (cv::KeyPoint key_point : keypoints_blue) {
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
         }
@@ -402,7 +408,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors_vec.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.1);
+                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.01);
+
+                for (int i = 0; i < Y.rows() - 1; i ++) {
+                    total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
+                }
+
             }
             else {
                 reg(X, Y, sigma2, num_of_nodes, 0.05, 50);
@@ -419,10 +430,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, 0, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, total_len, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
-        std::cout << "Registration time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
+        std::cout << "Tracking step time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);

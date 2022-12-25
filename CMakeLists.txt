@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(trackdlo)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-O2)   # -std=c++11
+add_compile_options(-O3)   # -std=c++11
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -151,16 +151,16 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(
-  cpp_test cpp/src/test.cpp
-)
-
-add_executable(
   trackdlo_node cpp/src/tracking_node.cpp cpp/src/trackdlo.cpp
 )
 
-add_executable(
-  test_node cpp/src/test_node.cpp cpp/src/trackdlo.cpp
-)
+# add_executable(
+#   cpp_test cpp/src/test.cpp
+# )
+
+# add_executable(
+#   test_node cpp/src/test_node.cpp cpp/src/trackdlo.cpp
+# )
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -187,19 +187,19 @@ target_link_libraries(trackdlo_node
   Eigen3::Eigen
 )
 
-target_link_libraries(cpp_test
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBS}
-  Eigen3::Eigen
-)
+# target_link_libraries(cpp_test
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBS}
+#   Eigen3::Eigen
+# )
 
-target_link_libraries(test_node
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBS}
-  Eigen3::Eigen
-)
+# target_link_libraries(test_node
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBS}
+#   Eigen3::Eigen
+# )
 
 #############
 ## Install ##

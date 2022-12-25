@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
       Splitter Ratio: 0.5
-    Tree Height: 178
+    Tree Height: 318
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -25,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -96,7 +96,77 @@ Visualization Manager:
       Marker Topic: /results
       Name: MarkerArray
       Namespaces:
-        {}
+        line_results0: true
+        line_results1: true
+        line_results10: true
+        line_results11: true
+        line_results12: true
+        line_results13: true
+        line_results14: true
+        line_results15: true
+        line_results16: true
+        line_results17: true
+        line_results18: true
+        line_results19: true
+        line_results2: true
+        line_results20: true
+        line_results21: true
+        line_results22: true
+        line_results23: true
+        line_results24: true
+        line_results25: true
+        line_results26: true
+        line_results27: true
+        line_results28: true
+        line_results29: true
+        line_results3: true
+        line_results30: true
+        line_results31: true
+        line_results32: true
+        line_results33: true
+        line_results34: true
+        line_results4: true
+        line_results5: true
+        line_results6: true
+        line_results7: true
+        line_results8: true
+        line_results9: true
+        node_results0: true
+        node_results1: true
+        node_results10: true
+        node_results11: true
+        node_results12: true
+        node_results13: true
+        node_results14: true
+        node_results15: true
+        node_results16: true
+        node_results17: true
+        node_results18: true
+        node_results19: true
+        node_results2: true
+        node_results20: true
+        node_results21: true
+        node_results22: true
+        node_results23: true
+        node_results24: true
+        node_results25: true
+        node_results26: true
+        node_results27: true
+        node_results28: true
+        node_results29: true
+        node_results3: true
+        node_results30: true
+        node_results31: true
+        node_results32: true
+        node_results33: true
+        node_results34: true
+        node_results35: true
+        node_results4: true
+        node_results5: true
+        node_results6: true
+        node_results7: true
+        node_results8: true
+        node_results9: true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -160,7 +230,77 @@ Visualization Manager:
       Marker Topic: /guide_nodes
       Name: MarkerArray
       Namespaces:
-        {}
+        guide_node_results0: true
+        guide_node_results1: true
+        guide_node_results10: true
+        guide_node_results11: true
+        guide_node_results12: true
+        guide_node_results13: true
+        guide_node_results14: true
+        guide_node_results15: true
+        guide_node_results16: true
+        guide_node_results17: true
+        guide_node_results18: true
+        guide_node_results19: true
+        guide_node_results2: true
+        guide_node_results20: true
+        guide_node_results21: true
+        guide_node_results22: true
+        guide_node_results23: true
+        guide_node_results24: true
+        guide_node_results25: true
+        guide_node_results26: true
+        guide_node_results27: true
+        guide_node_results28: true
+        guide_node_results29: true
+        guide_node_results3: true
+        guide_node_results30: true
+        guide_node_results31: true
+        guide_node_results32: true
+        guide_node_results33: true
+        guide_node_results34: true
+        guide_node_results35: true
+        guide_node_results4: true
+        guide_node_results5: true
+        guide_node_results6: true
+        guide_node_results7: true
+        guide_node_results8: true
+        guide_node_results9: true
+        line_results0: true
+        line_results1: true
+        line_results10: true
+        line_results11: true
+        line_results12: true
+        line_results13: true
+        line_results14: true
+        line_results15: true
+        line_results16: true
+        line_results17: true
+        line_results18: true
+        line_results19: true
+        line_results2: true
+        line_results20: true
+        line_results21: true
+        line_results22: true
+        line_results23: true
+        line_results24: true
+        line_results25: true
+        line_results26: true
+        line_results27: true
+        line_results28: true
+        line_results29: true
+        line_results3: true
+        line_results30: true
+        line_results31: true
+        line_results32: true
+        line_results33: true
+        line_results34: true
+        line_results4: true
+        line_results5: true
+        line_results6: true
+        line_results7: true
+        line_results8: true
+        line_results9: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -191,7 +331,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.8001469373703003
+      Distance: 0.692308783531189
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -199,17 +339,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.40007179975509644
-        Y: -0.0030790152959525585
-        Z: 0.011637137271463871
+        X: 0.3807499408721924
+        Y: 0.23735547065734863
+        Z: -0.01788284257054329
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3547973334789276
+      Pitch: 0.4647964537143707
       Target Frame: <Fixed Frame>
-      Yaw: 3.295379638671875
+      Yaw: 3.160376787185669
     Saved: ~
 Window Geometry:
   Displays:
@@ -219,7 +359,7 @@ Window Geometry:
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000041e0000035afc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000000ef000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d0061006700650100000132000002650000001600ffffff000000010000010f0000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000003efc0100000002fb0000000800540069006d0065010000000000000738000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003140000035a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000003220000035afc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000017b000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006501000001be000001d90000001600ffffff000000010000010f0000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000003efc0100000002fb0000000800540069006d0065010000000000000738000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000004100000035a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:

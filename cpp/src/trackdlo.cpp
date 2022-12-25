@@ -143,7 +143,7 @@ void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, Ma
         RowVectorXf vec1 = cur_closest - pt;
         RowVectorXf vec2 = direction_pt - pt;
 
-        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.07) {
+        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.02) {
             opposite_closest_found = true;
             opposite_closest = cur_closest.replicate(1, 1);
             break;
@@ -153,6 +153,7 @@ void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, Ma
 
 MatrixXf sort_pts (MatrixXf pts_orig) {
 
+    // int start_idx = 18; 
     int start_idx = 0;
 
     MatrixXf pts = pts_orig.replicate(1, 1);
@@ -567,10 +568,16 @@ bool ecpd_lle (MatrixXf X_orig,
             P = P_stored.replicate(1, 1);
         }
 
-
+        
+        // use cdcpd's pvis
         if (occluded_nodes.size() != 0 && mat_max != 0) {
-            // project onto the bmask to find distance to closest none zero pixel
+            // if has corresponding guide node, use that instead of the original position
             MatrixXf nodes_h = Y.replicate(1, 1);
+            for (auto entry : correspondence_priors) {
+                nodes_h.row(entry(0, 0)) = entry.rightCols(3);
+            }
+
+            // project onto the bmask to find distance to closest none zero pixel
             nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
             nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
             MatrixXf proj_matrix(3, 4);
@@ -600,7 +607,7 @@ bool ecpd_lle (MatrixXf X_orig,
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
 
-            std::cout << P_vis.col(0).transpose() << std::endl;
+            // std::cout << P_vis.col(0).transpose() << std::endl;
 
             // modify P
             P = P.cwiseProduct(P_vis);
@@ -614,6 +621,7 @@ bool ecpd_lle (MatrixXf X_orig,
         }
 
 
+        // change membership probablity for each section of the rope
         // if (occluded_nodes.size() != 0) {
 
         //     ROS_INFO("modified membership probability");
@@ -767,7 +775,8 @@ void tracking_step (MatrixXf X_orig,
 
     guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = sigma2*100;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    // ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.5, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -824,9 +833,20 @@ void tracking_step (MatrixXf X_orig,
         }
     }
 
-    // print_1d_vector(valid_guide_nodes_indices);
+    // calculate total length of the object
+    double cur_total_len = 0.0;
+    for (int i = 0; i < guide_nodes.rows() - 1; i ++) {
+        cur_total_len += pt2pt_dis(guide_nodes.row(i), guide_nodes.row(i+1));
+    }
 
-    if (head_visible && tail_visible) {
+    std::cout << "total_len: " << total_len << "; cur_total_len" << cur_total_len << std::endl;
+
+    if (fabs(total_len - cur_total_len) < 0.02) {
+        ROS_INFO("Total length unchanged");
+        state = 3;
+    }
+
+    else if (head_visible && tail_visible) {
 
         ROS_INFO("Both ends visible");
 
@@ -1096,7 +1116,7 @@ void tracking_step (MatrixXf X_orig,
     //     priors_vec = {priors_vec[0], priors_vec[priors_vec.size()-1]};
     // }
 
-    std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
+    // std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
 
     // // visualization for debug
     // Mat mask_rgb;
@@ -1126,11 +1146,15 @@ void tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 2, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 0.6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
         ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
         // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
+    }
+    else if (state == 3) {
+        sigma2 *= 100;
+        ecpd_lle (X_orig, Y, sigma2, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
     }  
     else {
         ROS_ERROR("Not a valid state!");
