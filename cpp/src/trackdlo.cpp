@@ -407,7 +407,7 @@ bool ecpd_lle (MatrixXf X_orig,
             G = 1/(2*beta * 2*beta) * (-sqrt(2)*converted_node_dis/beta).array().exp() * (sqrt(2)*converted_node_dis.array() + beta);
         }
         else if (kernel == "2nd order") {
-            G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*converted_node_dis/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*converted_node_dis.array() + sqrt(3)*diff_yy.array());
+            G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*converted_node_dis/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*converted_node_dis.array() + sqrt(3)*converted_node_dis_sq.array());
         }
         else { // default to gaussian
             G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
@@ -776,7 +776,7 @@ void tracking_step (MatrixXf X_orig,
     guide_nodes = Y.replicate(1, 1);
     double sigma2_pre_proc = sigma2*100;
     // ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.5, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.8, 1, 2, 0.05, 50, 0.00001, true, true, false, false, {}, 0, "1st order");
 
     bool head_visible = false;
     bool tail_visible = false;
@@ -1146,15 +1146,18 @@ void tracking_step (MatrixXf X_orig,
     // cv::waitKey(3);
 
     if (state == 2) {
-        ecpd_lle (X_orig, Y, sigma2, 0.6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
+        // ecpd_lle (X_orig, Y, sigma2, 5, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 1, 5, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "2nd order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
     }
     else if (state == 1) {
-        ecpd_lle (X_orig, Y, sigma2, 7, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
+        // ecpd_lle (X_orig, Y, sigma2, 20, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
+        ecpd_lle (X_orig, Y, sigma2, 1, 5, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "2nd order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
         // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
     }
     else if (state == 3) {
         sigma2 *= 100;
-        ecpd_lle (X_orig, Y, sigma2, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+        // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
+        ecpd_lle (X_orig, Y, sigma2, 0.5, 5, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "2nd order");
     }  
     else {
         ROS_ERROR("Not a valid state!");

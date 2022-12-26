@@ -323,7 +323,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.005, 0.005, 0.005);
+        sor.setLeafSize (0.008, 0.008, 0.008);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
