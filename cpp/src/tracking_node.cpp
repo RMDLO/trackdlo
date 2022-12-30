@@ -512,6 +512,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
         priors_pub.publish(priors_results);
+
+        // reset all guide nodes
+        for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
+            guide_nodes_results.markers[i].action = visualization_msgs::Marker::DELETEALL;
+        }
     }
     else {
         ROS_ERROR("empty pointcloud!");

@@ -344,6 +344,10 @@ bool ecpd_lle (MatrixXf X_orig,
     clock_t cur_time = clock();
     bool converged = true;
 
+    if (correspondence_priors.size() == 0) {
+        use_ecpd = false;
+    }
+
     MatrixXf X = X_orig.replicate(1, 1);
 
     int M = Y.rows();
@@ -417,44 +421,6 @@ bool ecpd_lle (MatrixXf X_orig,
     // get the LLE matrix
     MatrixXf L = calc_LLE_weights(6, Y_0);
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
-
-    // // point deletion from the original point cloud
-    // MatrixXf X_temp = MatrixXf::Zero(N, 3);
-    // if (occluded_nodes.size() != 0) {
-    //     std::vector<int> max_p_nodes(N, 0);
-    //     MatrixXf diff_xy = MatrixXf::Zero(M, N);
-
-    //     // update diff_xy
-    //     for (int i = 0; i < M; i ++) {
-    //         for (int j = 0; j < N; j ++) {
-    //             diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
-    //         }
-    //     }
-
-    //     MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
-    //     double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
-    //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
-
-    //     int M_head = occluded_nodes[0];
-    //     int M_tail = M - 1 - occluded_nodes[occluded_nodes.size()-1];
-
-    //     int X_temp_counter = 0;
-
-    //     for (int i = 0; i < N; i ++) {
-    //         P.col(i).maxCoeff(&max_p_nodes[i]);
-    //         int max_p_node = max_p_nodes[i];
-
-    //         // critical nodes: M_head and M-M_tail-1
-    //         if (max_p_node != M_head && max_p_node != (M-M_tail-1)) {
-    //             X_temp.row(X_temp_counter) = X.row(i);
-    //             X_temp_counter += 1;
-    //         }
-    //     }
-
-    //     // std::cout << "X original len: " << X.rows() << std::endl;
-    //     X = X_temp.topRows(X_temp_counter);
-    //     // std::cout << "X after deletion len: " << X.rows() << std::endl;
-    // }
 
     int N_orig = X.rows();
 
@@ -772,29 +738,15 @@ void tracking_step (MatrixXf X_orig,
                     Mat bmask_transformed_normalized,
                     double mask_dist_threshold,
                     double mat_max) {
-
-    guide_nodes = Y.replicate(1, 1);
-    double sigma2_pre_proc = sigma2*100;
-    // ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 0.8, 1, 2, 0.05, 50, 0.00001, true, true, false, false, {}, 0, "1st order");
-
-    bool head_visible = false;
-    bool tail_visible = false;
-
-    if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) < 0.01) {
-        head_visible = true;
-    }
-    if (pt2pt_dis(guide_nodes.row(guide_nodes.rows()-1), Y.row(Y.rows()-1)) < 0.01) {
-        tail_visible = true;
-    }
-
-    MatrixXf priors;
-    // std::vector<MatrixXf> priors_vec = {};
+    
+    // variable initialization
     std::vector<int> occluded_nodes = {};
-
+    std::vector<int> visible_nodes = {};
+    std::vector<MatrixXf> valid_nodes_vec = {};
     int state = 0;
 
-    MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+    // project Y onto the original image to determine occluded nodes
+    MatrixXf nodes_h = Y.replicate(1, 1);
     nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
     nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
     MatrixXf proj_matrix(3, 4);
@@ -802,366 +754,46 @@ void tracking_step (MatrixXf X_orig,
                     0.0, 916.265869140625, 354.02392578125, 0.0,
                     0.0, 0.0, 1.0, 0.0;
     MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
-
-    std::vector<int> valid_guide_nodes_indices;
     for (int i = 0; i < image_coords.rows(); i ++) {
         int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
         // not currently using the original distance transform because I can't figure it out
         if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold / mat_max * 255) {
-            valid_guide_nodes_indices.push_back(i);
+            valid_nodes_vec.push_back(Y.row(i));
+            visible_nodes.push_back(i);
         }
         else {
-            if (i == 0) {head_visible = false;}
-            if (i == image_coords.rows()-1) {tail_visible = false;}
-        }
-    }
-
-    if (!head_visible && !tail_visible) {
-        // if head node is within the mask threshold
-        if (valid_guide_nodes_indices[0] == 0) {
-            if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) < pt2pt_dis(guide_nodes.row(Y.rows()-1), Y.row(Y.rows()-1))) {
-                head_visible = true;
-            }
-        }
-        // if tail node is within the mask threshold
-        if (valid_guide_nodes_indices[valid_guide_nodes_indices.size()-1] == Y.rows()-1) {
-            if (pt2pt_dis(guide_nodes.row(0), Y.row(0)) > pt2pt_dis(guide_nodes.row(Y.rows()-1), Y.row(Y.rows()-1))) {
-                tail_visible = true;
-            }
-        }
-    }
-
-    // calculate total length of the object
-    double cur_total_len = 0.0;
-    for (int i = 0; i < guide_nodes.rows() - 1; i ++) {
-        cur_total_len += pt2pt_dis(guide_nodes.row(i), guide_nodes.row(i+1));
-    }
-
-    std::cout << "total_len: " << total_len << "; cur_total_len" << cur_total_len << std::endl;
-
-    if (fabs(total_len - cur_total_len) < 0.02) {
-        ROS_INFO("Total length unchanged");
-        state = 3;
-    }
-
-    else if (head_visible && tail_visible) {
-
-        ROS_INFO("Both ends visible");
-
-        state = 2;
-
-        std::vector<MatrixXf> valid_head_nodes;
-        std::vector<int> valid_head_node_indices;
-        for (int i = 0; i < guide_nodes.rows(); i ++) {
-            if (i == valid_guide_nodes_indices[i]) {
-                valid_head_nodes.push_back(guide_nodes.row(i));
-                valid_head_node_indices.push_back(i);
-            }
-            else {
-                break;
-            }
-
-            if (i == valid_guide_nodes_indices.size()-1) {
-                break;
-            }
-        }
-
-        std::vector<MatrixXf> valid_tail_nodes;
-        std::vector<int> valid_tail_node_indices;
-        for (int i = 0; i < guide_nodes.rows(); i ++) {
-            if (guide_nodes.rows()-1-i == valid_guide_nodes_indices[valid_guide_nodes_indices.size()-1-i]) {
-                valid_tail_nodes.insert(valid_tail_nodes.begin(), guide_nodes.row(guide_nodes.rows()-1-i));
-                valid_tail_node_indices.insert(valid_tail_node_indices.begin(), guide_nodes.rows()-1-i);
-            }
-            else {
-                break;
-            }
-
-            if (valid_guide_nodes_indices.size()-1-i == 0) {
-                break;
-            }
-        }
-
-        // ---- head visible part -----
-        double total_dist_Y = 0;
-        double total_dist_guide_nodes = 0;
-        int it_gn = 0;
-        int last_visible_index_head = -1;
-
-        if (valid_head_nodes.size() != 0) {
-            MatrixXf temp(1, 4);
-            temp << 0, valid_head_nodes[0](0, 0), valid_head_nodes[0](0, 1), valid_head_nodes[0](0, 2);
-            priors_vec.push_back(temp);
-        }
-
-        for (int it_y0 = 0; it_y0 < valid_head_nodes.size()-1; it_y0 ++) {
-            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0+1]);
-
-            while (total_dist_guide_nodes < total_dist_Y) {
-                total_dist_guide_nodes += pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
-                if (total_dist_guide_nodes >= total_dist_Y) {
-                    total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
-                    MatrixXf new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])
-                                            * (valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn]);
-                    MatrixXf temp(1, 4);
-                    temp << it_y0+1, new_y0_coord(0, 0), new_y0_coord(0, 1), new_y0_coord(0, 2);
-                    priors_vec.push_back(temp);
-                    break;
-                }
-                // if at the end of guide nodes
-                if (it_gn == valid_head_nodes.size() - 2) {
-                    last_visible_index_head = it_y0;
-                    break;
-                }
-                it_gn += 1;
-            }
-
-            if (last_visible_index_head != -1) {
-                break;
-            }
-        }
-        if (last_visible_index_head == -1) {
-            last_visible_index_head = valid_head_nodes.size() - 1;
-        }
-
-        // ----- tail visible part -----
-        total_dist_Y = 0;
-        total_dist_guide_nodes = 0;
-        it_gn = valid_tail_nodes.size() - 1;
-        int last_visible_index_tail = -1;
-
-        if (valid_tail_nodes.size() != 0) {
-            MatrixXf temp(1, 4);
-            temp << valid_tail_nodes.size()-1 + valid_tail_node_indices[0], valid_tail_nodes[valid_tail_nodes.size()-1](0, 0), valid_tail_nodes[valid_tail_nodes.size()-1](0, 1), valid_tail_nodes[valid_tail_nodes.size()-1](0, 2);
-            priors_vec.push_back(temp);
-        }
-
-        for (int it_y0 = valid_tail_nodes.size()-1; it_y0 > 0; it_y0 --) {
-            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0-1]);
-            while (total_dist_guide_nodes < total_dist_Y) {
-                total_dist_guide_nodes += pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
-                if (total_dist_guide_nodes >= total_dist_Y) {
-                    total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
-                    MatrixXf new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])
-                                            * (valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn]);
-                    MatrixXf temp(1, 4);
-                    temp << it_y0-1 + valid_tail_node_indices[0], new_y0_coord(0, 0), new_y0_coord(0, 1), new_y0_coord(0, 2);
-                    priors_vec.push_back(temp);
-                    break;
-                }
-                // if at the end of guide nodes
-                if (it_gn == 1) {
-                    last_visible_index_tail = it_y0 + valid_tail_node_indices[0];
-                    break;
-                }
-                it_gn -= 1;
-            }
-            if (last_visible_index_tail != -1) {
-                break;
-            }
-        }
-        if (last_visible_index_tail == -1) {
-            last_visible_index_tail = 0;
-        }
-
-        for (int i = last_visible_index_head+1; i < last_visible_index_tail; i ++) {
-            occluded_nodes.push_back(i);
-        }
-
-        // std::cout << last_visible_index_head << ", " << last_visible_index_tail << std::endl;
-    }
-    
-    else if (head_visible && (!tail_visible)) {
-
-        ROS_INFO("Head visible");
-
-        state = 1;
-
-        std::vector<MatrixXf> valid_head_nodes;
-        std::vector<int> valid_head_node_indices;
-        for (int i = 0; i < guide_nodes.rows(); i ++) {
-            if (i == valid_guide_nodes_indices[i]) {
-                valid_head_nodes.push_back(guide_nodes.row(i));
-                valid_head_node_indices.push_back(i);
-            }
-            else {
-                break;
-            }
-
-            if (i == valid_guide_nodes_indices.size()-1) {
-                break;
-            }
-        }
-
-        double total_dist_Y = 0;
-        double total_dist_guide_nodes = 0;
-        int it_gn = 0;
-        int last_visible_index_head = -1;
-
-        if (valid_head_nodes.size() != 0) {
-            MatrixXf temp(1, 4);
-            temp << 0, valid_head_nodes[0](0, 0), valid_head_nodes[0](0, 1), valid_head_nodes[0](0, 2);
-            priors_vec.push_back(temp);
-        }
-
-        for (int it_y0 = 0; it_y0 < valid_head_nodes.size()-1; it_y0 ++) {
-            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0+1]);
-
-            while (total_dist_guide_nodes < total_dist_Y) {
-                total_dist_guide_nodes += pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
-                if (total_dist_guide_nodes >= total_dist_Y) {
-                    total_dist_guide_nodes -= pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn+1]);
-                    MatrixXf new_y0_coord = valid_head_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_head_nodes[it_gn], valid_head_nodes[it_gn + 1])
-                                            * (valid_head_nodes[it_gn + 1] - valid_head_nodes[it_gn]);
-                    MatrixXf temp(1, 4);
-                    temp << it_y0+1, new_y0_coord(0, 0), new_y0_coord(0, 1), new_y0_coord(0, 2);
-                    priors_vec.push_back(temp);
-                    break;
-                }
-                // if at the end of guide nodes
-                if (it_gn == valid_head_nodes.size() - 2) {
-                    last_visible_index_head = it_y0;
-                    break;
-                }
-                it_gn += 1;
-            }
-
-            if (last_visible_index_head != -1) {
-                break;
-            }
-        }
-        if (last_visible_index_head == -1) {
-            last_visible_index_head = valid_head_nodes.size() - 1;
-        }
-
-        for (int i = last_visible_index_head+1; i < guide_nodes.rows(); i ++) {
             occluded_nodes.push_back(i);
         }
     }
 
-    else if ((!head_visible) && tail_visible) {
-
-        ROS_INFO("Tail visible");
-
-        state = 1;
-
-        std::vector<MatrixXf> valid_tail_nodes;
-        std::vector<int> valid_tail_node_indices;
-        for (int i = 0; i < guide_nodes.rows(); i ++) {
-            if (guide_nodes.rows()-1-i == valid_guide_nodes_indices[valid_guide_nodes_indices.size()-1-i]) {
-                valid_tail_nodes.insert(valid_tail_nodes.begin(), guide_nodes.row(guide_nodes.rows()-1-i));
-                valid_tail_node_indices.insert(valid_tail_node_indices.begin(), guide_nodes.rows()-1-i);
-            }
-            else {
-                break;
-            }
-
-            if (valid_guide_nodes_indices.size()-1-i == 0) {
-                break;
-            }
-        }
-
-        double total_dist_Y = 0;
-        double total_dist_guide_nodes = 0;
-        int it_gn = valid_tail_nodes.size() - 1;
-        int last_visible_index_tail = -1;
-
-        if (valid_tail_nodes.size() != 0) {
-            MatrixXf temp(1, 4);
-            temp << valid_tail_nodes.size()-1 + valid_tail_node_indices[0], valid_tail_nodes[valid_tail_nodes.size()-1](0, 0), valid_tail_nodes[valid_tail_nodes.size()-1](0, 1), valid_tail_nodes[valid_tail_nodes.size()-1](0, 2);
-            priors_vec.push_back(temp);
-        }
-
-        for (int it_y0 = valid_tail_nodes.size()-1; it_y0 > 0; it_y0 --) {
-            total_dist_Y += abs(geodesic_coord[it_y0] - geodesic_coord[it_y0-1]);
-            while (total_dist_guide_nodes < total_dist_Y) {
-                total_dist_guide_nodes += pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
-                if (total_dist_guide_nodes >= total_dist_Y) {
-                    total_dist_guide_nodes -= pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn-1]);
-                    MatrixXf new_y0_coord = valid_tail_nodes[it_gn] + (total_dist_Y - total_dist_guide_nodes)/pt2pt_dis(valid_tail_nodes[it_gn], valid_tail_nodes[it_gn - 1])
-                                            * (valid_tail_nodes[it_gn - 1] - valid_tail_nodes[it_gn]);
-                    MatrixXf temp(1, 4);
-                    temp << it_y0-1 + valid_tail_node_indices[0], new_y0_coord(0, 0), new_y0_coord(0, 1), new_y0_coord(0, 2);
-                    priors_vec.push_back(temp);
-                    break;
-                }
-                // if at the end of guide nodes
-                if (it_gn == 1) {
-                    last_visible_index_tail = it_y0 + valid_tail_node_indices[0];
-                    break;
-                }
-                it_gn -= 1;
-            }
-            if (last_visible_index_tail != -1) {
-                break;
-            }
-        }
-        if (last_visible_index_tail == -1) {
-            last_visible_index_tail = 0;
-        }
-
-        for (int i = 0; i < last_visible_index_tail; i ++) {
-            occluded_nodes.push_back(i);
-        }
+    // copy valid guide nodes vec to guide nodes
+    // not using topRows() because it caused weird bugs
+    guide_nodes = MatrixXf::Zero(valid_nodes_vec.size(), 3);
+    for (int i = 0; i < valid_nodes_vec.size(); i ++) {
+        guide_nodes.row(i) = valid_nodes_vec[i];
     }
 
-    else {
-        ROS_ERROR("Neither tip visible!");
+    // run rigid registration on guide nodes and X
+    double sigma2_pre_proc = sigma2*100;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
+
+    std::cout << "finished first reg" << std::endl;
+
+    // copy guide nodes to priors_vec (this could be combined into one step in the future)
+    priors_vec = {};
+    for (int i = 0; i < guide_nodes.rows(); i ++) {
+        MatrixXf temp = MatrixXf::Zero(1, 4);
+        temp(0, 0) = visible_nodes[i];
+        temp(0, 1) = guide_nodes(i, 0);
+        temp(0, 2) = guide_nodes(i, 1);
+        temp(0, 3) = guide_nodes(i, 2);
+        priors_vec.push_back(temp);
     }
 
-    // // TEMP TEST
-    // if (state == 1) {
-    //     priors_vec = {priors_vec[0], priors_vec[priors_vec.size()-1]};
-    // }
+    print_1d_vector(visible_nodes);
 
-    // std::cout << "priors vec length = " + (std::to_string(priors_vec.size())) << std::endl;
-
-    // // visualization for debug
-    // Mat mask_rgb;
-    // cv::cvtColor(bmask, mask_rgb, cv::COLOR_GRAY2BGR);
-    // std::cout << "before draw image" << std::endl;
-    // for (MatrixXf prior : priors_vec) {
-    //     MatrixXf proj_matrix(3, 4);
-    //     proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
-    //                     0.0, 916.265869140625, 354.02392578125, 0.0,
-    //                     0.0, 0.0, 1.0, 0.0;
-    //     MatrixXf prior_h(1, 4);
-    //     prior_h << prior(0, 1), prior(0, 2), prior(0, 3), 1.0;
-    //     std::cout << prior_h << std::endl;
-
-    //     MatrixXf image_coord = (proj_matrix * prior_h.transpose()).transpose();
-    //     std::cout << image_coord << std::endl;
-
-    //     int x = static_cast<int>(image_coord(0, 0)/image_coord(0, 2));
-    //     int y = static_cast<int>(image_coord(0, 1)/image_coord(0, 2));
-    //     std::cout << x << ", " << y << std::endl;
-
-    //     cv::circle(mask_rgb, cv::Point(x, y), 5, cv::Scalar(0, 200, 0), -1);
-    // }
-    // std::cout << "after draw image" << std::endl;
-
-    // cv::imshow("frame", mask_rgb);
-    // cv::waitKey(3);
-
-    if (state == 2) {
-        // ecpd_lle (X_orig, Y, sigma2, 5, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.0001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
-        ecpd_lle (X_orig, Y, sigma2, 1, 5, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "2nd order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
-    }
-    else if (state == 1) {
-        // ecpd_lle (X_orig, Y, sigma2, 20, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
-        ecpd_lle (X_orig, Y, sigma2, 1, 5, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "2nd order", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
-        // ecpd_lle (X_orig, Y, sigma2, 2, 2, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.2, bmask_transformed_normalized, mat_max);
-    }
-    else if (state == 3) {
-        sigma2 *= 100;
-        // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "1st order");
-        ecpd_lle (X_orig, Y, sigma2, 0.5, 5, 2, 0.05, 50, 0.00001, true, true, true, false, {}, 0, "2nd order");
-    }  
-    else {
-        ROS_ERROR("Not a valid state!");
-    }
-
-    // return guide_nodes;
+    // second registation to imput velocity
+    ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.1, "1st order", occluded_nodes, 0, bmask_transformed_normalized, mat_max);
 }
