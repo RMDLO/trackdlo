@@ -538,60 +538,60 @@ bool ecpd_lle (MatrixXf X_orig,
         }
 
         
-        // // use cdcpd's pvis
-        // if (occluded_nodes.size() != 0 && mat_max != 0) {
-        //     // if has corresponding guide node, use that instead of the original position
-        //     MatrixXf nodes_h = Y.replicate(1, 1);
-        //     for (auto entry : correspondence_priors) {
-        //         nodes_h.row(entry(0, 0)) = entry.rightCols(3);
-        //     }
+        // use cdcpd's pvis
+        if (occluded_nodes.size() != 0 && mat_max != 0) {
+            // if has corresponding guide node, use that instead of the original position
+            MatrixXf nodes_h = Y.replicate(1, 1);
+            for (auto entry : correspondence_priors) {
+                nodes_h.row(entry(0, 0)) = entry.rightCols(3);
+            }
 
-        //     // project onto the bmask to find distance to closest none zero pixel
-        //     nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-        //     nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-        //     MatrixXf proj_matrix(3, 4);
-        //     proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
-        //                     0.0, 916.265869140625, 354.02392578125, 0.0,
-        //                     0.0, 0.0, 1.0, 0.0;
-        //     MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+            // project onto the bmask to find distance to closest none zero pixel
+            nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+            nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+            MatrixXf proj_matrix(3, 4);
+            proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+                            0.0, 916.265869140625, 354.02392578125, 0.0,
+                            0.0, 0.0, 1.0, 0.0;
+            MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
-        //     MatrixXf P_vis = MatrixXf::Ones(P.rows(), P.cols());
-        //     double total_P_vis = 0;
-        //     for (int i = 0; i < image_coords.rows(); i ++) {
-        //         int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-        //         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+            MatrixXf P_vis = MatrixXf::Ones(P.rows(), P.cols());
+            double total_P_vis = 0;
+            for (int i = 0; i < image_coords.rows(); i ++) {
+                int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+                int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-        //         double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
-        //         double P_vis_i = exp(-k_vis*pixel_dist);
-        //         total_P_vis += P_vis_i;
+                double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
+                double P_vis_i = exp(-k_vis*pixel_dist);
+                total_P_vis += P_vis_i;
 
-        //         // // test
-        //         // if (P_vis_i < 1e-10) {
-        //         //     P_vis_i = 0;
-        //         // }
+                // // test
+                // if (P_vis_i < 1e-10) {
+                //     P_vis_i = 0;
+                // }
 
-        //         P_vis.row(i) = P_vis_i * P_vis.row(i);
-        //     }
+                P_vis.row(i) = P_vis_i * P_vis.row(i);
+            }
 
-        //     // normalize P_vis
-        //     P_vis = P_vis / total_P_vis;
+            // normalize P_vis
+            P_vis = P_vis / total_P_vis;
 
-        //     // std::cout << P_vis.col(0).transpose() << std::endl;
+            // std::cout << P_vis.col(0).transpose() << std::endl;
 
-        //     // modify P
-        //     P = P.cwiseProduct(P_vis);
+            // modify P
+            P = P.cwiseProduct(P_vis);
 
-        //     // modify c
-        //     c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
-        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // }
-        // else {
-        //     P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // }
+            // modify c
+            c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) / N;
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
+        else {
+            P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        }
 
 
         // old
-        P = P.array().rowwise() / (P.colwise().sum().array() + c);
+        // P = P.array().rowwise() / (P.colwise().sum().array() + c);
         // // quick test
         // if (occluded_nodes.size() != 0) {
         //     for (int i = 0; i < occluded_nodes.size(); i ++) {
@@ -746,5 +746,18 @@ void tracking_step (MatrixXf X_orig,
     print_1d_vector(visible_nodes);
 
     // second registation to imput velocity
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.01, "1st order", occluded_nodes, 0, bmask_transformed_normalized, mat_max);
+    // would not work for omega <= 0.000001
+    // if (occluded_nodes.size()!=0 && occluded_nodes[0]!=0 && occluded_nodes[occluded_nodes.size()-1]!=Y.rows()-1) {
+    //     // Use Gaussian
+    //     ROS_INFO("Used Gaussian");
+    //     ecpd_lle (X_orig, Y, sigma2, 1, 1, 2, 0.05, 100, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
+    // }
+    // else {
+    //     // use 1st order
+    //     ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 100, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
+    // }
+
+    // for quick test
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "Gaussian", occluded_nodes, 0.0125, bmask_transformed_normalized, mat_max);
 }
