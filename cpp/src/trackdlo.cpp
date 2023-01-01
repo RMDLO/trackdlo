@@ -18,6 +18,10 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
+#include <ctime>
+#include <chrono>
+#include <thread>
+
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
@@ -114,140 +118,80 @@ void remove_row(MatrixXf& matrix, unsigned int rowToRemove) {
     matrix.conservativeResize(numRows,numCols);
 }
 
-void find_closest (MatrixXf pt, MatrixXf arr, MatrixXf& closest, int& idx) {
-    closest = arr.row(0).replicate(1, 1);
-    double min_dis = pt2pt_dis(pt, closest);
-    idx = 0;
+MatrixXf sort_pts (MatrixXf Y_0) {
+    int N = Y_0.rows();
+    MatrixXf Y_0_sorted = MatrixXf::Zero(N, 3);
+    std::vector<MatrixXf> Y_0_sorted_vec = {};
+    std::vector<bool> selected_node(N, false);
+    std::vector<bool> visited(N, false);
+    selected_node[0] = true;
 
-    for (int i = 0; i < arr.rows(); i ++) {
-        double cur_dis = pt2pt_dis(pt, arr.row(i));
-        if (cur_dis < min_dis) {
-            min_dis = cur_dis;
-            closest = arr.row(i).replicate(1, 1);
-            idx = i;
+    MatrixXf G = MatrixXf::Zero(N, N);
+    for (int i = 0; i < N; i ++) {
+        for (int j = 0; j < N; j ++) {
+            G(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
         }
     }
-}
 
-void find_opposite_closest (MatrixXf pt, MatrixXf arr, MatrixXf direction_pt, MatrixXf& opposite_closest, bool& opposite_closest_found) {
-    MatrixXf arr_copy = arr.replicate(1, 1);
-    opposite_closest_found = false;
-    opposite_closest = pt.replicate(1, 1);
+    int reverse = 0;
+    int counter = 0;
+    int reverse_on = 0;
+    int insertion_counter = 0;
 
-    while (!opposite_closest_found && arr_copy.rows() != 0) {
-        MatrixXf cur_closest;
-        int cur_index;
-        find_closest(pt, arr_copy, cur_closest, cur_index);
-        remove_row(arr_copy, cur_index);
+    while (counter < N-1) {
+        double minimum = 999999;
+        int a = 0;
+        int b = 0;
 
-        RowVectorXf vec1 = cur_closest - pt;
-        RowVectorXf vec2 = direction_pt - pt;
-
-        if (vec1.dot(vec2) < 0 && pt2pt_dis(cur_closest, pt) < 0.02) {
-            opposite_closest_found = true;
-            opposite_closest = cur_closest.replicate(1, 1);
-            break;
-        }
-    }
-}
-
-MatrixXf sort_pts (MatrixXf pts_orig) {
-
-    // int start_idx = 18; 
-    int start_idx = 0;
-
-    MatrixXf pts = pts_orig.replicate(1, 1);
-    MatrixXf starting_pt = pts.row(start_idx).replicate(1, 1);
-    remove_row(pts, start_idx);
-
-    // starting point will be the current first point in the new list
-    MatrixXf sorted_pts = MatrixXf::Zero(pts_orig.rows(), pts_orig.cols());
-    std::vector<MatrixXf> sorted_pts_vec;
-    sorted_pts_vec.push_back(starting_pt);
-
-    // get the first closest point
-    MatrixXf closest_1;
-    int min_idx;
-    find_closest(starting_pt, pts, closest_1, min_idx);
-    sorted_pts_vec.push_back(closest_1);
-    remove_row(pts, min_idx);
-
-    // get the second closest point
-    MatrixXf closest_2;
-    bool found;
-    find_opposite_closest(starting_pt, pts, closest_1, closest_2, found);
-    bool true_start = false;
-    if (!found) {
-        true_start = true;
-    }
-
-    while (pts.rows() != 0) {
-        MatrixXf cur_target = sorted_pts_vec[sorted_pts_vec.size() - 1];
-        MatrixXf cur_direction = sorted_pts_vec[sorted_pts_vec.size() - 2];
-        MatrixXf cur_closest;
-        bool found;
-        find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
-
-        if (!found) {
-            // std::cout << "not found!" << std::endl;
-        }
-
-        sorted_pts_vec.push_back(cur_closest);
-        
-        // really dumb method
-        int row_num = 0;
-        for (int i = 0; i < pts.rows(); i ++) {
-            if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
-                row_num = i;
-                break;
-            }
-        }
-        remove_row(pts, row_num);
-    }
-
-    if (!true_start) {
-        sorted_pts_vec.insert(sorted_pts_vec.begin(), closest_2);
-
-        int row_num = 0;
-        for (int i = 0; i < pts.rows(); i ++) {
-            if (pt2pt_dis(pts.row(i), closest_2) < 0.00001) {
-                row_num = i;
-                break;
-            }
-        }
-        remove_row(pts, row_num);
-
-        while (pts.rows() != 0) {
-            MatrixXf cur_target = sorted_pts_vec[0];
-            MatrixXf cur_direction = sorted_pts_vec[1];
-            MatrixXf cur_closest;
-            bool found;
-            find_opposite_closest(cur_target, pts, cur_direction, cur_closest, found);
-        
-            if (!found) {
-                // std::cout << "not found!" << std::endl;
-                break;
-            }
-
-            sorted_pts_vec.insert(sorted_pts_vec.begin(), cur_closest);
-
-            int row_num = 0;
-            for (int i = 0; i < pts.rows(); i ++) {
-                if (pt2pt_dis(pts.row(i), cur_closest) < 0.00001) {
-                    row_num = i;
-                    break;
+        for (int m = 0; m < N; m ++) {
+            if (selected_node[m] == true) {
+                for (int n = 0; n < N; n ++) {
+                    if ((!selected_node[n]) && (G(m, n) != 0.0)) {
+                        if (minimum > G(m, n)) {
+                            minimum = G(m, n);
+                            a = m;
+                            b = n;
+                        }
+                    }
                 }
             }
-            remove_row(pts, row_num);
         }
+
+        if (counter == 0) {
+            Y_0_sorted_vec.push_back(Y_0.row(a));
+            Y_0_sorted_vec.push_back(Y_0.row(b));
+        }
+        else {
+            if (visited[a] == true) {
+                reverse += 1;
+                reverse_on = a;
+                insertion_counter = 1;
+            }
+            
+            if (reverse % 2 == 1) {
+                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(a));
+                Y_0_sorted_vec.insert(it, Y_0.row(b));
+            }
+            else if (reverse != 0) {
+                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(a));
+                insertion_counter += 1;
+            }
+            else {
+                Y_0_sorted_vec.push_back(Y_0.row(b));
+            }
+        }
+
+        visited[a] = true;
+        selected_node[b] = true;
+        counter += 1;
     }
 
-    // fill the eigen matrix
-    for (int i = 0; i < sorted_pts.rows(); i ++) {
-        sorted_pts.row(i) = sorted_pts_vec[i];
+    // copy to Y_0_sorted
+    for (int i = 0; i < N; i ++) {
+        Y_0_sorted.row(i) = Y_0_sorted_vec[i];
     }
 
-    return sorted_pts;
+    return Y_0_sorted;
 }
 
 std::vector<int> get_nearest_indices (int k, int M, int idx) {

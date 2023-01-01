@@ -40,7 +40,7 @@ bool ecpd_lle (MatrixXf X_orig,
                Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
                double mat_max = 0);
 
-MatrixXf sort_pts (MatrixXf pts_orig);
+MatrixXf sort_pts (MatrixXf Y_0);
 double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
 
 void tracking_step (MatrixXf X_orig,
