@@ -123,8 +123,8 @@ MatrixXf sort_pts (MatrixXf Y_0) {
     MatrixXf Y_0_sorted = MatrixXf::Zero(N, 3);
     std::vector<MatrixXf> Y_0_sorted_vec = {};
     std::vector<bool> selected_node(N, false);
-    std::vector<bool> visited(N, false);
     selected_node[0] = true;
+    int last_visited_b = 0;
 
     MatrixXf G = MatrixXf::Zero(N, N);
     for (int i = 0; i < N; i ++) {
@@ -162,7 +162,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
             Y_0_sorted_vec.push_back(Y_0.row(b));
         }
         else {
-            if (visited[a] == true) {
+            if (last_visited_b != a) {
                 reverse += 1;
                 reverse_on = a;
                 insertion_counter = 1;
@@ -173,7 +173,8 @@ MatrixXf sort_pts (MatrixXf Y_0) {
                 Y_0_sorted_vec.insert(it, Y_0.row(b));
             }
             else if (reverse != 0) {
-                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(a));
+                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(reverse_on));
+                Y_0_sorted_vec.insert(it + insertion_counter, Y_0.row(b));
                 insertion_counter += 1;
             }
             else {
@@ -181,7 +182,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
             }
         }
 
-        visited[a] = true;
+        last_visited_b = b;
         selected_node[b] = true;
         counter += 1;
     }

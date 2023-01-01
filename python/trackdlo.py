@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import matplotlib.pyplot as plt
 import rospy
@@ -11,16 +11,13 @@ import struct
 import time
 import cv2
 import numpy as np
-import math
 
 import time
-import sys
 import pickle as pkl
 import yaml
 from os.path import dirname, abspath, join
 
 import message_filters
-from sklearn.neighbors import NearestNeighbors
 import open3d as o3d
 from scipy import ndimage
 from scipy import interpolate
@@ -80,8 +77,6 @@ def register(pts, M, mu=0, max_iter=50):
 
     prev_Y, prev_s = Y, s
     new_Y, new_s = get_estimates(prev_Y, prev_s)
-    # it = 0
-    tol = 0.0
     
     for it in range (max_iter):
         prev_Y, prev_s = new_Y, new_s
@@ -89,123 +84,31 @@ def register(pts, M, mu=0, max_iter=50):
 
     return new_Y, new_s
 
-def find_closest (pt, arr):
-    closest = arr[0].copy()
-    min_dis = np.sqrt((pt[0] - closest[0])**2 + (pt[1] - closest[1])**2 + (pt[2] - closest[2])**2)
-    idx = 0
-
-    for i in range (0, len(arr)):
-        cur_pt = arr[i].copy()
-        cur_dis = np.sqrt((pt[0] - cur_pt[0])**2 + (pt[1] - cur_pt[1])**2 + (pt[2] - cur_pt[2])**2)
-        if cur_dis < min_dis:
-            min_dis = cur_dis
-            closest = arr[i].copy()
-            idx = i
-    
-    return closest, idx
-
-def find_opposite_closest (pt, arr, direction_pt):
-    arr_copy = arr.copy()
-    opposite_closest_found = False
-    opposite_closest = pt.copy()  # will get overwritten
-
-    while (not opposite_closest_found) and (len(arr_copy) != 0):
-        cur_closest, cur_index = find_closest (pt, arr_copy)
-        arr_copy.pop (cur_index)
-
-        vec1 = np.array(cur_closest) - np.array(pt)
-        vec2 = np.array(direction_pt) - np.array(pt)
-
-        # threshold: 0.07m
-        if (np.dot (vec1, vec2) < 0) and (pt2pt_dis_sq(np.array(cur_closest), np.array(pt)) < 0.07**2):
-            opposite_closest_found = True
-            opposite_closest = cur_closest.copy()
-            break
-    
-    return opposite_closest, opposite_closest_found
-
-def sort_pts (pts_orig):
-
-    start_idx = 0
-
-    pts = pts_orig.copy()
-    starting_pt = pts[start_idx].copy()
-    pts.pop(start_idx)
-    # starting point will be the current first point in the new list
-    sorted_pts = []
-    sorted_pts.append(starting_pt)
-
-    # get the first closest point
-    closest_1, min_idx = find_closest (starting_pt, pts)
-    sorted_pts.append(closest_1)
-    pts.pop(min_idx)
-
-    # get the second closest point
-    closest_2, found = find_opposite_closest(starting_pt, pts, closest_1)
-    true_start = False
-    if not found:
-        # closest 1 is true start
-        true_start = True
-    # closest_2 is not popped from pts
-
-    # move through the rest of pts to build the sorted pt list
-    # if true_start:
-    #   can proceed until pts is empty
-    # if !true_start:
-    #   start in the direction of closest_1, the list would build until one end is reached. 
-    #   in that case the next closest point would be closest_2. starting that point, all 
-    #   newly added points to sorted_pts should be inserted at the front
-    while len(pts) != 0:
-        cur_target = sorted_pts[-1]
-        cur_direction = sorted_pts[-2]
-        cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
-
-        if not found:
-            print ("not found!")
-            break
-
-        sorted_pts.append(cur_closest)
-        pts.remove (cur_closest)
-
-    # begin the second loop that inserts new points at front
-    if not true_start:
-        # first insert closest_2 at front and pop it from pts
-        sorted_pts.insert(0, closest_2)
-        pts.remove(closest_2)
-
-        while len(pts) != 0:
-            cur_target = sorted_pts[0]
-            cur_direction = sorted_pts[1]
-            cur_closest, found = find_opposite_closest(cur_target, pts, cur_direction)
-
-            if not found:
-                print ("not found!")
-                break
-
-            sorted_pts.insert(0, cur_closest)
-            pts.remove(cur_closest)
-
-    return sorted_pts
-
-def sort_pts_mst (pts_orig):
-
-    INF = 999999
-    diff = pts_orig[:, None, :] - pts_orig[None, :,  :]
+def sort_pts (Y_0):
+    diff = Y_0[:, None, :] - Y_0[None, :,  :]
     diff = np.square(diff)
     diff = np.sum(diff, 2)
+
     N = len(diff)
     G = diff.copy()
+
     selected_node = np.zeros(N,).tolist()
-
-    no_edge = 0
     selected_node[0] = True
-    sorted_pts = []
+    Y_0_sorted = []
 
-    init_a = None
-    reverse = False
-    while (no_edge < N - 1):
+    # printing for edge and weight
+    print("Edge : Weight\n")
         
-        minimum = INF
+    reverse = 0
+    counter = 0
+    reverse_on = 0
+    insertion_counter = 0
+    last_visited_b = 0
+    while (counter < N - 1):
+
+        print("reverse = ", reverse)
+        
+        minimum = 999999
         a = 0
         b = 0
         for m in range(N):
@@ -217,23 +120,32 @@ def sort_pts_mst (pts_orig):
                             minimum = G[m][n]
                             a = m
                             b = n
+        print(str(a) + "-" + str(b) + ":" + str(G[a][b]))
 
-        if len(sorted_pts) == 0:
-            sorted_pts.append(pts_orig[a])
-            sorted_pts.append(pts_orig[b])
-            init_a = a
+        if len(Y_0_sorted) == 0:
+            Y_0_sorted.append(Y_0[a].tolist())
+            Y_0_sorted.append(Y_0[b].tolist())
         else:
-            if a == init_a:
-                reverse = True
-            if reverse:
-                # switch direction
-                sorted_pts.insert(0, pts_orig[b])
-            else:
-                sorted_pts.append(pts_orig[b])
-        selected_node[b] = True
-        no_edge += 1
+            if last_visited_b != a:
+                reverse += 1
+                reverse_on = a
+                insertion_counter = 0
 
-    return np.array(sorted_pts)
+            if reverse % 2 == 1:
+                # switch direction
+                Y_0_sorted.insert(Y_0_sorted.index(Y_0[a].tolist()), Y_0[b].tolist())
+            elif reverse != 0:
+                Y_0_sorted.insert(Y_0_sorted.index(Y_0[reverse_on].tolist())+1+insertion_counter, Y_0[b].tolist())
+                insertion_counter += 1
+            else:
+                Y_0_sorted.append(Y_0[b].tolist())
+
+        last_visited_b = b
+        selected_node[b] = True
+
+        counter += 1
+
+    return np.array(Y_0_sorted)
 
 # assuming Y is sorted
 # k -- going left for k indices, going right for k indices. a total of 2k neighbors.
@@ -1083,7 +995,7 @@ def callback (rgb, pc):
     if not initialized:
 
         init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
-        init_nodes = sort_pts_mst(init_nodes)
+        init_nodes = sort_pts(init_nodes)
 
         guide_nodes_Y_0 = init_nodes.copy()
         guide_nodes_sigma2_0 = sigma2
@@ -1189,7 +1101,6 @@ if __name__=='__main__':
     rospy.init_node('track_dlo', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    # depth_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
 
     # header
@@ -1201,7 +1112,6 @@ if __name__=='__main__':
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-    init_nodes_pub = rospy.Publisher ('/init_nodes', PointCloud2, queue_size=10)
     nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
