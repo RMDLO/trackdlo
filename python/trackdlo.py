@@ -22,6 +22,10 @@ import open3d as o3d
 from scipy import ndimage
 from scipy import interpolate
 
+proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
+                        [             0.0, 916.265869140625,   354.02392578125, 0.0], \
+                        [             0.0,              0.0,               1.0, 0.0]])
+
 def pt2pt_dis_sq(pt1, pt2):
     return np.sum(np.square(pt1 - pt2))
 
@@ -95,9 +99,6 @@ def sort_pts (Y_0):
     selected_node = np.zeros(N,).tolist()
     selected_node[0] = True
     Y_0_sorted = []
-
-    # printing for edge and weight
-    print("Edge : Weight\n")
         
     reverse = 0
     counter = 0
@@ -105,8 +106,6 @@ def sort_pts (Y_0):
     insertion_counter = 0
     last_visited_b = 0
     while (counter < N - 1):
-
-        print("reverse = ", reverse)
         
         minimum = 999999
         a = 0
@@ -120,7 +119,6 @@ def sort_pts (Y_0):
                             minimum = G[m][n]
                             a = m
                             b = n
-        print(str(a) + "-" + str(b) + ":" + str(G[a][b]))
 
         if len(Y_0_sorted) == 0:
             Y_0_sorted.append(Y_0[a].tolist())
@@ -192,6 +190,7 @@ def indices_array(n):
 
 def ecpd_lle (X_orig,                      # input point cloud
               Y_0,                         # input nodes
+              sigma2_0,                    # initial variance
               beta,                        # MCT kernel strength
               alpha,                       # MCT overall strength
               gamma,                       # LLE strength
@@ -201,12 +200,13 @@ def ecpd_lle (X_orig,                      # input point cloud
               include_lle = True, 
               use_geodesic = False, 
               use_prev_sigma2 = False, 
-              sigma2_0 = None,              # initial variance
               use_ecpd = False, 
               correspondence_priors = None,
               omega = None,                 # ecpd strength. DO NOT go lower than 1e-6
               kernel = 'Gaussian',          # Gaussian, Laplacian, 1st order, 2nd order
-              occluded_nodes = None):       # nodes that are not in this array are either head nodes or tail nodes
+              occluded_nodes = None,
+              k_vis = 0,
+              bmask_transformed = None): 
 
     X = X_orig.copy()
 
@@ -272,36 +272,9 @@ def ecpd_lle (X_orig,                      # input point cloud
     L = calc_LLE_weights(2, Y_0)
     H = np.matmul((np.identity(M) - L).T, np.identity(M) - L)
 
-    # TEMP TEST
-    if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
-        pts_dis_sq = np.sum((X[None, :, :] - Y[:, None, :]) ** 2, axis=2)
-        c = (2 * np.pi * sigma2) ** (D / 2)
-        c = c * mu / (1 - mu)
-        c = c * M / N
-        P = np.exp(-pts_dis_sq / (2 * sigma2))
-        den = np.sum(P, axis=0)
-        den = np.tile(den, (M, 1))
-        den[den == 0] = np.finfo(float).eps
-        den += c
-        P = np.divide(P, den)
-        max_p_nodes = np.argmax(P, axis=0)
-
-        # determine the indices where head, tail, floating region starts/ends
-        M_head = occluded_nodes[0]
-        M_tail = M - 1 - occluded_nodes[-1]
-
-        # critical nodes: M_head and M-M_tail-1
-        X = np.delete(X, (max_p_nodes == M_head)|(max_p_nodes == M-M_tail-1), 0)
-
     if correspondence_priors is not None and len(correspondence_priors) != 0:
         additional_pc = correspondence_priors[:, 1:4]
         X = np.vstack((additional_pc, X))
-
-    # # add color
-    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    # pc_rgba_arr = np.full((len(X), 1), pc_rgba)
-    # filtered_pc_colored = np.hstack((X, pc_rgba_arr)).astype('O')
-    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
     N = len(X)
     
@@ -354,30 +327,30 @@ def ecpd_lle (X_orig,                      # input point cloud
         else:
             P = P_stored.copy()
 
+        # use cdcpd's pvis
         if (occluded_nodes is not None) and (len(occluded_nodes) != 0):
+            nodes = correspondence_priors[:, 1:4]
+            nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
+            # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
+            image_coords = np.matmul(proj_matrix, nodes_h.T).T
+            xs = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+            ys = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
             # modified probability distribution
-            P_vis = np.zeros((M, N))
+            P_vis = np.ones((M, N))
+            total_P_vis = 0
 
-            # determine the indices where head, tail, floating region starts/ends
-            M_head = occluded_nodes[0]
-            M_tail = M - 1 - occluded_nodes[-1]
-
-            P_vis_fill_head = np.zeros((M, 1))
-            P_vis_fill_tail = np.zeros((M, 1))
-            P_vis_fill_floating = np.zeros((M, 1))
-
-            P_vis_fill_head[0 : M_head, 0] = 1 / M_head
-            P_vis_fill_tail[M-M_tail : M, 0] = 1 / M_tail
-            P_vis_fill_floating[M_head : M-M_tail, 0] = 1 / (M - M_head - M_tail)
-
-            # fill in P_vis
-            P_vis[:, (max_p_nodes >= 0)&(max_p_nodes < M_head)] = P_vis_fill_head
-            P_vis[:, (max_p_nodes >= M-M_tail)&(max_p_nodes < M)] = P_vis_fill_tail
-            P_vis[:, (max_p_nodes >= M_head)&(max_p_nodes < M-M_tail)] = P_vis_fill_floating
-            # P_vis[:, (max_p_nodes >= 0)&(max_p_nodes <= M_head)] = P_vis_fill_head
-            # P_vis[:, (max_p_nodes >= M-M_tail-1)&(max_p_nodes < M)] = P_vis_fill_tail
-            # P_vis[:, (max_p_nodes > M_head)&(max_p_nodes < M-M_tail-1)] = P_vis_fill_floating
+            # for loop for now, will change later
+            for i in range (len(image_coords)):
+                x = xs[i]
+                y = ys[i]
+                pixel_dist = bmask_transformed[y, x]
+                P_vis_i = np.exp(-k_vis*pixel_dist)
+                total_P_vis += P_vis_i
+                P_vis[i] *= P_vis_i
+            
+            # normalize P_vis
+            P_vis = P_vis / total_P_vis
 
             # modify P
             P = P_vis * P
@@ -398,20 +371,6 @@ def ecpd_lle (X_orig,                      # input point cloud
             c = c * M / N
             den += c
             P = np.divide(P, den)
-
-        # # original method
-        # den = np.sum(P, axis=0)
-        # den = np.tile(den, (M, 1))
-        # den[den == 0] = np.finfo(float).eps
-        # c = (2 * np.pi * sigma2) ** (D / 2)
-        # c = c * mu / (1 - mu)
-        # c = c * M / N
-        # den += c
-        # P = np.divide(P, den)
-
-        # if occluded_nodes is not None:
-        #     print(occluded_nodes)
-        #     P[occluded_nodes] = 0
 
         Pt1 = np.sum(P, axis=0)
         P1 = np.sum(P, axis=1)
@@ -476,422 +435,34 @@ def ecpd_lle (X_orig,                      # input point cloud
 
     return Y, sigma2
 
-def pre_process (params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0):
-
-    proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
-                            [             0.0, 916.265869140625,   354.02392578125, 0.0], \
-                            [             0.0,              0.0,               1.0, 0.0]])
-
-    # log time
-    cur_time = time.time()
-    guide_nodes, guide_nodes_sigma2_0 = ecpd_lle(X_orig = X, 
-                                                 Y_0 = Y_0, 
-                                                 beta = params["CPD_LLE_params"]["beta"], 
-                                                 alpha = params["CPD_LLE_params"]["alpha"],
-                                                 gamma = params["CPD_LLE_params"]["gamma"], 
-                                                 mu = params["CPD_LLE_params"]["mu"], 
-                                                 max_iter = params["CPD_LLE_params"]["max_iter"],
-                                                 tol = params["CPD_LLE_params"]["tolerance"], 
-                                                 include_lle = params["CPD_LLE_params"]["include_lle"], 
-                                                 use_geodesic = params["CPD_LLE_params"]["use_geodesic"], 
-                                                 use_prev_sigma2 = params["CPD_LLE_params"]["use_prev_sigma2"], 
-                                                 sigma2_0 = sigma2_0*params["CPD_LLE_params"]["sigma2_0_scale"], 
-                                                 kernel = params["CPD_LLE_params"]["kernel"])
-
-    rospy.logwarn('Pre-processing registration: ' + str((time.time() - cur_time)*1000) + ' ms')
-
-    # determine which head node is occluded, if any
-    head_visible = False
-    tail_visible = False
-
-    if pt2pt_dis(guide_nodes[0], Y_0[0]) < params["initialization_params"]["max_end_displacement"]:
-        head_visible = True
-    if pt2pt_dis(guide_nodes[-1], Y_0[-1]) < params["initialization_params"]["max_end_displacement"]:
-        tail_visible = True
-
-    if not head_visible and not tail_visible:
-        rospy.logerr("Neither end visible!")
-        # sys.exit() # terminate program
-        if pt2pt_dis(guide_nodes[0], Y_0[0]) < pt2pt_dis(guide_nodes[-1], Y_0[-1]):
-            head_visible = True
-        else:
-            tail_visible = True
-
-    cur_total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
-
-    # print('tail displacement = ', pt2pt_dis(guide_nodes[-1], Y_0[-1]))
-    # print('head displacement = ', pt2pt_dis(guide_nodes[0], Y_0[0]))
-    # print('length difference = ', abs(cur_total_len - total_len))
-
-    # visible_dist = np.sum(np.sqrt(np.sum(np.square(np.diff(guide_nodes, axis=0)), axis=1)))
-    correspondence_priors = None
-    occluded_nodes = None
-
-    mask_dis_threshold = params["initialization_params"]["mask_dis_threshold"]
-    num_fit_pts = 100
-    state = None # 0 for no occlusion, 1 for one tip visible, 2 for two tips visible
-
-    # if abs(cur_total_len - total_len) < 0.02 and head_visible and tail_visible: # (head_visible and tail_visible) or 
-
-    #     rospy.loginfo("Total length unchanged, state = 0")
-
-    #     state = 0
-    #     # print('head visible and tail visible or the same len')
-    #     correspondence_priors = []
-    #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
-    #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
-
-    # log time
-    cur_time = time.time()
-    
-    # elif head_visible and tail_visible:
-    if head_visible and tail_visible: # but length condition not met - middle part is occluded
-        
-        if abs(cur_total_len - total_len) < params["initialization_params"]["max_total_len_change"]:
-            rospy.loginfo("Total length unchanged, state = 0")
-            state = 0
-        else:
-            rospy.loginfo("Both ends visible but total length changed, state = 2")
-            state = 2
-
-        # print('head and tail visible but total length changed')
-
-        # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
-        # determined which nodes are occluded from mask information
-        # projection
-        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
-        # cap uv to be within (1280, 720)
-        us = np.where(us >= 1280, 1279, us)
-        vs = np.where(vs >= 720, 719, vs)
-        uvs = np.vstack((vs, us)).T
-        uvs_t = tuple(map(tuple, uvs.T))
-        # invert bmask for distance transform
-        bmask_transformed = ndimage.distance_transform_edt(255 - bmask)
-        # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
-        vis = bmask_transformed[uvs_t]
-        valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
-
-        # # special case: all nodes visible but length is slightly above the threshold
-        # if len(valid_guide_nodes_indices) == len(guide_nodes):
-        #     correspondence_priors = []
-        #     correspondence_priors.append(np.append(np.array([0]), guide_nodes[0]))
-        #     correspondence_priors.append(np.append(np.array([len(guide_nodes)-1]), guide_nodes[-1]))
-        #     return guide_nodes, np.array(correspondence_priors), None, 0
-
-        # determine a set of nodes for head and a set of nodes for tail
-        valid_head_node_indices = []
-        for node_idx in range (0, len(guide_nodes)):
-            if node_idx in valid_guide_nodes_indices:
-                # valid_head_nodes.append(guide_nodes[node_idx])
-                valid_head_node_indices.append(node_idx)
-            else: 
-                break
-        if len(valid_head_node_indices) != 0:
-            valid_head_nodes = guide_nodes[np.array(valid_head_node_indices)]
-        else:
-            valid_head_nodes = []
-            print('error! no valid head nodes')
-
-        valid_tail_node_indices = []
-        for node_idx in range (len(guide_nodes)-1, -1, -1):
-            if node_idx in valid_guide_nodes_indices:
-                # valid_tail_nodes.append(guide_nodes[node_idx])
-                valid_tail_node_indices.append(node_idx)
-            else:
-                break
-
-        if len(valid_tail_node_indices) != 0:
-            valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)] # valid tail node is reversed, starting from the end
-        else:
-            valid_tail_nodes = []
-            print('error! no valid tail nodes')
-
-        # initialize a variable for last visible head index and last visible tail index
-        last_visible_index_head = None
-        last_visible_index_tail = None
-
-        # ----- head visible part -----
-        correspondence_priors_head = []
-
-        # if only one head node is visible, should not fit spline
-        if len(valid_head_nodes) <= 3:
-            correspondence_priors_head = np.hstack((valid_head_node_indices[0], valid_head_nodes[0]))
-            last_visible_index_head = 0
-
-        else:
-            tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
-            # 1st fit, less points
-            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-
-            # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
-            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-            total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
-
-            last_visible_index_head = len(geodesic_coord[geodesic_coord < total_spline_len]) - 1
-
-            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord = " + str(geodesic_coord[0:last_visible_index_head+1]))
-
-            # geodesic coord is 1D
-            correspondence_priors_head = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
-            # occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
-        
-        # ----- tail visible part -----
-        correspondence_priors_tail = []
-
-        # if not enough tail node is visible, should not fit spline
-        if len(valid_tail_nodes) <= 3:
-            correspondence_priors_tail = np.hstack((valid_tail_node_indices[0], valid_tail_nodes[0]))
-            last_visible_index_tail = len(Y_0) - 1
-
-        else:
-            tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
-            # 1st fit, less points
-            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-
-            # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
-            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-            total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
-
-            geodesic_coord_from_tail = np.abs(geodesic_coord - geodesic_coord[-1]).tolist()
-            geodesic_coord_from_tail.reverse()
-            geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
-
-            last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])
-
-            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord_from_tail = " + str(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]))
-
-            # geodesic coord is 1D
-            correspondence_priors_tail = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]*1000).astype(int)].T)).T        
-            # occluded_nodes = np.arange(0, last_visible_index_tail, 1)
-
-        # compile occluded nodes
-        occluded_nodes = np.arange(last_visible_index_head+1, last_visible_index_tail, 1)
-        correspondence_priors = np.vstack((correspondence_priors_head, correspondence_priors_tail))
-
-        # if len(valid_guide_nodes_indices) == len(guide_nodes):
-        #     occluded_nodes = None
-        #     correspondence_priors = correspondence_priors_head
-
-    elif head_visible and not tail_visible:
-
-        rospy.loginfo("Head visible, state = 1")
-
-        state = 1
-
-        # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
-        # determined which nodes are occluded from mask information
-        # projection
-        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
-        # temp
-        us = np.where(us >= 1280, 1279, us)
-        vs = np.where(vs >= 720, 719, vs)
-        uvs = np.vstack((vs, us)).T
-        uvs_t = tuple(map(tuple, uvs.T))
-        # invert bmask for distance transform
-        bmask_transformed = ndimage.distance_transform_edt(255 - bmask)
-        # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
-        vis = bmask_transformed[uvs_t]
-        valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
-
-        valid_head_node_indices = []
-        for node_idx in range (0, len(guide_nodes)):
-            if node_idx in valid_guide_nodes_indices:
-                # valid_head_nodes.append(guide_nodes[node_idx])
-                valid_head_node_indices.append(node_idx)
-            else: 
-                break
-        if len(valid_head_node_indices) != 0:
-            valid_head_nodes = guide_nodes[np.array(valid_head_node_indices)]
-        else:
-            valid_head_nodes = []
-            print('error! no valid head nodes')
-
-        correspondence_priors = []
-
-        # if only one head node is visible, should not fit spline
-        if len(valid_head_nodes) <= 3:
-            correspondence_priors_head = np.hstack((valid_head_node_indices[0], valid_head_nodes[0]))
-            last_visible_index_head = 0
-
-        else:
-            tck, u = interpolate.splprep(valid_head_nodes.T, s=0.0001)
-            # 1st fit, less points
-            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-
-            # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
-            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-            total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
-
-            last_visible_index_head = len(geodesic_coord[geodesic_coord < total_spline_len]) - 1
-
-            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord = " + str(geodesic_coord[0:last_visible_index_head+1]))
-
-            # geodesic coord is 1D
-            correspondence_priors = np.vstack((np.arange(0, last_visible_index_head+1), spline_pts[(geodesic_coord[0:last_visible_index_head+1]*1000).astype(int)].T)).T
-        
-        occluded_nodes = np.arange(last_visible_index_head+1, len(Y_0), 1)
-
-    elif tail_visible and not head_visible:
-
-        rospy.loginfo("Tail visible, state = 1")
-
-        state = 1
-
-        # first need to determine which portion of the guide nodes are actual useful data (not occupying empty space)
-        # determined which nodes are occluded from mask information
-        # projection
-        guide_nodes_h = np.hstack((guide_nodes, np.ones((len(guide_nodes), 1))))
-        # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
-        image_coords = np.matmul(proj_matrix, guide_nodes_h.T).T
-        us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
-        vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
-        # temp
-        us = np.where(us >= 1280, 1279, us)
-        vs = np.where(vs >= 720, 719, vs)
-        uvs = np.vstack((vs, us)).T
-        uvs_t = tuple(map(tuple, uvs.T))
-        # invert bmask for distance transform
-        bmask_transformed = ndimage.distance_transform_edt(255 - bmask)
-        # bmask_transformed = bmask_transformed / np.amax(bmask_transformed)
-        vis = bmask_transformed[uvs_t]
-        valid_guide_nodes_indices = np.where(vis < mask_dis_threshold)[0]
-
-        valid_tail_node_indices = []
-        for node_idx in range (len(guide_nodes)-1, -1, -1):
-            if node_idx in valid_guide_nodes_indices:
-                # valid_tail_nodes.append(guide_nodes[node_idx])
-                valid_tail_node_indices.append(node_idx)
-            else:
-                break
-
-        if len(valid_tail_node_indices) != 0:
-            valid_tail_nodes = guide_nodes[np.array(valid_tail_node_indices)] # valid tail node is reversed, starting from the end
-        else:
-            valid_tail_nodes = []
-            print('error! no valid tail nodes')
-
-        correspondence_priors = []
-
-        # if only one tail node is visible, should not fit spline
-        if len(valid_tail_nodes) <= 3:
-            correspondence_priors_tail = np.hstack((valid_tail_node_indices[0], valid_tail_nodes[0]))
-            last_visible_index_tail = len(Y_0) - 1
-
-        else:
-            tck, u = interpolate.splprep(valid_tail_nodes.T, s=0.0001)
-            # 1st fit, less points
-            u_fine = np.linspace(0, 1, num_fit_pts) # <-- num fit points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-
-            # 2nd fit, higher accuracy
-            num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1010)
-            u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
-            x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
-            spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
-            total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
-
-            geodesic_coord_from_tail = np.abs(geodesic_coord - geodesic_coord[-1]).tolist()
-            geodesic_coord_from_tail.reverse()
-            geodesic_coord_from_tail = np.array(geodesic_coord_from_tail)
-
-            last_visible_index_tail = len(Y_0) - len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])
-
-            rospy.logwarn("spline total len = " + str(total_spline_len) + "; geodesic_coord_from_tail = " + str(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]))
-
-            # geodesic coord is 1D
-            correspondence_priors = np.vstack((np.arange(len(Y_0)-1, last_visible_index_tail-1, -1), spline_pts[(geodesic_coord_from_tail[0:len(geodesic_coord_from_tail[geodesic_coord_from_tail < total_spline_len])]*1000).astype(int)].T)).T        
-            
-        occluded_nodes = np.arange(0, last_visible_index_tail, 1)
-    
-    # if none of the above condition is satisfied
-    else:
-        print('error!')
-
-    rospy.logwarn('Pre-processing fit spline: ' + str((time.time() - cur_time)*1000) + ' ms')
-
-    return guide_nodes, guide_nodes_sigma2_0, np.array(correspondence_priors), occluded_nodes, state
-
-def tracking_step (params, X, Y_0, sigma2_0, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0):
-
-    # log time 
-    cur_time = time.time()
-    guide_nodes, guide_nodes_sigma2_0, correspondence_priors, occluded_nodes, state = pre_process(params, X, Y_0, geodesic_coord, total_len, bmask, sigma2_0, guide_nodes_Y_0, guide_nodes_sigma2_0)
-    # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
-    rospy.logwarn('Pre-processing total: ' + str((time.time() - cur_time)*1000) + ' ms')
-
+def tracking_step (X_orig, Y_0, sigma2_0, geodesic_coord, bmask_transformed, mask_dist_threshold):
     # log time
     cur_time = time.time()
 
-    # state: 0 --> both tips visible and length unchanged; 1 --> one tip visible; 2 --> both tips visible but length changed
-    # if state == 0:
-    #     Y, sigma2 = ecpd_lle(X, Y_0, 3, 1, 1, 0.0, 30, 0.00001, True, True, False, None, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
-    # elif state == 1:
-    if state != 2:
-        # Y, sigma2 = ecpd_lle(X, Y_0, 7, 1, 1, 0.0, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, omega=0.000001, kernel='1st order', occluded_nodes=occluded_nodes)
-        Y, sigma2 = ecpd_lle(X_orig = X, 
-                             Y_0 = Y_0, 
-                             beta = params["ECPD_params_2"]["beta"], 
-                             alpha = params["ECPD_params_2"]["alpha"],
-                             gamma = params["ECPD_params_2"]["gamma"], 
-                             mu = params["ECPD_params_2"]["mu"], 
-                             max_iter = params["ECPD_params_2"]["max_iter"],
-                             tol = params["ECPD_params_2"]["tolerance"], 
-                             include_lle = params["ECPD_params_2"]["include_lle"], 
-                             use_geodesic = params["ECPD_params_2"]["use_geodesic"], 
-                             use_prev_sigma2 = params["ECPD_params_2"]["use_prev_sigma2"], 
-                             sigma2_0 = sigma2_0, 
-                             use_ecpd = True,
-                             correspondence_priors = correspondence_priors,
-                             omega = params["ECPD_params_2"]["omega"],
-                             kernel = params["ECPD_params_2"]["kernel"],
-                             occluded_nodes = occluded_nodes)
-    else:
-        # Y, sigma2 = ecpd_lle(X, Y_0, 1, 1, 1, 0.1, 30, 0.00001, True, True, True, sigma2_0, True, correspondence_priors, 0.000001, 'Gaussian', occluded_nodes)
-        Y, sigma2 = ecpd_lle(X_orig = X, 
-                             Y_0 = Y_0, 
-                             beta = params["ECPD_params_1"]["beta"], 
-                             alpha = params["ECPD_params_1"]["alpha"],
-                             gamma = params["ECPD_params_1"]["gamma"], 
-                             mu = params["ECPD_params_1"]["mu"], 
-                             max_iter = params["ECPD_params_1"]["max_iter"],
-                             tol = params["ECPD_params_1"]["tolerance"], 
-                             include_lle = params["ECPD_params_1"]["include_lle"], 
-                             use_geodesic = params["ECPD_params_1"]["use_geodesic"], 
-                             use_prev_sigma2 = params["ECPD_params_1"]["use_prev_sigma2"], 
-                             sigma2_0 = sigma2_0, 
-                             use_ecpd = True,
-                             correspondence_priors = correspondence_priors,
-                             omega = params["ECPD_params_1"]["omega"],
-                             kernel = params["ECPD_params_1"]["kernel"],
-                             occluded_nodes = occluded_nodes)
+    # projection
+    nodes_h = np.hstack((Y_0, np.ones((len(Y_0), 1))))
+    image_coords = np.matmul(proj_matrix, nodes_h.T).T
+    us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
+    vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
+
+    us = np.where(us >= 1280, 1279, us)
+    vs = np.where(vs >= 720, 719, vs)
+
+    uvs = np.vstack((vs, us)).T
+    uvs_t = tuple(map(tuple, uvs.T))
+    vis = bmask_transformed[uvs_t]
+    occluded_nodes = np.where(vis > mask_dist_threshold)[0]
+    visible_nodes = np.where(vis <= mask_dist_threshold)[0]
+
+    guide_nodes = Y_0[visible_nodes]
+    guide_nodes, _ = ecpd_lle(X_orig, Y_0, 0, 10000, 1, 1, 0.05, 50, 0.00001, True, True, False, False)
+    correspondence_priors = np.vstack((visible_nodes, guide_nodes.T)).T
+
+    Y, sigma2 = ecpd_lle(X_orig, Y_0, sigma2_0, 10, 1, 2, 0.05, 50, 0.00001, True, True, True, True, correspondence_priors, 0.000005, "1st order", occluded_nodes, bmask_transformed)
 
     rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
-    return correspondence_priors[:, 1:4], Y, sigma2, guide_nodes, guide_nodes_sigma2_0  # correspondence_priors[:, 1:4]
+    return correspondence_priors[:, 1:4], Y, sigma2  # correspondence_priors[:, 1:4]
 
 
 initialized = False
@@ -911,7 +482,7 @@ def callback (rgb, pc):
     global params, read_params
 
     if not read_params:
-        setting_path = join(dirname(dirname(abspath(__file__))), "settings/TrackDLO_params.yaml")
+        setting_path = join(dirname(dirname(abspath(__file__))), "config/TrackDLO_params.yaml")
         with open(setting_path, 'r') as file:
             params = yaml.safe_load(file)
         read_params = True
@@ -919,10 +490,6 @@ def callback (rgb, pc):
     # log time
     cur_time_cb = time.time()
     print('----------')
-
-    proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
-                            [             0.0, 916.265869140625,   354.02392578125, 0.0], \
-                            [             0.0,              0.0,               1.0, 0.0]])
 
     # process rgb image
     cur_image = ros_numpy.numpify(rgb)
@@ -997,8 +564,7 @@ def callback (rgb, pc):
         init_nodes, sigma2 = register(filtered_pc, params["initialization_params"]["num_of_nodes"], mu=params["initialization_params"]["mu"], max_iter=params["initialization_params"]["max_iter"])
         init_nodes = sort_pts(init_nodes)
 
-        guide_nodes_Y_0 = init_nodes.copy()
-        guide_nodes_sigma2_0 = sigma2
+        nodes = init_nodes.copy()
 
         # compute preset coord and total len. one time action
         seg_dis = np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1))
@@ -1014,7 +580,7 @@ def callback (rgb, pc):
         initialized = True
         # header.stamp = rospy.Time.now()
         # converted_init_nodes = pcl2.create_cloud(header, fields, init_nodes)
-        # init_nodes_pub.publish(converted_init_nodes)
+        # nodes_pub.publish(converted_init_nodes)
 
     # cpd
     if initialized:
@@ -1042,7 +608,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        guide_nodes, nodes, sigma2, guide_nodes_Y_0, guide_nodes_sigma2_0 = tracking_step(params, filtered_pc, init_nodes, sigma2, geodesic_coord, total_len, bmask, guide_nodes_Y_0, guide_nodes_sigma2_0)
+        guide_nodes, nodes, sigma2 = tracking_step(filtered_pc, nodes, sigma2, geodesic_coord, bmask_transformed, mask_dis_threshold)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
@@ -1113,7 +679,7 @@ if __name__=='__main__':
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
-    guide_nodes_pub = rospy.Publisher ('/guide_nodes', PointCloud2, queue_size=10)
+    guide_nodes_pub = rospy.Publisher ('/guide_nodes_pc', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
