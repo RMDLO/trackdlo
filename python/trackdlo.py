@@ -32,6 +32,11 @@ def pt2pt_dis_sq(pt1, pt2):
 def pt2pt_dis(pt1, pt2):
     return np.sqrt(np.sum(np.square(pt1 - pt2)))
 
+occlusion_mask_rgb = None
+def update_occlusion_mask(data):
+	global occlusion_mask_rgb
+	occlusion_mask_rgb = ros_numpy.numpify(data)
+
 def register(pts, M, mu=0, max_iter=50):
 
     # initial guess
@@ -455,10 +460,10 @@ def tracking_step (X_orig, Y_0, sigma2_0, geodesic_coord, bmask_transformed, mas
     visible_nodes = np.where(vis <= mask_dist_threshold)[0]
 
     guide_nodes = Y_0[visible_nodes]
-    guide_nodes, _ = ecpd_lle(X_orig, Y_0, 0, 10000, 1, 1, 0.05, 50, 0.00001, True, True, False, False)
+    guide_nodes, _ = ecpd_lle(X_orig, guide_nodes, 0, 10000, 1, 1, 0.05, 50, 0.00001, True, True, False, False)
     correspondence_priors = np.vstack((visible_nodes, guide_nodes.T)).T
 
-    Y, sigma2 = ecpd_lle(X_orig, Y_0, sigma2_0, 10, 1, 2, 0.05, 50, 0.00001, True, True, True, True, correspondence_priors, 0.000005, "1st order", occluded_nodes, bmask_transformed)
+    Y, sigma2 = ecpd_lle(X_orig, Y_0, sigma2_0, 10, 1, 2, 0.05, 50, 0.00001, True, True, True, True, correspondence_priors, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed)
 
     rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
@@ -480,6 +485,7 @@ def callback (rgb, pc):
     global total_len, geodesic_coord
     global guide_nodes_Y_0, guide_nodes_sigma2_0
     global params, read_params
+    global occlusion_mask_rgb
 
     if not read_params:
         setting_path = join(dirname(dirname(abspath(__file__))), "config/TrackDLO_params.yaml")
@@ -501,27 +507,35 @@ def callback (rgb, pc):
     cur_pc = ros_numpy.point_cloud2.get_xyz_points(pc_data)
     cur_pc = cur_pc.reshape((720, 1280, 3))
 
+    # process opencv mask
+    if occlusion_mask_rgb is None:
+        occlusion_mask_rgb = np.ones(cur_image.shape).astype('uint8')*255
+    occlusion_mask = cv2.cvtColor(occlusion_mask_rgb.copy(), cv2.COLOR_RGB2GRAY)
+
     if not params["initialization_params"]["using_rope_with_markers"]:
         # color thresholding
         lower = (90, 90, 90)
         upper = (120, 255, 255)
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
+        # color thresholding
         # --- rope blue ---
         lower = (90, 60, 40)
         upper = (130, 255, 255)
-        mask = cv2.inRange(hsv_image, lower, upper)
+        mask_dlo = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
         # --- tape red ---
         lower = (130, 60, 40)
         upper = (255, 255, 255)
         mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
         lower = (0, 60, 40)
-        upper = (30, 255, 255)
+        upper = (10, 255, 255)
         mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
-        mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())
+        mask_marker = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy()).astype('uint8')
 
-        mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
+        # combine masks
+        mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+        mask = cv2.bitwise_and(mask.copy(), occlusion_mask.copy())
 
     bmask = mask.copy() # for checking visibility, max = 255
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
@@ -641,7 +655,9 @@ def callback (rgb, pc):
             us = (image_coords[:, 0] / image_coords[:, 2]).astype(int)
             vs = (image_coords[:, 1] / image_coords[:, 2]).astype(int)
 
-            tracking_img = cur_image.copy()
+            cur_image_masked = cv2.bitwise_and(cur_image, occlusion_mask_rgb)
+            tracking_img = (cur_image*0.5 + cur_image_masked*0.5).astype(np.uint8)
+
             for i in range (len(image_coords)):
                 # draw circle
                 uv = (us[i], vs[i])
@@ -682,6 +698,8 @@ if __name__=='__main__':
     guide_nodes_pub = rospy.Publisher ('/guide_nodes_pc', PointCloud2, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
+
+    opencv_mask_sub = rospy.Subscriber('/mask_with_occlusion', Image, update_occlusion_mask)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, pc_sub], 10)
     ts.registerCallback(callback)
