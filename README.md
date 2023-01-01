@@ -28,11 +28,11 @@ This is the TrackDLO ROS package for tracking deformable linear objects under oc
 ----------------------
 ## Python:
 
-### To test the most recent version of TrackDLO with RGB-D camera stream:
+### To test TrackDLO with RGB-D camera stream:
 1. Run ```roslaunch trackdlo realsense_node.launch```. This will bring up the rviz window with color image, mask, and tracking result (2D and 3D) visualized.
 2. Open a new terminal and run ```rosrun trackdlo trackdlo.py```. This will start the tracking algorithm and publish all results.
 
-### To test the most recent version of TrackDLO with ROS bag files:
+### To test TrackDLO with ROS bag files:
 1. Download the bag files from [here](https://drive.google.com/drive/folders/1AwMXysdzRQLz7w8umj66rrKa-Bh0XlVJ?usp=share_link) and place them in your ROS workspace.
 2. Run ```roslaunch trackdlo replay_bag.launch```. This will bring up the rviz window with color image, mask, and tracking result (2D and 3D) visualized. The RGB-D camera node will not be started.
 3. Open a new terminal and run ```rosrun trackdlo trackdlo.py```. This will start the tracking algorithm and the results will be published after the bag file starts running.
