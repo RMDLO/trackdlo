@@ -316,16 +316,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
     double mask_dist_threshold = 10;
 
-    // Mat tracking_img;
-    // cur_image.copyTo(tracking_img);
-    // for (cv::KeyPoint key_point : keypoints) {
-    //     cv::circle(tracking_img, key_point.pt, 5, cv::Scalar(0, 150, 255), -1);
-    // }
-
-    // // publish image
-    // tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
-
-    // pcl test
     sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
 
@@ -374,8 +364,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
         }
-
-        // std::cout << Y_0_sorted.rows() << ", " << Y_0_sorted.cols() << std::endl;
 
         // log time
         std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
