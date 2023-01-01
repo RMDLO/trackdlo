@@ -520,8 +520,6 @@ bool ecpd_lle (MatrixXf X_orig,
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
 
-            // std::cout << P_vis.col(0).transpose() << std::endl;
-
             // modify P
             P = P.cwiseProduct(P_vis);
 
@@ -604,8 +602,7 @@ bool ecpd_lle (MatrixXf X_orig,
 
         if (pt2pt_dis_sq(Y, Y_0 + G*W) < tol) {
             Y = Y_0 + G*W;
-            std::cout << "iterations until convergence: " << it << std::endl;
-            // ROS_INFO("Iteration until convergence: " + std::to_string(it));
+            ROS_INFO_STREAM("Iteration until convergence: " + std::to_string(it+1));
             break;
         }
         else {
@@ -674,8 +671,6 @@ void tracking_step (MatrixXf X_orig,
     double sigma2_pre_proc = sigma2*100;
     ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
 
-    std::cout << "finished first reg" << std::endl;
-
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
     for (int i = 0; i < guide_nodes.rows(); i ++) {
@@ -686,8 +681,6 @@ void tracking_step (MatrixXf X_orig,
         temp(0, 3) = guide_nodes(i, 2);
         priors_vec.push_back(temp);
     }
-
-    print_1d_vector(visible_nodes);
 
     // second registation to imput velocity
     // would not work for omega <= 0.000001

@@ -233,6 +233,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     // log time
     std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
+    double time_diff;
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
@@ -354,7 +355,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
-        std::cout << "num of points: " << X.rows() << std::endl;
+        ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         if (use_eval_rope) {
             for (cv::KeyPoint key_point : keypoints_red) {
@@ -421,7 +422,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, total_len, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
-        std::cout << "Tracking step time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
+        time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
+        ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -447,10 +449,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             cv::Scalar point_color;
             cv::Scalar line_color;
-
-            
-            // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
-            // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
             
             if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
                 point_color = cv::Scalar(0, 150, 255);
@@ -514,8 +512,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     pc_pub.publish(output);
 
-    std::cout << "total time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count() << "[ms]" << std::endl;
-    
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
+    ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
+        
     return tracking_img_msg;
 }
 

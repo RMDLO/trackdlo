@@ -17,7 +17,6 @@ import time
 import pickle as pkl
 
 import message_filters
-from sklearn.neighbors import NearestNeighbors
 import open3d as o3d
 from scipy import ndimage
 from scipy import interpolate
