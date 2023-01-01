@@ -418,7 +418,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
