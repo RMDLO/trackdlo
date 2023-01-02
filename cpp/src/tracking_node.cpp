@@ -30,7 +30,6 @@ using cv::Mat;
 ros::Publisher pc_pub;
 ros::Publisher results_pub;
 ros::Publisher guide_nodes_pub;
-ros::Publisher priors_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -233,6 +232,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     // log time
     std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
+    double time_diff;
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
@@ -354,7 +354,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
-        std::cout << "num of points: " << X.rows() << std::endl;
+        ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         if (use_eval_rope) {
             for (cv::KeyPoint key_point : keypoints_red) {
@@ -418,10 +418,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, total_len, mask, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
-        std::cout << "Tracking step time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() << "[ms]" << std::endl;
+        time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
+        ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -447,10 +448,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             cv::Scalar point_color;
             cv::Scalar line_color;
-
-            
-            // std::cout << "bmask dist = " << static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) << std::endl;
-            // std::cout << "mask val = " << static_cast<int>(mask.at<uchar>(col, row)) << std::endl;
             
             if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
                 point_color = cv::Scalar(0, 150, 255);
@@ -495,11 +492,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // publish the results as a marker array
         visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
         visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
-        visualization_msgs::MarkerArray priors_results = MatrixXf2MarkerArray(priors, "camera_color_optical_frame", "priors_results", {1.0, 1.0, 1.0, 0.5}, {1.0, 1.0, 0.0, 0.5});
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
-        priors_pub.publish(priors_results);
 
         // reset all guide nodes
         for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
@@ -514,8 +509,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     pc_pub.publish(output);
 
-    std::cout << "total time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count() << "[ms]" << std::endl;
-    
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
+    ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
+        
     return tracking_img_msg;
 }
 
@@ -530,7 +526,6 @@ int main(int argc, char **argv) {
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
-    priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/priors", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);

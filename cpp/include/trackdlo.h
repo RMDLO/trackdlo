@@ -49,8 +49,6 @@ void tracking_step (MatrixXf X_orig,
                     MatrixXf& gn_result,
                     std::vector<MatrixXf>& priors_result,
                     std::vector<double> geodesic_coord,
-                    double total_len,
-                    Mat bmask,
                     Mat bmask_transformed_normalized,
                     double mask_dist_threshold,
                     double mat_max);

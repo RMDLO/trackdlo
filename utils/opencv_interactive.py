@@ -1,27 +1,10 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 import rospy
 import ros_numpy
-from sensor_msgs.msg import PointCloud2, PointField, Image
-import sensor_msgs.point_cloud2 as pcl2
-import std_msgs.msg
-
-import struct
-import time
+from sensor_msgs.msg import Image
 import cv2
 import numpy as np
-import math
-
-import time
-import pickle as pkl
-
-# import message_filters
-# from sklearn.neighbors import NearestNeighbors
-# import open3d as o3d
-# from scipy import ndimage
-# import pyrealsense2 as rs
-
 
 rect = (0,0,0,0)
 startPoint = False

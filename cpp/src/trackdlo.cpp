@@ -123,8 +123,8 @@ MatrixXf sort_pts (MatrixXf Y_0) {
     MatrixXf Y_0_sorted = MatrixXf::Zero(N, 3);
     std::vector<MatrixXf> Y_0_sorted_vec = {};
     std::vector<bool> selected_node(N, false);
-    std::vector<bool> visited(N, false);
     selected_node[0] = true;
+    int last_visited_b = 0;
 
     MatrixXf G = MatrixXf::Zero(N, N);
     for (int i = 0; i < N; i ++) {
@@ -162,7 +162,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
             Y_0_sorted_vec.push_back(Y_0.row(b));
         }
         else {
-            if (visited[a] == true) {
+            if (last_visited_b != a) {
                 reverse += 1;
                 reverse_on = a;
                 insertion_counter = 1;
@@ -173,7 +173,8 @@ MatrixXf sort_pts (MatrixXf Y_0) {
                 Y_0_sorted_vec.insert(it, Y_0.row(b));
             }
             else if (reverse != 0) {
-                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(a));
+                auto it = find(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end(), Y_0.row(reverse_on));
+                Y_0_sorted_vec.insert(it + insertion_counter, Y_0.row(b));
                 insertion_counter += 1;
             }
             else {
@@ -181,7 +182,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
             }
         }
 
-        visited[a] = true;
+        last_visited_b = b;
         selected_node[b] = true;
         counter += 1;
     }
@@ -520,8 +521,6 @@ bool ecpd_lle (MatrixXf X_orig,
             // normalize P_vis
             P_vis = P_vis / total_P_vis;
 
-            // std::cout << P_vis.col(0).transpose() << std::endl;
-
             // modify P
             P = P.cwiseProduct(P_vis);
 
@@ -604,8 +603,7 @@ bool ecpd_lle (MatrixXf X_orig,
 
         if (pt2pt_dis_sq(Y, Y_0 + G*W) < tol) {
             Y = Y_0 + G*W;
-            std::cout << "iterations until convergence: " << it << std::endl;
-            // ROS_INFO("Iteration until convergence: " + std::to_string(it));
+            ROS_INFO_STREAM("Iteration until convergence: " + std::to_string(it+1));
             break;
         }
         else {
@@ -628,8 +626,6 @@ void tracking_step (MatrixXf X_orig,
                     MatrixXf& guide_nodes,
                     std::vector<MatrixXf>& priors_vec,
                     std::vector<double> geodesic_coord,
-                    double total_len,
-                    Mat bmask,
                     Mat bmask_transformed_normalized,
                     double mask_dist_threshold,
                     double mat_max) {
@@ -674,8 +670,6 @@ void tracking_step (MatrixXf X_orig,
     double sigma2_pre_proc = sigma2*100;
     ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
 
-    std::cout << "finished first reg" << std::endl;
-
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
     for (int i = 0; i < guide_nodes.rows(); i ++) {
@@ -686,8 +680,6 @@ void tracking_step (MatrixXf X_orig,
         temp(0, 3) = guide_nodes(i, 2);
         priors_vec.push_back(temp);
     }
-
-    print_1d_vector(visible_nodes);
 
     // second registation to imput velocity
     // would not work for omega <= 0.000001
