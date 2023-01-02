@@ -1,5 +1,5 @@
 initialization_params:
-  num_of_nodes: 18
+  num_of_nodes: 36
   mu: 0.05
   max_iter: 100
   mask_dis_threshold: 10

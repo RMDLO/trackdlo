@@ -20,7 +20,10 @@ from os.path import dirname, abspath, join
 import message_filters
 import open3d as o3d
 from scipy import ndimage
-from scipy import interpolate
+
+from visualization_msgs.msg import Marker
+from visualization_msgs.msg import MarkerArray
+from scipy.spatial.transform import Rotation as R
 
 proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                         [             0.0, 916.265869140625,   354.02392578125, 0.0], \
@@ -36,6 +39,86 @@ occlusion_mask_rgb = None
 def update_occlusion_mask(data):
 	global occlusion_mask_rgb
 	occlusion_mask_rgb = ros_numpy.numpify(data)
+
+# original post: https://stackoverflow.com/a/59204638
+def rotation_matrix_from_vectors(vec1, vec2):
+    """ Find the rotation matrix that aligns vec1 to vec2
+    :param vec1: A 3d "source" vector
+    :param vec2: A 3d "destination" vector
+    :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
+    """
+    a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
+    v = np.cross(a, b)
+    c = np.dot(a, b)
+    s = np.linalg.norm(v)
+    kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+    return rotation_matrix
+
+def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
+    results = MarkerArray()
+    for i in range (0, len(Y)):
+        cur_node_result = Marker()
+        cur_node_result.header.frame_id = marker_frame
+        cur_node_result.type = Marker.SPHERE
+        cur_node_result.action = Marker.ADD
+        cur_node_result.ns = "node_results" + str(i)
+        cur_node_result.id = i
+
+        cur_node_result.pose.position.x = Y[i, 0]
+        cur_node_result.pose.position.y = Y[i, 1]
+        cur_node_result.pose.position.z = Y[i, 2]
+        cur_node_result.pose.orientation.w = 1.0
+        cur_node_result.pose.orientation.x = 0.0
+        cur_node_result.pose.orientation.y = 0.0
+        cur_node_result.pose.orientation.z = 0.0
+
+        cur_node_result.scale.x = 0.01
+        cur_node_result.scale.y = 0.01
+        cur_node_result.scale.z = 0.01
+        cur_node_result.color.r = node_color[0]
+        cur_node_result.color.g = node_color[1]
+        cur_node_result.color.b = node_color[2]
+        cur_node_result.color.a = node_color[3]
+
+        results.markers.append(cur_node_result)
+
+        if i == len(Y)-1:
+            break
+
+        cur_line_result = Marker()
+        cur_line_result.header.frame_id = marker_frame
+        cur_line_result.type = Marker.CYLINDER
+        cur_line_result.action = Marker.ADD
+        cur_line_result.ns = "line_results" + str(i)
+        cur_line_result.id = i
+
+        cur_line_result.pose.position.x = ((Y[i] + Y[i+1])/2)[0]
+        cur_line_result.pose.position.y = ((Y[i] + Y[i+1])/2)[1]
+        cur_line_result.pose.position.z = ((Y[i] + Y[i+1])/2)[2]
+
+        rot_matrix = rotation_matrix_from_vectors(np.array([0, 0, 1]), (Y[i+1]-Y[i])/pt2pt_dis(Y[i+1], Y[i])) 
+        r = R.from_matrix(rot_matrix)
+        x = r.as_quat()[0]
+        y = r.as_quat()[1]
+        z = r.as_quat()[2]
+        w = r.as_quat()[3]
+
+        cur_line_result.pose.orientation.w = w
+        cur_line_result.pose.orientation.x = x
+        cur_line_result.pose.orientation.y = y
+        cur_line_result.pose.orientation.z = z
+        cur_line_result.scale.x = 0.005
+        cur_line_result.scale.y = 0.005
+        cur_line_result.scale.z = pt2pt_dis(Y[i], Y[i+1])
+        cur_line_result.color.r = line_color[0]
+        cur_line_result.color.g = line_color[1]
+        cur_line_result.color.b = line_color[2]
+        cur_line_result.color.a = line_color[3]
+
+        results.markers.append(cur_line_result)
+    
+    return results
 
 def register(pts, M, mu=0, max_iter=50):
 
@@ -559,16 +642,16 @@ def callback (rgb, pc):
 
     rospy.loginfo("Downsampled point cloud size: " + str(len(filtered_pc)))
 
-    # # add color
-    # pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    # pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
-    # filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
-    # filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
+    # add color
+    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    pc_rgba_arr = np.full((len(filtered_pc), 1), pc_rgba)
+    filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
+    filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    # header.stamp = rospy.Time.now()
-    # converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
-    # pc_pub.publish(converted_points)
+    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    header.stamp = rospy.Time.now()
+    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
 
@@ -627,28 +710,14 @@ def callback (rgb, pc):
 
         init_nodes = nodes.copy()
 
-        # add color
-        nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
-        nodes_rgba_arr = np.full((len(nodes), 1), nodes_rgba)
-        nodes_colored = np.hstack((nodes, nodes_rgba_arr)).astype('O')
-        nodes_colored[:, 3] = nodes_colored[:, 3].astype(int)
-        header.stamp = rospy.Time.now()
-        converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
-        nodes_pub.publish(converted_nodes)
-
-        # add color for guide nodes
-        guide_nodes_rgba = struct.unpack('I', struct.pack('BBBB', 255, 255, 255, 255))[0]
-        guide_nodes_rgba_arr = np.full((len(guide_nodes), 1), guide_nodes_rgba)
-        guide_nodes_colored = np.hstack((guide_nodes, guide_nodes_rgba_arr)).astype('O')
-        guide_nodes_colored[:, 3] = guide_nodes_colored[:, 3].astype(int)
-        header.stamp = rospy.Time.now()
-        converted_guide_nodes = pcl2.create_cloud(header, fields, guide_nodes_colored)
-        guide_nodes_pub.publish(converted_guide_nodes)
+        results = ndarray2MarkerArray(nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
+        guide_nodes_results = ndarray2MarkerArray(guide_nodes, "camera_color_optical_frame", [0, 0, 0, 0.5], [0, 0, 1, 0.5])
+        results_pub.publish(results)
+        guide_nodes_pub.publish(guide_nodes_results)
 
         if params["initialization_params"]["pub_tracking_image"]:
             # project and pub tracking image
             nodes_h = np.hstack((nodes, np.ones((len(nodes), 1))))
-            # nodes_h = np.hstack((guide_nodes, np.ones((len(nodes), 1)))) # TEMP
 
             # proj_matrix: 3*4; nodes_h.T: 4*M; result: 3*M
             image_coords = np.matmul(proj_matrix, nodes_h.T).T
@@ -662,7 +731,7 @@ def callback (rgb, pc):
                 # draw circle
                 uv = (us[i], vs[i])
                 if vis[i] < mask_dis_threshold:
-                    cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
+                    cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
                 else:
                     cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
 
@@ -694,8 +763,8 @@ if __name__=='__main__':
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-    nodes_pub = rospy.Publisher ('/nodes', PointCloud2, queue_size=10)
-    guide_nodes_pub = rospy.Publisher ('/guide_nodes_pc', PointCloud2, queue_size=10)
+    results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
+    guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
 
