@@ -630,17 +630,11 @@ void tracking_step (MatrixXf X_orig,
     // variable initialization
     std::vector<int> occluded_nodes = {};
     std::vector<int> visible_nodes = {};
-    std::vector<int> visibility(Y.rows(), 0);
     std::vector<MatrixXf> valid_nodes_vec = {};
     int state = 0;
 
-    // run rigid registration on guide nodes and X
-    guide_nodes = Y.replicate(1, 1);
-    double sigma2_pre_proc = sigma2*100;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, true, false);
-
-    // project guide nodes onto the original image to determine occluded nodes
-    MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+    // project Y onto the original image to determine occluded nodes
+    MatrixXf nodes_h = Y.replicate(1, 1);
     nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
     nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
     MatrixXf proj_matrix(3, 4);
@@ -653,55 +647,13 @@ void tracking_step (MatrixXf X_orig,
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
         // not currently using the original distance transform because I can't figure it out
-        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) == 0) {
-            valid_nodes_vec.push_back(guide_nodes.row(i));
+        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold / mat_max * 255) {
+            valid_nodes_vec.push_back(Y.row(i));
             visible_nodes.push_back(i);
-            visibility[i] = 1;
         }
         else {
             occluded_nodes.push_back(i);
-            visibility[i] = 0;
         }
-    }
-
-    // remove any points in X_orig that are not most possibly produced by a visible node
-    MatrixXf X_temp = MatrixXf::Zero(X_orig.rows(), 3);
-    MatrixXf X_cleaned;
-    if (occluded_nodes.size() != 0) {
-        std::vector<int> max_p_nodes(X_orig.rows(), 0);
-        MatrixXf diff_x_guide_nodes = MatrixXf::Zero(guide_nodes.rows(), X_orig.rows());
-
-        // update diff_xy
-        for (int i = 0; i < guide_nodes.rows(); i ++) {
-            for (int j = 0; j < X_orig.rows(); j ++) {
-                diff_x_guide_nodes(i, j) = (guide_nodes.row(i) - X_orig.row(j)).squaredNorm();
-            }
-        }
-
-        MatrixXf P = (-0.5 * diff_x_guide_nodes / sigma2_pre_proc).array().exp();
-        double c = pow((2 * M_PI * sigma2_pre_proc), static_cast<double>(3)/2) * 0.05 / (1 - 0.05) * static_cast<double>(guide_nodes.rows())/X_orig.rows();
-        P = P.array().rowwise() / (P.colwise().sum().array() + c);
-
-        int X_temp_counter = 0;
-
-        for (int i = 0; i < X_orig.rows(); i ++) {
-            P.col(i).maxCoeff(&max_p_nodes[i]);
-            int max_p_node = max_p_nodes[i];
-
-            // critical nodes: M_head and M-M_tail-1
-            if (visibility[max_p_node] == 1) {
-                X_temp.row(X_temp_counter) = X_orig.row(i);
-                X_temp_counter += 1;
-            }
-        }
-
-        print_1d_vector(visibility);
-        std::cout << "X original len: " << X_orig.rows() << std::endl;
-        X_cleaned = X_temp.topRows(X_temp_counter);
-        std::cout << "X after deletion len: " << X_cleaned.rows() << std::endl;
-    }
-    else {
-        X_cleaned = X_orig.replicate(1, 1);
     }
 
     // copy valid guide nodes vec to guide nodes
@@ -710,6 +662,10 @@ void tracking_step (MatrixXf X_orig,
     for (int i = 0; i < valid_nodes_vec.size(); i ++) {
         guide_nodes.row(i) = valid_nodes_vec[i];
     }
+
+    // run rigid registration on guide nodes and X
+    double sigma2_pre_proc = sigma2*100;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
 
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
@@ -735,6 +691,6 @@ void tracking_step (MatrixXf X_orig,
     // }
 
     // for quick test
-    ecpd_lle (X_cleaned, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000003, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
     // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "Gaussian", occluded_nodes, 0.0125, bmask_transformed_normalized, mat_max);
 }
