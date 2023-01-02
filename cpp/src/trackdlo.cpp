@@ -14,9 +14,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
-#include <pcl/filters/conditional_removal.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
 
 #include <ctime>
 #include <chrono>
@@ -139,7 +136,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
     int insertion_counter = 0;
 
     while (counter < N-1) {
-        double minimum = 999999;
+        double minimum = INFINITY;
         int a = 0;
         int b = 0;
 
