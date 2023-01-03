@@ -45,6 +45,7 @@ bool updated_opencv_mask = false;
 bool use_eval_rope = true;
 int num_of_nodes = 30;
 double total_len = 0;
+bool visualize_dist = true;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -313,7 +314,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 15;
+    double mask_dist_threshold = 10;
 
     sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
@@ -348,7 +349,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.015, 0.015, 0.015);
+        sor.setLeafSize (0.01, 0.01, 0.01);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
@@ -356,9 +357,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         if (use_eval_rope) {
-            // for (cv::KeyPoint key_point : keypoints_red) {
-            //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            // }
+            for (cv::KeyPoint key_point : keypoints_red) {
+                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            }
             for (cv::KeyPoint key_point : keypoints_blue) {
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
@@ -385,17 +386,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
 
                 // use ecpd to help initialize
-                std::vector<MatrixXf> priors_vec;
                 for (int i = 0; i < Y_0_sorted.rows(); i ++) {
                     MatrixXf temp = MatrixXf::Zero(1, 4);
                     temp(0, 0) = i;
                     temp(0, 1) = Y_0_sorted(i, 0);
                     temp(0, 2) = Y_0_sorted(i, 1);
                     temp(0, 3) = Y_0_sorted(i, 2);
-                    priors_vec.push_back(temp);
+                    priors.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors_vec, 0.01);
+                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors, 0.01);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -440,30 +440,131 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // cur_image.copyTo(tracking_img);
 
         // draw points
-        for (int i = 0; i < image_coords.rows(); i ++) {
+        if (!visualize_dist || priors.size()==Y.rows()) {
+            for (int i = 0; i < image_coords.rows(); i ++) {
 
-            int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-            int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+                int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+                int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-            cv::Scalar point_color;
-            cv::Scalar line_color;
+                cv::Scalar point_color;
+                cv::Scalar line_color;
+
+                if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
+                    point_color = cv::Scalar(0, 150, 255);
+                    line_color = cv::Scalar(0, 255, 0);
+                }
+                else {
+                    point_color = cv::Scalar(0, 0, 255);
+                    line_color = cv::Scalar(0, 0, 255);
+                }
+
+                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+
+                if (i != image_coords.rows()-1) {
+                    cv::line(tracking_img, cv::Point(row, col),
+                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                    static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                                    line_color, 2);
+                }
+            }
+        }
+        else {
+            // priors contain visible nodes
+            MatrixXf visible_nodes = MatrixXf::Zero(priors.size(), 3);
+            MatrixXf occluded_nodes = MatrixXf::Zero(Y.rows() - priors.size(), 3);
+            std::vector<int> visibility(Y.rows(), 0);
+
+            // record geodesic coord
+            bool use_geodesic = false;
+            double cur_sum = 0;
+            MatrixXf Y_geodesic = MatrixXf::Zero(Y.rows(), 3);
+            if (use_geodesic) {
+                Y_geodesic(0, 0) = 0.0;
+                Y_geodesic(0, 1) = 0.0;
+                Y_geodesic(0, 2) = 0.0;
+                for (int i = 1; i < Y.rows(); i ++) {
+                    cur_sum += (Y.row(i-1) - Y.row(i)).norm();
+                    Y_geodesic(i, 0) = cur_sum;
+                    Y_geodesic(i, 1) = 0.0;
+                    Y_geodesic(i, 2) = 0.0;
+                }
+            }
+
+            for (int i = 0; i < priors.size(); i ++) {
+                visibility[priors[i](0, 0)] = 1;
+                if (!use_geodesic) {
+                    visible_nodes(i, 0) = priors[i](0, 1);
+                    visible_nodes(i, 1) = priors[i](0, 2);
+                    visible_nodes(i, 2) = priors[i](0, 3);
+                }
+                else {
+                    visible_nodes.row(i) = Y_geodesic.row(priors[i](0, 0));
+                }
+            }
+            int counter = 0;
+            for (int i = 0; i < visibility.size(); i ++) {
+                if (visibility[i] == 0) {
+                    if (!use_geodesic) {
+                        occluded_nodes.row(counter) = Y.row(i);
+                    }
+                    else {
+                        occluded_nodes.row(counter) = Y_geodesic.row(i);
+                    }
+                    counter += 1;
+                }
+            }
+            MatrixXf diff_visible_occluded = MatrixXf::Zero(visible_nodes.rows(), occluded_nodes.rows());
             
-            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
-                point_color = cv::Scalar(0, 150, 255);
-                line_color = cv::Scalar(0, 255, 0);
-            }
-            else {
-                point_color = cv::Scalar(0, 0, 255);
-                line_color = cv::Scalar(0, 0, 255);
+            for (int i = 0; i < visible_nodes.rows(); i ++) {
+                for (int j = 0; j < occluded_nodes.rows(); j ++) {
+                    diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).squaredNorm();
+                }
             }
 
-            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+            double max_dist = 0;
+            for (int i = 0; i < diff_visible_occluded.rows(); i ++) {
+                if (max_dist < diff_visible_occluded.row(i).minCoeff()) {
+                    max_dist = diff_visible_occluded.row(i).minCoeff();
+                }
+            }
 
-            if (i != image_coords.rows()-1) {
-                cv::line(tracking_img, cv::Point(row, col),
-                                       cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
-                                                 static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                 line_color, 2);
+            counter = -1;
+            for (int i = 0; i < image_coords.rows(); i ++) {
+
+                int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+                int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+                cv::Scalar point_color;
+                cv::Scalar line_color;
+
+                if (visibility[i] == 1) {
+                    counter += 1;
+                }
+
+                if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
+                    double min_dist_to_occluded_node = diff_visible_occluded.row(counter).minCoeff();
+                    point_color = cv::Scalar(static_cast<int>(min_dist_to_occluded_node/max_dist*255), 0, static_cast<int>((1-min_dist_to_occluded_node/max_dist)*255));
+                    if (visibility[i+1] == 0) {
+                        line_color = cv::Scalar(static_cast<int>(min_dist_to_occluded_node/max_dist*255 / 2), 0, static_cast<int>((255 + (1-min_dist_to_occluded_node/max_dist)*255) / 2));
+                    }
+                    else if (counter != diff_visible_occluded.rows()-1){
+                        double min_dist_to_occluded_node_next = diff_visible_occluded.row(counter+1).minCoeff();
+                        line_color = cv::Scalar(static_cast<int>((min_dist_to_occluded_node_next/max_dist + min_dist_to_occluded_node/max_dist)*255 / 2), 0, static_cast<int>(((1-min_dist_to_occluded_node_next/max_dist) + (1-min_dist_to_occluded_node/max_dist))*255 / 2));
+                    }
+                }
+                else {
+                    point_color = cv::Scalar(0, 0, 255);
+                    line_color = cv::Scalar(0, 0, 255);
+                }
+
+                if (i != image_coords.rows()-1) {
+                    cv::line(tracking_img, cv::Point(row, col),
+                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                    static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                                    line_color, 2);
+                }
+
+                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
             }
         }
 
