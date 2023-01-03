@@ -14,9 +14,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
-#include <pcl/filters/conditional_removal.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
 
 #include <ctime>
 #include <chrono>
@@ -139,7 +136,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
     int insertion_counter = 0;
 
     while (counter < N-1) {
-        double minimum = 999999;
+        double minimum = INFINITY;
         int a = 0;
         int b = 0;
 
@@ -667,8 +664,8 @@ void tracking_step (MatrixXf X_orig,
     }
 
     // run rigid registration on guide nodes and X
-    double sigma2_pre_proc = sigma2*100;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
+    double sigma2_pre_proc = sigma2;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, false, true, true, false);
 
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
@@ -682,7 +679,7 @@ void tracking_step (MatrixXf X_orig,
     }
 
     // second registation to imput velocity
-    // would not work for omega <= 0.000001
+    // would not work if omega <= 0.000001
     // if (occluded_nodes.size()!=0 && occluded_nodes[0]!=0 && occluded_nodes[occluded_nodes.size()-1]!=Y.rows()-1) {
     //     // Use Gaussian
     //     ROS_INFO("Used Gaussian");
@@ -693,7 +690,14 @@ void tracking_step (MatrixXf X_orig,
     //     ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 100, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
     // }
 
-    // for quick test
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
-    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000005, "Gaussian", occluded_nodes, 0.0125, bmask_transformed_normalized, mat_max);
+    // ----- for quick test -----
+
+    // params for eval rope (short)
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, false, false, true, true, priors_vec, 0.000007, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
+
+    // params for long rope
+    // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
+
+    // test Gaussian
+    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 }
