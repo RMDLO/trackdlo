@@ -696,7 +696,7 @@ void tracking_step (MatrixXf X_orig,
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000003, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
 
     // params for long rope
-    ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000007, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
     // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);

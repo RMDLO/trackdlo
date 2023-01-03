@@ -313,7 +313,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 10;
+    double mask_dist_threshold = 15;
 
     sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
@@ -348,7 +348,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.008, 0.008, 0.008);
+        sor.setLeafSize (0.015, 0.015, 0.015);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
@@ -356,9 +356,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         if (use_eval_rope) {
-            for (cv::KeyPoint key_point : keypoints_red) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
+            // for (cv::KeyPoint key_point : keypoints_red) {
+            //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            // }
             for (cv::KeyPoint key_point : keypoints_blue) {
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
