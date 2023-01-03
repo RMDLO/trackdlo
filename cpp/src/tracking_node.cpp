@@ -43,7 +43,7 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = true;
-int num_of_nodes = 40;
+int num_of_nodes = 30;
 double total_len = 0;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
@@ -348,7 +348,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.005, 0.005, 0.005);
+        sor.setLeafSize (0.008, 0.008, 0.008);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
@@ -403,7 +403,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             }
             else {
-                reg(X, Y, sigma2, num_of_nodes, 0.05, 50);
+                reg(X, Y, sigma2, num_of_nodes, 0.05, 100);
                 Y = sort_pts(Y);
                 // record geodesic coord
                 double cur_sum = 0;
