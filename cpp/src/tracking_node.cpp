@@ -458,14 +458,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     line_color = cv::Scalar(0, 0, 255);
                 }
 
-                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
-
                 if (i != image_coords.rows()-1) {
                     cv::line(tracking_img, cv::Point(row, col),
                                         cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                     static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
                                                     line_color, 2);
                 }
+
+                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
             }
         }
         else {
@@ -475,7 +475,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             std::vector<int> visibility(Y.rows(), 0);
 
             // record geodesic coord
-            bool use_geodesic = false;
+            bool use_geodesic = true;
+
             double cur_sum = 0;
             MatrixXf Y_geodesic = MatrixXf::Zero(Y.rows(), 3);
             if (use_geodesic) {
@@ -517,7 +518,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             
             for (int i = 0; i < visible_nodes.rows(); i ++) {
                 for (int j = 0; j < occluded_nodes.rows(); j ++) {
-                    diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).squaredNorm();
+                    diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).norm();
                 }
             }
 
