@@ -128,7 +128,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /trackdlo/tracking_img
+      Image Topic: /tracking_img
       Max Value: 1
       Median window: 5
       Min Value: 0
