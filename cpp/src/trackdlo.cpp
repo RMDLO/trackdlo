@@ -664,8 +664,8 @@ void tracking_step (MatrixXf X_orig,
     }
 
     // run rigid registration on guide nodes and X
-    double sigma2_pre_proc = sigma2*1000;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.00001, false, true, true, false);
+    double sigma2_pre_proc = sigma2;
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.000000001, false, true, true, false);
 
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
@@ -678,23 +678,10 @@ void tracking_step (MatrixXf X_orig,
         priors_vec.push_back(temp);
     }
 
-    // second registation to imput velocity
-    // would not work if omega <= 0.000001
-    // if (occluded_nodes.size()!=0 && occluded_nodes[0]!=0 && occluded_nodes[occluded_nodes.size()-1]!=Y.rows()-1) {
-    //     // Use Gaussian
-    //     ROS_INFO("Used Gaussian");
-    //     ecpd_lle (X_orig, Y, sigma2, 1, 1, 2, 0.05, 100, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 10, bmask_transformed_normalized, mat_max);
-    // }
-    // else {
-    //     // use 1st order
-    //     ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 100, 0.00001, true, true, true, true, priors_vec, 0.000005, "1st order", occluded_nodes, 0.015, bmask_transformed_normalized, mat_max);
-    // }
-
     // ----- for quick test -----
 
     // params for eval rope (short)
-    sigma2 *= 1;
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 10, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
 
     // params for long rope
     // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);

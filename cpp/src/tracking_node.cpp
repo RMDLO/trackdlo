@@ -27,9 +27,9 @@
 
 using cv::Mat;
 
-// ros::Publisher pc_pub;
-// ros::Publisher results_pub;
-// ros::Publisher guide_nodes_pub;
+ros::Publisher pc_pub;
+ros::Publisher results_pub;
+ros::Publisher guide_nodes_pub;
 ros::Publisher error_pub;
 
 using Eigen::MatrixXd;
@@ -49,7 +49,7 @@ int num_of_nodes = 30;
 double total_len = 0;
 bool visualize_dist = false;
 
-bool compute_eval_error = true;
+bool compute_eval_error = false;
 MatrixXf last_Y_gt_head = MatrixXf::Zero(1, 3);
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
@@ -627,38 +627,34 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
         }
 
-        // // visualize distance transform result
-        // cv::imshow("frame", bmask_transformed_normalized);
-        // cv::waitKey(3);
-
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
-        // tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bmask_transformed_rgb).toImageMsg();
 
-        // // fill in header
-        // cur_pc->header.frame_id = "camera_color_optical_frame";
-        // cur_pc->header.seq = cloud->header.seq;
-        // cur_pc->fields = cloud->fields;
+        // fill in header
+        cur_pc->header.frame_id = "camera_color_optical_frame";
+        cur_pc->header.seq = cloud->header.seq;
+        cur_pc->fields = cloud->fields;
 
-        // cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
-        // cur_pc_downsampled.header.seq = cloud->header.seq;
-        // cur_pc_downsampled.fields = cloud->fields;
+        cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
+        cur_pc_downsampled.header.seq = cloud->header.seq;
+        cur_pc_downsampled.fields = cloud->fields;
 
-        // // Convert to ROS data type
-        // // pcl_conversions::moveFromPCL(*cur_pc, output);
-        // pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
+        // Convert to ROS data type
+        // pcl_conversions::moveFromPCL(*cur_pc, output);
+        pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
-        // // publish the results as a marker array
-        // visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
-        // visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
+        // publish the results as a marker array
+        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
+        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
 
-        // results_pub.publish(results);
-        // guide_nodes_pub.publish(guide_nodes_results);
+        results_pub.publish(results);
+        guide_nodes_pub.publish(guide_nodes_results);
+        pc_pub.publish(output);
 
-        // // reset all guide nodes
-        // for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
-        //     guide_nodes_results.markers[i].action = visualization_msgs::Marker::DELETEALL;
-        // }
+        // reset all guide nodes
+        for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
+            guide_nodes_results.markers[i].action = visualization_msgs::Marker::DELETEALL;
+        }
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -682,15 +678,10 @@ int main(int argc, char **argv) {
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
     image_transport::Publisher mask_pub = it.advertise("/mask", 10);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
-    // pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
-    // results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
-    // guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
+    pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
+    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
     error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 1);
-
-    // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
-    //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
-    //     mask_pub.publish(test_image);
-    // });
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
