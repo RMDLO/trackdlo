@@ -17,6 +17,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <std_msgs/Float64.h>
 
 #include <ctime>
 #include <chrono>
@@ -29,6 +30,7 @@ using cv::Mat;
 ros::Publisher pc_pub;
 ros::Publisher results_pub;
 ros::Publisher guide_nodes_pub;
+ros::Publisher error_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -45,7 +47,10 @@ bool updated_opencv_mask = false;
 bool use_eval_rope = true;
 int num_of_nodes = 30;
 double total_len = 0;
-bool visualize_dist = true;
+bool visualize_dist = false;
+
+bool compute_eval_error = false;
+MatrixXf last_Y_gt_head = MatrixXf::Zero(1, 3);
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -288,22 +293,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cur_image_orig.copyTo(cur_image);
     }
 
-    // simple blob detector
-    std::vector<cv::KeyPoint> keypoints_red;
-    std::vector<cv::KeyPoint> keypoints_blue;
-    if (use_eval_rope) {
-        cv::SimpleBlobDetector::Params blob_params;
-        blob_params.filterByColor = false;
-        blob_params.filterByArea = true;
-        blob_params.filterByCircularity = false;
-        blob_params.filterByInertia = true;
-        blob_params.filterByConvexity = false;
-        cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
-        // detect
-        detector->detect(mask_red, keypoints_red);
-        detector->detect(mask_blue, keypoints_blue);
-    }
-
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
     // distance transform
@@ -349,21 +338,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.01, 0.01, 0.01);
+        sor.setLeafSize (0.005, 0.005, 0.005);
         sor.filter (cur_pc_downsampled);
 
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
-
-        if (use_eval_rope) {
-            for (cv::KeyPoint key_point : keypoints_red) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-            for (cv::KeyPoint key_point : keypoints_blue) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-        }
 
         // log time
         std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
@@ -373,6 +353,28 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         if (!initialized) {
             if (use_eval_rope) {
+                // simple blob detector
+                std::vector<cv::KeyPoint> keypoints_red;
+                std::vector<cv::KeyPoint> keypoints_blue;
+                cv::SimpleBlobDetector::Params blob_params;
+                blob_params.filterByColor = false;
+                blob_params.filterByArea = true;
+                blob_params.minArea = 10;
+                blob_params.filterByCircularity = false;
+                blob_params.filterByInertia = true;
+                blob_params.filterByConvexity = false;
+                cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
+                // detect
+                detector->detect(mask_red, keypoints_red);
+                detector->detect(mask_blue, keypoints_blue);
+
+                for (cv::KeyPoint key_point : keypoints_red) {
+                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                }
+                for (cv::KeyPoint key_point : keypoints_blue) {
+                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                }
+
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
@@ -393,6 +395,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     temp(0, 2) = Y_0_sorted(i, 1);
                     temp(0, 3) = Y_0_sorted(i, 2);
                     priors.push_back(temp);
+
+                    if (compute_eval_error && i == 0) {
+                        last_Y_gt_head = Y_0_sorted.row(0).replicate(1, 1);
+                    }
                 }
 
                 ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0.00001, true, true, false, true, priors, 0.01);
@@ -414,6 +420,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
 
             initialized = true;
+            goto skip_error_computation;
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
@@ -423,6 +430,57 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
+        // compute error
+        if (compute_eval_error) {
+            // simple blob detector
+            std::vector<cv::KeyPoint> keypoints_red;
+            std::vector<cv::KeyPoint> keypoints_blue;
+            cv::SimpleBlobDetector::Params blob_params;
+            blob_params.filterByColor = false;
+            blob_params.filterByArea = true;
+            blob_params.minArea = 10;
+            blob_params.filterByCircularity = false;
+            blob_params.filterByInertia = true;
+            blob_params.filterByConvexity = false;
+            cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
+            // detect
+            detector->detect(mask_red, keypoints_red);
+            detector->detect(mask_blue, keypoints_blue);
+
+            for (cv::KeyPoint key_point : keypoints_red) {
+                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            }
+            for (cv::KeyPoint key_point : keypoints_blue) {
+                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            }
+
+            MatrixXf Y_gt = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
+            MatrixXf Y_gt_sorted = sort_pts(Y_gt);
+            
+            MatrixXf Y_gt_reversed = Y_gt_sorted.replicate(1, 1);
+
+            double temp = sqrt(pow(last_Y_gt_head(0, 0)-Y_gt_sorted(0, 0), 2) + pow(last_Y_gt_head(0, 1)-Y_gt_sorted(0, 1), 2) + pow(last_Y_gt_head(0, 2)-Y_gt_sorted(0, 2), 2));
+            if (temp > 0.02) {
+                for (int i = 0; i < Y_gt_sorted.rows(); i ++) {
+                    Y_gt_sorted.row(Y_gt_sorted.rows()-1-i) = Y_gt_reversed.row(i);
+                }
+            }
+
+            float error = 0;
+            for (int i = 0; i < Y.rows(); i ++) {
+                error += pt2pt_dis(Y_gt_sorted.row(i), Y.row(i));
+            }
+            error = error / Y.rows();
+            std_msgs::Float64 error_msg;
+            error_msg.data = error;
+            error_pub.publish(error_msg);
+
+            last_Y_gt_head = Y_gt_sorted.row(0);
+        }
+
+        skip_error_computation:
+
+        // projection and image
         MatrixXf nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
@@ -458,14 +516,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     line_color = cv::Scalar(0, 0, 255);
                 }
 
-                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
-
                 if (i != image_coords.rows()-1) {
                     cv::line(tracking_img, cv::Point(row, col),
                                         cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                     static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
                                                     line_color, 2);
                 }
+
+                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
             }
         }
         else {
@@ -475,7 +533,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             std::vector<int> visibility(Y.rows(), 0);
 
             // record geodesic coord
-            bool use_geodesic = false;
+            bool use_geodesic = true;
+
             double cur_sum = 0;
             MatrixXf Y_geodesic = MatrixXf::Zero(Y.rows(), 3);
             if (use_geodesic) {
@@ -517,7 +576,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             
             for (int i = 0; i < visible_nodes.rows(); i ++) {
                 for (int j = 0; j < occluded_nodes.rows(); j ++) {
-                    diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).squaredNorm();
+                    diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).norm();
                 }
             }
 
@@ -568,13 +627,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
         }
 
-        // // visualize distance transform result
-        // cv::imshow("frame", bmask_transformed_normalized);
-        // cv::waitKey(3);
-
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
-        // tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bmask_transformed_rgb).toImageMsg();
 
         // fill in header
         cur_pc->header.frame_id = "camera_color_optical_frame";
@@ -595,6 +649,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
+        pc_pub.publish(output);
 
         // reset all guide nodes
         for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
@@ -607,7 +662,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     // std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
-    pc_pub.publish(output);
+    // pc_pub.publish(output);
 
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
     ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
@@ -620,21 +675,17 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 1, update_opencv_mask);
-    image_transport::Publisher mask_pub = it.advertise("/mask", 1);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 1);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
+    image_transport::Publisher mask_pub = it.advertise("/mask", 10);
+    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
+    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 1);
 
-    // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
-    //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
-    //     mask_pub.publish(test_image);
-    // });
-
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 1);
-    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 1);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 10);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
                                              const sensor_msgs::PointCloud2ConstPtr&,
