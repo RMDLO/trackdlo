@@ -1,12 +1,15 @@
 # TrackDLO ROS Package
 
-This is the TrackDLO ROS package for tracking deformable linear objects under occlusion. The TrackDLO algorithm solves the problem of real-time state estimation of Deformable Linear Objects (DLOs), like wires and ropes, under occlusion. The goal of DLO state estimation under occlusion is to extract the structure of the DLO from a noisy or incomplete set of measurements. TrackDLO accounts for directional rigidity to infer the motion of the occluded part of the object from the motion of the visible part. TrackDLO also introduces the notion of a geodesic proximity metric for linking a set of nodes which represent the configuration of the DLO. This modified proximity metric not only improves tracking under occlusion, but also mitigates tracking entanglement for cases of self-occlusion. TrackDLO performs robust wire state estimation under known confounders like partial occlusion by other objects, tip occlusion, and self-occlusion.
+This is the implementation of *TrackDLO: Tracking Deformable Linear Objects Under Occlusion by Enforcing Motion Coherence* (under submission) by Jingyi Xiang, Holly Dinkel, Harry Zhao, Naixiang Gao, Brian Coltin, Trey Smith, and Timothy Bretl. We provide the implementation in both Python and C++.
+
+## Abstract
+The TrackDLO algorithm estimates the state of Deformable Linear Objects (DLOs), such as wire and rope, under occlusion. State estimation under occlusion extracts the structure of an object from a noisy or incomplete set of measurements over time. TrackDLO uses Extended Coherent Point Drift with modified membership probability to extrapolate the motion of the occluded part of the object from the motion of the visible part. TrackDLO also uses a non-Gaussian kernel over the standard Gaussian kernel for more consistent and reasonable velocity field extrapolation. Furthermore, TrackDLO incorporates a modified distance proximity metric for linking a set of nodes which represent the configuration of the DLO. TrackDLO performs robust wire state estimation under known tracking confounders like partial occlusion by other objects, tip occlusion, and self-occlusion.
 
 <p align="center">
-  <img src="images/occlusion1.png" width="400" title="hover text"> <img src="images/occlusion2.png" width="400" title="hover text">
+  <img src="images/occlusion1.png" width="400" title="Tracking Under Occlusion 1"> <img src="images/occlusion2.png" width="400" title="Tracking Under Occlusion 2">
 </p>
 
-----------------------
+
 ## C++:
 
 ### Important:
@@ -25,7 +28,7 @@ This is the TrackDLO ROS package for tracking deformable linear objects under oc
 3. In another terminal, run ```rosrun trackdlo trackdlo_node```. This will start the tracking algorithm.
 4. Finally, open another ternimal and run ```rosbag play <name_of_the_bag_file>.bag```. This will replay the bag file and all results will be published in rviz.
 
-----------------------
+
 ## Python:
 
 ### To test TrackDLO with RGB-D camera stream:
