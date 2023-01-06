@@ -397,7 +397,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors.push_back(temp);
 
                     if (compute_eval_error && i == 0) {
-                        last_Y_gt_head = temp.replicate(1, 1);
+                        last_Y_gt_head = Y_0_sorted.row(0).replicate(1, 1);
                     }
                 }
 
@@ -456,14 +456,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             MatrixXf Y_gt = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
             MatrixXf Y_gt_sorted = sort_pts(Y_gt);
-
-            std::cout << Y_gt_sorted.rows() << "; " << Y.rows() << std::endl;
             
-            MatrixXf Y_gt_reversed = MatrixXf::Zero(Y.rows(), 3);
-            Y_gt_reversed = Y_gt_sorted.replicate(1, 1);
+            MatrixXf Y_gt_reversed = Y_gt_sorted.replicate(1, 1);
 
             double temp = sqrt(pow(last_Y_gt_head(0, 0)-Y_gt_sorted(0, 0), 2) + pow(last_Y_gt_head(0, 1)-Y_gt_sorted(0, 1), 2) + pow(last_Y_gt_head(0, 2)-Y_gt_sorted(0, 2), 2));
-            std::cout << temp << std::endl;
             if (temp > 0.02) {
                 for (int i = 0; i < Y_gt_sorted.rows(); i ++) {
                     Y_gt_sorted.row(Y_gt_sorted.rows()-1-i) = Y_gt_reversed.row(i);
@@ -474,7 +470,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             for (int i = 0; i < Y.rows(); i ++) {
                 error += pt2pt_dis(Y_gt_sorted.row(i), Y.row(i));
             }
-            error /= Y.rows();
+            error = error / Y.rows();
             std_msgs::Float64 error_msg;
             error_msg.data = error;
             error_pub.publish(error_msg);
@@ -689,7 +685,7 @@ int main(int argc, char **argv) {
     // pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     // results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
     // guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
-    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 10);
+    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 1);
 
     // image_transport::Subscriber sub = it.subscribe("/camera/color/image_raw", 1, [&](const sensor_msgs::ImageConstPtr& msg){
     //     sensor_msgs::ImagePtr test_image = imageCallback(msg);
