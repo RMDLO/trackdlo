@@ -6,7 +6,7 @@ This is the implementation of *TrackDLO: Tracking Deformable Linear Objects Unde
 The TrackDLO algorithm estimates the state of Deformable Linear Objects (DLOs), such as wire and rope, under occlusion. State estimation under occlusion extracts the structure of an object from a noisy or incomplete set of measurements over time. TrackDLO uses Extended Coherent Point Drift with modified membership probability to extrapolate the motion of the occluded part of the object from the motion of the visible part. TrackDLO also uses a non-Gaussian kernel over the standard Gaussian kernel for more consistent and reasonable velocity field extrapolation. Furthermore, TrackDLO incorporates a modified distance proximity metric for linking a set of nodes which represent the configuration of the DLO. TrackDLO performs robust wire state estimation under known tracking confounders like partial occlusion by other objects, tip occlusion, and self-occlusion.
 
 <p align="center">
-  <img src="images/occlusion1.png" width="400" title="Tracking Under Occlusion 1"> <img src="images/occlusion2.png" width="400" title="Tracking Under Occlusion 2">
+  <img src="images/rope_rod.png" width="600" title="Tracking Under Occlusion">
 </p>
 
 
