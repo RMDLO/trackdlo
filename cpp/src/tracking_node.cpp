@@ -420,10 +420,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
 
             initialized = true;
-            goto skip_error_computation;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, true, true, false, false);
+            // ecpd_lle (X, Y, sigma2, 1, 1, 10, 0.05, 50, 0.00001, true, false, false, false);
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
@@ -477,8 +476,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             last_Y_gt_head = Y_gt_sorted.row(0);
         }
-
-        skip_error_computation:
 
         // projection and image
         MatrixXf nodes_h = Y.replicate(1, 1);
@@ -660,7 +657,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_ERROR("empty pointcloud!");
     }
 
-    // std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // pc_pub.publish(output);
 

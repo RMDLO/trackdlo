@@ -656,6 +656,12 @@ void tracking_step (MatrixXf X_orig,
         }
     }
 
+    if (valid_nodes_vec.size() == 0) {
+        ROS_ERROR("The current state is too different from the last state!");
+        ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+        return;
+    }
+
     // copy valid guide nodes vec to guide nodes
     // not using topRows() because it caused weird bugs
     guide_nodes = MatrixXf::Zero(valid_nodes_vec.size(), 3);
@@ -665,7 +671,7 @@ void tracking_step (MatrixXf X_orig,
 
     // run rigid registration on guide nodes and X
     double sigma2_pre_proc = sigma2;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 1, 0.05, 50, 0.000000001, false, true, true, false);
+    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 2, 0.05, 50, 0.000000001, false, true, true, false);
 
     // copy guide nodes to priors_vec (this could be combined into one step in the future)
     priors_vec = {};
@@ -681,11 +687,11 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 10, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // params for long rope
-    // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.018, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "Gaussian", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 10, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "Gaussian", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
 }
