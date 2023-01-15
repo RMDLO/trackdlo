@@ -265,7 +265,7 @@ bool ecpd_lle (MatrixXf X_orig,
                MatrixXf& Y,
                double& sigma2,
                double beta,
-               double alpha,
+               double lambda,
                double gamma,
                double mu,
                int max_iter = 30,
@@ -275,7 +275,7 @@ bool ecpd_lle (MatrixXf X_orig,
                bool use_prev_sigma2 = false,
                bool use_ecpd = false,
                std::vector<MatrixXf> correspondence_priors = {},
-               double omega = 0,
+               double alpha = 0,
                std::string kernel = "Gaussian",
                std::vector<int> occluded_nodes = {},
                double k_vis = 0,
@@ -364,29 +364,27 @@ bool ecpd_lle (MatrixXf X_orig,
     MatrixXf L = calc_LLE_weights(6, Y_0);
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
-    int N_orig = X.rows();
-
-    // add correspondence priors to the set
-    // this is different from the Python implementation; here the additional points are being appended at the end
-    MatrixXf priors = MatrixXf::Zero(correspondence_priors.size(), 3);
+    // construct R and J
+    MatrixXf priors = MatrixXf::Zero(Y.rows(), 3);
+    MatrixXf J = MatrixXf::Zero(M, M);
+    MatrixXf Y_extended = Y_0.replicate(1, 1);
+    MatrixXf G_masked = MatrixXf::Zero(M, M);
     if (correspondence_priors.size() != 0) {
         int num_of_correspondence_priors = correspondence_priors.size();
 
         for (int i = 0; i < num_of_correspondence_priors; i ++) {
             MatrixXf temp = MatrixXf::Zero(1, 3);
+            int index = correspondence_priors[i](0, 0);
             temp(0, 0) = correspondence_priors[i](0, 1);
             temp(0, 1) = correspondence_priors[i](0, 2);
             temp(0, 2) = correspondence_priors[i](0, 3);
 
-            X.conservativeResize(X.rows() + 1, Eigen::NoChange);
-            X.row(X.rows()-1) = temp;
-
-            priors.row(i) = temp;
+            priors.row(index) = temp;
+            J.row(index) = MatrixXf::Identity(M, M).row(index);
+            Y_extended.row(index) = temp;
+            G_masked.row(index) = G.row(index);
         }
     }
-
-    // update N
-    N = X.rows();
 
     // diff_xy should be a (M * N) matrix
     MatrixXf diff_xy = MatrixXf::Zero(M, N);
@@ -549,41 +547,21 @@ bool ecpd_lle (MatrixXf X_orig,
         MatrixXf B_matrix;
         if (include_lle) {
             if (use_ecpd) {
-                MatrixXf P_tilde = MatrixXf::Zero(M, N);
-                // correspondence priors: index, x, y, z
-                for (int i = 0; i < correspondence_priors.size(); i ++) {
-                    int index = static_cast<int>(correspondence_priors[i](0, 0));
-                    P_tilde(index, i + N_orig) = 1;
-                }
-
-                MatrixXf P_tilde_1 = P_tilde.rowwise().sum();
-                MatrixXf P_tilde_X = P_tilde * X;
-
-                A_matrix = P1.asDiagonal()*G + alpha*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + sigma2/omega * P_tilde_1.asDiagonal()*G;
-                B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0 + sigma2/omega * (P_tilde_X - (P_tilde_1.asDiagonal() * Y_0 + sigma2*gamma*H * Y_0));
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + alpha*G_masked;
+                B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
-                A_matrix = P1.asDiagonal()*G + alpha*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G;
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0;
             }
         }
         else {
             if (use_ecpd) {
-                MatrixXf P_tilde = MatrixXf::Zero(M, N);
-                // correspondence priors: index, x, y, z
-                for (int i = 0; i < correspondence_priors.size(); i ++) {
-                    int index = static_cast<int>(correspondence_priors[i](0, 0));
-                    P_tilde(index, i + N_orig) = 1;
-                }
-
-                MatrixXf P_tilde_1 = P_tilde.rowwise().sum();
-                MatrixXf P_tilde_X = P_tilde * X;
-
-                A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M) + sigma2/omega * P_tilde_1.asDiagonal()*G;
-                B_matrix = PX - P1.asDiagonal() * Y_0 + sigma2/omega * (P_tilde_X - P_tilde_1.asDiagonal()*Y_0);
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*G_masked;
+                B_matrix = PX - P1.asDiagonal() * Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
-                A_matrix = P1.asDiagonal() * G + alpha * sigma2 * MatrixXf::Identity(M, M);
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M);
                 B_matrix = PX - P1.asDiagonal() * Y_0;
             }
         }
@@ -687,7 +665,7 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 10, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // params for long rope
     // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
