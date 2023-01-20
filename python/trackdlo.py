@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 import rospy
 import ros_numpy
 from sensor_msgs.msg import PointCloud2, PointField, Image
 import sensor_msgs.point_cloud2 as pcl2
 import std_msgs.msg
+from rospy.numpy_msg import numpy_msg
+from rospy_tutorials.msg import Floats
+from visualization_msgs.msg import Marker
+from visualization_msgs.msg import MarkerArray
 
 import struct
 import time
@@ -13,16 +16,12 @@ import cv2
 import numpy as np
 
 import time
-import pickle as pkl
 import yaml
 from os.path import dirname, abspath, join
 
 import message_filters
 import open3d as o3d
 from scipy import ndimage
-
-from visualization_msgs.msg import Marker
-from visualization_msgs.msg import MarkerArray
 from scipy.spatial.transform import Rotation as R
 
 proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
@@ -60,6 +59,7 @@ def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
     for i in range (0, len(Y)):
         cur_node_result = Marker()
         cur_node_result.header.frame_id = marker_frame
+        cur_node_result.header.stamp = rospy.Time.now()
         cur_node_result.type = Marker.SPHERE
         cur_node_result.action = Marker.ADD
         cur_node_result.ns = "node_results" + str(i)
@@ -80,6 +80,8 @@ def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
         cur_node_result.color.g = node_color[1]
         cur_node_result.color.b = node_color[2]
         cur_node_result.color.a = node_color[3]
+        
+        numpy_pub.publish(Y)
 
         results.markers.append(cur_node_result)
 
@@ -749,7 +751,7 @@ def callback (rgb, pc):
 
 if __name__=='__main__':
 
-    rospy.init_node('track_dlo', anonymous=True)
+    rospy.init_node('trackdlo', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
@@ -764,6 +766,7 @@ if __name__=='__main__':
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
+    numpy_pub = rospy.Publisher('/results_numpy', numpy_msg(Floats), queue_size=10)
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
