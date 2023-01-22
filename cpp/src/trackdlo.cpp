@@ -365,7 +365,7 @@ bool ecpd_lle (MatrixXf X_orig,
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
     // construct R and J
-    MatrixXf priors = MatrixXf::Zero(Y.rows(), 3);
+    MatrixXf priors = MatrixXf::Zero(correspondence_priors.size(), 3);
     MatrixXf J = MatrixXf::Zero(M, M);
     MatrixXf Y_extended = Y_0.replicate(1, 1);
     MatrixXf G_masked = MatrixXf::Zero(M, M);
@@ -379,10 +379,35 @@ bool ecpd_lle (MatrixXf X_orig,
             temp(0, 1) = correspondence_priors[i](0, 2);
             temp(0, 2) = correspondence_priors[i](0, 3);
 
-            priors.row(index) = temp;
+            priors.row(i) = temp;
             J.row(index) = MatrixXf::Identity(M, M).row(index);
             Y_extended.row(index) = temp;
             G_masked.row(index) = G.row(index);
+        }
+
+        std::cout << "priors.rows() = " << priors.rows() << std::endl;
+        std::cout << priors << std::endl;
+
+        // project priors back onto the distance transform to give each entry in J different weight
+        MatrixXf nodes_h = priors.replicate(1, 1);
+        nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+        nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+        MatrixXf proj_matrix(3, 4);
+        proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+                        0.0, 916.265869140625, 354.02392578125, 0.0,
+                        0.0, 0.0, 1.0, 0.0;
+        MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+
+        for (int i = 0; i < image_coords.rows(); i ++) {
+            int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+            int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+            double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
+            double J_i = exp(-0.15*pixel_dist); // HARD CODED
+
+            std::cout << J.rows() << "; " << correspondence_priors[i](0, 0) << std::endl;
+
+            J.row(correspondence_priors[i](0, 0)) *= J_i;
         }
     }
 
@@ -480,8 +505,8 @@ bool ecpd_lle (MatrixXf X_orig,
         
         // use cdcpd's pvis
         if (occluded_nodes.size() != 0 && mat_max != 0) {
-            // if has corresponding guide node, use that instead of the original position
             MatrixXf nodes_h = Y.replicate(1, 1);
+            // if has corresponding guide node, use that instead of the original position
             for (auto entry : correspondence_priors) {
                 nodes_h.row(entry(0, 0)) = entry.rightCols(3);
             }
@@ -504,11 +529,6 @@ bool ecpd_lle (MatrixXf X_orig,
                 double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
                 double P_vis_i = exp(-k_vis*pixel_dist);
                 total_P_vis += P_vis_i;
-
-                // // test
-                // if (P_vis_i < 1e-10) {
-                //     P_vis_i = 0;
-                // }
 
                 P_vis.row(i) = P_vis_i * P_vis.row(i);
             }
@@ -665,7 +685,7 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 10, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 6, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 5, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // params for long rope
     // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
