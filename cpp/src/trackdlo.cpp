@@ -385,9 +385,6 @@ bool ecpd_lle (MatrixXf X_orig,
             G_masked.row(index) = G.row(index);
         }
 
-        std::cout << "priors.rows() = " << priors.rows() << std::endl;
-        std::cout << priors << std::endl;
-
         // project priors back onto the distance transform to give each entry in J different weight
         MatrixXf nodes_h = priors.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
@@ -403,9 +400,7 @@ bool ecpd_lle (MatrixXf X_orig,
             int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
             double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
-            double J_i = exp(-0.15*pixel_dist); // HARD CODED
-
-            std::cout << J.rows() << "; " << correspondence_priors[i](0, 0) << std::endl;
+            double J_i = exp(-1*pixel_dist); // HARD CODED
 
             J.row(correspondence_priors[i](0, 0)) *= J_i;
         }
@@ -685,7 +680,8 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 6, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 5, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    // sigma2 *= 1.5;
+    ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.0000001, false, true, true, true, priors_vec, 10, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // params for long rope
     // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);

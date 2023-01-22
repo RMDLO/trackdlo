@@ -44,7 +44,7 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = true;
+bool use_eval_rope = false;
 int num_of_nodes = 30;
 double total_len = 0;
 bool visualize_dist = false;
@@ -303,7 +303,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 20;
+    double mask_dist_threshold = 10;
 
     sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
@@ -422,7 +422,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 1, 1, 10, 0.05, 50, 0.00001, true, false, false, false);
+            // ecpd_lle (X, Y, sigma2, 5, 1, 1, 0.05, 50, 0.0000001, false, true, false, false, {}, 0, "1st order");
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
