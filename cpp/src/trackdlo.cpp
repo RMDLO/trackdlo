@@ -610,6 +610,69 @@ bool ecpd_lle (MatrixXf X_orig,
     return converged;
 }
 
+// alignment: 0 --> align with head; 1 --> align with tail
+std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
+    std::vector<MatrixXf> node_pairs = {};
+
+    // extreme cases: only one guide node available
+    // since this function will only be called when at least one of head or tail is visible, 
+    // the only node will be head or tail
+    if (guide_nodes.rows() == 1) {
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
+        node_pairs.push_back(node_pair);
+        return node_pairs;
+    }
+
+    double guide_nodes_total_dist = 0;
+    double total_seg_dist = 0;
+    
+    if (alignment == 0) {
+        // push back the first pair
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
+        node_pairs.push_back(node_pair);
+
+        // initialize iterators
+        int guide_nodes_it = 0;
+        int seg_dist_it = 0;
+        // ultimate terminating condition: run out of guide nodes to use. two conditions that can trigger this:
+        //   1. next visible node index - current visible node index > 1
+        //   2. currenting using the last two guide nodes
+        while (visible_nodes[guide_nodes_it+1] - visible_nodes[guide_nodes_it] == 1 && guide_nodes_it+1 <= guide_nodes.rows()-1) {
+            guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
+            // now keep adding segment dists until the total seg dists exceed the current total guide node dists
+            while (guide_nodes_total_dist > total_seg_dist) {
+                total_seg_dist += fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
+                if (total_seg_dist <= guide_nodes_total_dist) {
+                    seg_dist_it += 1;
+                }
+                else {
+                    total_seg_dist -= fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
+                }
+            }
+            // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
+            // the node desired should be in between guide_nodes[guide_nodes_it] and guide_node[guide_nodes_it + 1]
+            // seg_dist_it will also be within guide_nodes_it and guide_nodes_it + 1
+            if (guide_nodes_it == 0 && seg_dist_it == 0) {
+                continue;
+            }
+            double remaining_dist = total_seg_dist - (guide_nodes_total_dist - pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1)));
+            MatrixXf temp = (guide_nodes.row(guide_nodes_it + 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
+            node_pair(0, 0) = seg_dist_it;
+            node_pair(0, 1) = temp(0, 0);
+            node_pair(0, 2) = temp(0, 1);
+            node_pair(0, 3) = temp(0, 2);
+            node_pairs.push_back(node_pair);
+
+            // update guide_nodes_it at the very end
+            guide_nodes_it += 1;
+        }
+    }
+
+    return node_pairs;
+}
+
 void tracking_step (MatrixXf X_orig,
                     MatrixXf& Y,
                     double& sigma2,
@@ -649,32 +712,46 @@ void tracking_step (MatrixXf X_orig,
         }
     }
 
+    // copy valid guide nodes vec to guide nodes
+    // not using topRows() because it caused weird bugs
+    guide_nodes = MatrixXf::Zero(valid_nodes_vec.size(), 3);
+    if (occluded_nodes.size() != 0) {
+        for (int i = 0; i < valid_nodes_vec.size(); i ++) {
+            guide_nodes.row(i) = valid_nodes_vec[i];
+        }
+    }
+
+    // determine DLO state: heading visible, tail visible, both visible, or both occluded
+    // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
+    if (occluded_nodes.size() == 0) {
+        ROS_INFO("All nodes visible");
+        ecpd_lle(X_orig, Y, sigma2, 6, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "1st order");
+        return;
+    }
+    else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
+        ROS_INFO("Mid-section occluded");
+
+    }
+    else if (visible_nodes[0] == 0) {
+        ROS_INFO("Tip occluded");
+        
+        // register visible nodes (non-rigid registration)
+        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "1st order");
+
+        priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
+    }
+    else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
+        ROS_INFO("Head occluded");
+        
+    }
+    else {
+        ROS_INFO("Both ends occluded");
+    }
+
     if (valid_nodes_vec.size() == 0) {
         ROS_ERROR("The current state is too different from the last state!");
         ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
         return;
-    }
-
-    // copy valid guide nodes vec to guide nodes
-    // not using topRows() because it caused weird bugs
-    guide_nodes = MatrixXf::Zero(valid_nodes_vec.size(), 3);
-    for (int i = 0; i < valid_nodes_vec.size(); i ++) {
-        guide_nodes.row(i) = valid_nodes_vec[i];
-    }
-
-    // run rigid registration on guide nodes and X
-    double sigma2_pre_proc = sigma2;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 2, 0.05, 50, 0.000000001, false, true, true, false);
-
-    // copy guide nodes to priors_vec (this could be combined into one step in the future)
-    priors_vec = {};
-    for (int i = 0; i < guide_nodes.rows(); i ++) {
-        MatrixXf temp = MatrixXf::Zero(1, 4);
-        temp(0, 0) = visible_nodes[i];
-        temp(0, 1) = guide_nodes(i, 0);
-        temp(0, 2) = guide_nodes(i, 1);
-        temp(0, 3) = guide_nodes(i, 2);
-        priors_vec.push_back(temp);
     }
 
     // ----- for quick test -----
