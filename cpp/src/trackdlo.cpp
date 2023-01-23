@@ -19,11 +19,20 @@
 #include <chrono>
 #include <thread>
 
+#include <unistd.h>
+#include <cstdlib>
+#include <signal.h>
+
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
+
+void signal_callback_handler(int signum) {
+   // Terminate program
+   exit(signum);
+}
 
 template <typename T>
 void print_1d_vector (std::vector<T> vec) {
@@ -614,8 +623,6 @@ bool ecpd_lle (MatrixXf X_orig,
 std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
     std::vector<MatrixXf> node_pairs = {};
 
-    // std::cout << "in function" << std::endl;
-
     // extreme cases: only one guide node available
     // since this function will only be called when at least one of head or tail is visible, 
     // the only node will be head or tail
@@ -643,17 +650,10 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
         // ultimate terminating condition: run out of guide nodes to use. two conditions that can trigger this:
         //   1. next visible node index - current visible node index > 1
         //   2. currenting using the last two guide nodes
-        std::cout << "before the first while loop" << std::endl;
         while (visible_nodes[guide_nodes_it+1] - visible_nodes[guide_nodes_it] == 1 && guide_nodes_it+1 <= guide_nodes.rows()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
             guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
             // now keep adding segment dists until the total seg dists exceed the current total guide node dists
-            std::cout << "before the second while loop" << std::endl;
-            std::cout << "outer while loop: guide nodes total dist = " << guide_nodes_total_dist << "; total seg dist = " << total_seg_dist << "; seg dist it = " << seg_dist_it << std::endl;
-            std::cout << guide_nodes << std::endl; 
-            print_1d_vector(geodesic_coord);
-            ros::shutdown();
             while (guide_nodes_total_dist > total_seg_dist) {
-                std::cout << "guide nodes total dist = " << guide_nodes_total_dist << "; total seg dist = " << total_seg_dist << "; seg dist it = " << seg_dist_it << std::endl;
                 // break condition
                 if (seg_dist_it == geodesic_coord.size()-1) {
                     break;
@@ -672,7 +672,6 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
             if (seg_dist_it == geodesic_coord.size()-1) {
                 break;
             }
-            // std::cout << "seg_dist_it = " << seg_dist_it << "; guide_nodes_it = " << guide_nodes_it << std::endl;
             // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
             // the node desired should be in between guide_nodes[guide_nodes_it] and guide_node[guide_nodes_it + 1]
             // seg_dist_it will also be within guide_nodes_it and guide_nodes_it + 1
@@ -733,7 +732,6 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
             if (seg_dist_it == 0) {
                 break;
             }
-            // std::cout << "seg_dist_it = " << seg_dist_it << "; guide_nodes_it = " << guide_nodes_it << std::endl;
             // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
             // the node desired should be in between guide_nodes[guide_nodes_it] and guide_node[guide_nodes_it + 1]
             // seg_dist_it will also be within guide_nodes_it and guide_nodes_it + 1
@@ -810,6 +808,9 @@ void tracking_step (MatrixXf X_orig,
             guide_nodes.row(i) = valid_nodes_vec[i];
         }
     }
+    else {
+        guide_nodes = Y.replicate(1, 1);
+    }
 
     // aligning strength will be different for each case
     double alpha = 1.3;
@@ -825,14 +826,26 @@ void tracking_step (MatrixXf X_orig,
 
         // method 2: take the average position of two traversals
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        bool converged = ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        // if (!converged) {
+        //     ROS_ERROR("pre-proessing registration did not converge!");
+        // }
+        // else {
+        //     ROS_WARN("pre-processing registration converged");
+        // }
+
+        // std::cout << guide_nodes << std::endl;
+
+        // signal(SIGINT, signal_callback_handler);
+        // while(true){
+        //     sleep(1);
+        // }
 
         // get priors vec
-        std::cout << "got here" << std::endl;
         std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
-        // std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
+        std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
 
-        std::cout << "priors vec 1 len = " << priors_vec_1.size() << std::endl;
+        std::cout << "Y len = " << Y.rows() << "; priors vec 1 len = " << priors_vec_1.size() << "; priors vec 2 len = " << priors_vec_2.size() << std::endl;
 
         // // take average
         // priors_vec = {};
@@ -842,7 +855,6 @@ void tracking_step (MatrixXf X_orig,
 
         // temp place holder
         ecpd_lle(X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
-        return;
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
@@ -868,11 +880,11 @@ void tracking_step (MatrixXf X_orig,
         ROS_INFO("Both ends occluded");
     }
 
-    if (valid_nodes_vec.size() == 0) {
-        ROS_ERROR("The current state is too different from the last state!");
-        ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
-        return;
-    }
+    // if (valid_nodes_vec.size() == 0) {
+    //     ROS_ERROR("The current state is too different from the last state!");
+    //     ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    //     return;
+    // }
 
     // ----- for quick test -----
 
