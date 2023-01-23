@@ -827,14 +827,6 @@ void tracking_step (MatrixXf X_orig,
         // method 2: take the average position of two traversals
         // register visible nodes (non-rigid registration)
         bool converged = ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
-        // if (!converged) {
-        //     ROS_ERROR("pre-proessing registration did not converge!");
-        // }
-        // else {
-        //     ROS_WARN("pre-processing registration converged");
-        // }
-
-        // std::cout << guide_nodes << std::endl;
 
         // signal(SIGINT, signal_callback_handler);
         // while(true){
@@ -847,14 +839,21 @@ void tracking_step (MatrixXf X_orig,
 
         std::cout << "Y len = " << Y.rows() << "; priors vec 1 len = " << priors_vec_1.size() << "; priors vec 2 len = " << priors_vec_2.size() << std::endl;
 
-        // // take average
-        // priors_vec = {};
-        // for (int i = 0; i < priors_vec_1.size(); i ++) {
-        //     priors_vec.push_back((priors_vec_1[i] + priors_vec_2[i]) / 2.0);
-        // }
-
-        // temp place holder
-        ecpd_lle(X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
+        // take average
+        priors_vec = {};
+        for (int i = 0; i < Y.rows(); i ++) {
+            int pv1_index = i;
+            int pv2_index = i - (Y.rows() - priors_vec_2.size());
+            if (pv1_index >= priors_vec_1.size()) {
+                priors_vec.push_back(priors_vec_2[pv2_index]);
+            }
+            else if (pv2_index < 0) {
+                priors_vec.push_back(priors_vec_1[pv1_index]);
+            }
+            else {
+                priors_vec.push_back((priors_vec_1[pv1_index] + priors_vec_2[pv2_index]) / 2.0);
+            }
+        }
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
@@ -889,12 +888,11 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    // sigma2 *= 1.5;
     ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
-    // params for long rope
-    // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    // test 2nd order
+    // ecpd_lle (X_orig, Y, sigma2, 1.2, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "2nd order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 10, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "Gaussian", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 0.7, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 }
