@@ -7,12 +7,12 @@
   <!-- <node name="opencv_interaction" pkg="trackdlo" type="opencv_interactive.py"/> -->
 
   <!-- tracking rviz file -->
-  <group if="$(arg eval)">
+  <!-- <group if="$(arg eval)">
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking_eval_trackdlo.rviz" />
   </group>
 
   <group unless="$(arg eval)">
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking.rviz" />
-  </group>
+  </group> -->
 
 </launch>
