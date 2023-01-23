@@ -562,7 +562,7 @@ bool ecpd_lle (MatrixXf X_orig,
         MatrixXf B_matrix;
         if (include_lle) {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + alpha*G_masked;
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
@@ -572,7 +572,7 @@ bool ecpd_lle (MatrixXf X_orig,
         }
         else {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*G_masked;
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal() * Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
@@ -614,6 +614,8 @@ bool ecpd_lle (MatrixXf X_orig,
 std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
     std::vector<MatrixXf> node_pairs = {};
 
+    // std::cout << "in function" << std::endl;
+
     // extreme cases: only one guide node available
     // since this function will only be called when at least one of head or tail is visible, 
     // the only node will be head or tail
@@ -641,10 +643,22 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
         // ultimate terminating condition: run out of guide nodes to use. two conditions that can trigger this:
         //   1. next visible node index - current visible node index > 1
         //   2. currenting using the last two guide nodes
+        std::cout << "before the first while loop" << std::endl;
         while (visible_nodes[guide_nodes_it+1] - visible_nodes[guide_nodes_it] == 1 && guide_nodes_it+1 <= guide_nodes.rows()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
             guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
             // now keep adding segment dists until the total seg dists exceed the current total guide node dists
+            std::cout << "before the second while loop" << std::endl;
+            std::cout << "outer while loop: guide nodes total dist = " << guide_nodes_total_dist << "; total seg dist = " << total_seg_dist << "; seg dist it = " << seg_dist_it << std::endl;
+            std::cout << guide_nodes << std::endl; 
+            print_1d_vector(geodesic_coord);
+            ros::shutdown();
             while (guide_nodes_total_dist > total_seg_dist) {
+                std::cout << "guide nodes total dist = " << guide_nodes_total_dist << "; total seg dist = " << total_seg_dist << "; seg dist it = " << seg_dist_it << std::endl;
+                // break condition
+                if (seg_dist_it == geodesic_coord.size()-1) {
+                    break;
+                }
+
                 total_seg_dist += fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
                 if (total_seg_dist <= guide_nodes_total_dist) {
                     seg_dist_it += 1;
@@ -653,6 +667,10 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
                     total_seg_dist -= fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
                     break;
                 }
+            }
+            // additional break condition
+            if (seg_dist_it == geodesic_coord.size()-1) {
+                break;
             }
             // std::cout << "seg_dist_it = " << seg_dist_it << "; guide_nodes_it = " << guide_nodes_it << std::endl;
             // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
@@ -697,6 +715,11 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
             guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1));
             // now keep adding segment dists until the total seg dists exceed the current total guide node dists
             while (guide_nodes_total_dist > total_seg_dist) {
+                // break condition
+                if (seg_dist_it == 0) {
+                    break;
+                }
+
                 total_seg_dist += fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
                 if (total_seg_dist <= guide_nodes_total_dist) {
                     seg_dist_it -= 1;
@@ -705,6 +728,10 @@ std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const Matrix
                     total_seg_dist -= fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
                     break;
                 }
+            }
+            // additional break condition
+            if (seg_dist_it == 0) {
+                break;
             }
             // std::cout << "seg_dist_it = " << seg_dist_it << "; guide_nodes_it = " << guide_nodes_it << std::endl;
             // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
@@ -798,11 +825,14 @@ void tracking_step (MatrixXf X_orig,
 
         // method 2: take the average position of two traversals
         // register visible nodes (non-rigid registration)
-        // ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
 
-        // // get priors vec
-        // std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
+        // get priors vec
+        std::cout << "got here" << std::endl;
+        std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
         // std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
+
+        std::cout << "priors vec 1 len = " << priors_vec_1.size() << std::endl;
 
         // // take average
         // priors_vec = {};
