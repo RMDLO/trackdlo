@@ -651,7 +651,7 @@ def callback (rgb, pc):
     filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
     # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
+    # header.stamp = rospy.Time.now()
     converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
     pc_pub.publish(converted_points)
 
