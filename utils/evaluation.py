@@ -6,11 +6,11 @@ import cv2
 import rosbag
 import rospy
 from pylab import *
-from rospy.numpy_msg import numpy_msg
-from rospy_tutorials.msg import Floats
+from ros_numpy import point_cloud2
 from ros_numpy import numpify
 from sensor_msgs.msg import PointCloud2, Image
 import message_filters
+
 
 class TrackDLOEvaluator:
     """Extracts node topic created by the TrackDLO algorithm"""
@@ -18,24 +18,28 @@ class TrackDLOEvaluator:
         # self.bag = rosbag.Bag(bag)
         self.rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
-        self.trackdlo_results_sub = message_filters.Subscriber('/results_numpy', numpy_msg(Floats))
-        self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub], 10)
-        # self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10)
+        self.trackdlo_results_sub = message_filters.Subscriber('/results_pc', PointCloud2)
+        self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10)
         self.ts.registerCallback(self.callback)
-        self.gt_pub = rospy.Publisher('/gt_pts', numpy_msg(Floats), queue_size=10)
+        self.gt_pub = rospy.Publisher('/gt_pts', PointCloud2, queue_size=10)
 
-    def callback(self, rgb_img, pc):
-    # def callback(self, rgb_img, pc, results):
-        Y_true = self.get_ground_truth_nodes(rgb_img, pc)
-        self.gt_pub.publish(Y_true)
-        # print(results)
-        # print(Y_hat)
+    def callback(self, rgb_img, pc, track):
+        Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
+        Y_track = self.get_tracking_nodes(track, head)
+    
+    def get_tracking_nodes(self, track, head):
+        pc_data = point_cloud2.pointcloud2_to_array(track)
+        pc = point_cloud2.get_xyz_points(pc_data)
+        print("track:", pc.shape)
+        return pc
         
     def get_ground_truth_nodes(self, rgb_img, pc):
         
         proj_matrix = np.array([[918.359130859375,              0.0, 645.8908081054688, 0.0], \
                                 [             0.0, 916.265869140625,   354.02392578125, 0.0], \
                                 [             0.0,              0.0,               1.0, 0.0]])
+        head = rgb_img.header
+
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         hsv_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV)
@@ -70,15 +74,26 @@ class TrackDLOEvaluator:
         # Get nodes
         num_blobs = len(keypoints)
         Y_true = np.empty((num_blobs,3)) # Clarfiy variables/notation
+        Y_true_msg = PointCloud2()
+        pc_list = []
         for i in range(num_blobs):
             x = int(keypoints[i].pt[0])
             y = int(keypoints[i].pt[1])
-            pt = pc[y, x] # index pointcloud at blob pixel points
-            Y_true[i, 0] = pt[0]
-            Y_true[i, 1] = pt[1]
-            Y_true[i, 2] = pt[2]
+            new_pt = pc[y, x].tolist() # index pointcloud at blob pixel points
+            Y_true[i, 0] = new_pt[0]
+            Y_true[i, 1] = new_pt[1]
+            Y_true[i, 2] = new_pt[2]
+            pc_list.append(np.array(new_pt[0:3]).astype(np.float32))
+        pc = np.vstack(pc_list).astype(np.float32).T
+        rec_project = np.core.records.fromarrays(pc, 
+                                                names='x, y, z',
+                                                formats = 'float32, float32, float32')            
+
+        Y_true_msg = point_cloud2.array_to_pointcloud2(rec_project, head.stamp, frame_id='camera_color_optical_frame')
+        self.gt_pub.publish(Y_true_msg)
+        print("true:", Y_true.shape)
             
-        return Y_true
+        return Y_true, head
 
     def get_piecewise_curve(Y):
         pass
