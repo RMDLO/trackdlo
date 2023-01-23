@@ -125,7 +125,7 @@ def ndarray2MarkerArray (Y, node_color, line_color, head):
                                             names='x, y, z',
                                             formats = 'float32, float32, float32')
     Y_msg = point_cloud2.array_to_pointcloud2(rec_project, head.stamp, frame_id='camera_color_optical_frame') # include time stamp matching other time
-    pc_pub.publish(Y_msg)
+    track_pc_pub.publish(Y_msg)
     
     return results
 
@@ -773,7 +773,7 @@ if __name__=='__main__':
 
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
-    pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=10)
+    track_pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=10)
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
