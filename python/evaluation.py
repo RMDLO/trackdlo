@@ -105,13 +105,14 @@ class TrackDLOEvaluator:
         y = Y[:,1]
         n_data = Y.shape[0]
         n_seg = n_data - 1
-        dys = np.gradient(y, x)
+        print(n_data, n_seg)
+        dy = np.gradient(y, x)
         rgr = DecisionTreeRegressor(max_leaf_nodes=n_seg)
-        rgr.fit(x.reshape(-1, 1), dys.reshape(-1, 1))
+        rgr.fit(x.reshape(-1, 1), dy.reshape(-1, 1))
         dy_dt = rgr.predict(x.reshape(-1, 1)).flatten()
         y_sl = np.ones(len(x)) * np.nan
         fig, ax0 = plt.subplots(1, 1)
-        for i in dy_dt:
+        for i in np.unique(dy_dt):
             msk = dy_dt == i
             lin_reg = LinearRegression()
             lin_reg.fit(x[msk].reshape(-1, 1), y[msk].reshape(-1, 1))
