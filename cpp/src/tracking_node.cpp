@@ -401,7 +401,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     }
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01);
+                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -422,7 +422,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 1, 1, 10, 0.05, 50, 0.00001, true, false, false, false);
+            // ecpd_lle (X, Y, sigma2, 5, 1, 1, 0.05, 50, 0.0000001, false, true, false, false, {}, 0, "1st order");
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 

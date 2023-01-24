@@ -19,11 +19,20 @@
 #include <chrono>
 #include <thread>
 
+#include <unistd.h>
+#include <cstdlib>
+#include <signal.h>
+
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
+
+void signal_callback_handler(int signum) {
+   // Terminate program
+   exit(signum);
+}
 
 template <typename T>
 void print_1d_vector (std::vector<T> vec) {
@@ -365,7 +374,7 @@ bool ecpd_lle (MatrixXf X_orig,
     MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
 
     // construct R and J
-    MatrixXf priors = MatrixXf::Zero(Y.rows(), 3);
+    MatrixXf priors = MatrixXf::Zero(correspondence_priors.size(), 3);
     MatrixXf J = MatrixXf::Zero(M, M);
     MatrixXf Y_extended = Y_0.replicate(1, 1);
     MatrixXf G_masked = MatrixXf::Zero(M, M);
@@ -379,11 +388,31 @@ bool ecpd_lle (MatrixXf X_orig,
             temp(0, 1) = correspondence_priors[i](0, 2);
             temp(0, 2) = correspondence_priors[i](0, 3);
 
-            priors.row(index) = temp;
+            priors.row(i) = temp;
             J.row(index) = MatrixXf::Identity(M, M).row(index);
             Y_extended.row(index) = temp;
             G_masked.row(index) = G.row(index);
         }
+
+        // // project priors back onto the distance transform to give each entry in J different weight
+        // MatrixXf nodes_h = priors.replicate(1, 1);
+        // nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+        // nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+        // MatrixXf proj_matrix(3, 4);
+        // proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+        //                 0.0, 916.265869140625, 354.02392578125, 0.0,
+        //                 0.0, 0.0, 1.0, 0.0;
+        // MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+
+        // for (int i = 0; i < image_coords.rows(); i ++) {
+        //     int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+        //     int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+
+        //     double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
+        //     double J_i = exp(-1*pixel_dist); // HARD CODED
+
+        //     J.row(correspondence_priors[i](0, 0)) *= J_i;
+        // }
     }
 
     // diff_xy should be a (M * N) matrix
@@ -480,8 +509,8 @@ bool ecpd_lle (MatrixXf X_orig,
         
         // use cdcpd's pvis
         if (occluded_nodes.size() != 0 && mat_max != 0) {
-            // if has corresponding guide node, use that instead of the original position
             MatrixXf nodes_h = Y.replicate(1, 1);
+            // if has corresponding guide node, use that instead of the original position
             for (auto entry : correspondence_priors) {
                 nodes_h.row(entry(0, 0)) = entry.rightCols(3);
             }
@@ -504,11 +533,6 @@ bool ecpd_lle (MatrixXf X_orig,
                 double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
                 double P_vis_i = exp(-k_vis*pixel_dist);
                 total_P_vis += P_vis_i;
-
-                // // test
-                // if (P_vis_i < 1e-10) {
-                //     P_vis_i = 0;
-                // }
 
                 P_vis.row(i) = P_vis_i * P_vis.row(i);
             }
@@ -547,7 +571,7 @@ bool ecpd_lle (MatrixXf X_orig,
         MatrixXf B_matrix;
         if (include_lle) {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + alpha*G_masked;
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*gamma * H*G + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*gamma * H*Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
@@ -557,7 +581,7 @@ bool ecpd_lle (MatrixXf X_orig,
         }
         else {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*G_masked;
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal() * Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
@@ -595,6 +619,147 @@ bool ecpd_lle (MatrixXf X_orig,
     return converged;
 }
 
+// alignment: 0 --> align with head; 1 --> align with tail
+std::vector<MatrixXf> traverse (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
+    std::vector<MatrixXf> node_pairs = {};
+
+    // extreme cases: only one guide node available
+    // since this function will only be called when at least one of head or tail is visible, 
+    // the only node will be head or tail
+    if (guide_nodes.rows() == 1) {
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
+        node_pairs.push_back(node_pair);
+        return node_pairs;
+    }
+
+    double guide_nodes_total_dist = 0;
+    double total_seg_dist = 0;
+    
+    if (alignment == 0) {
+        // push back the first pair
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
+        node_pairs.push_back(node_pair);
+
+        // initialize iterators
+        int guide_nodes_it = 0;
+        int seg_dist_it = 0;
+        int last_seg_dist_it = seg_dist_it;
+
+        // ultimate terminating condition: run out of guide nodes to use. two conditions that can trigger this:
+        //   1. next visible node index - current visible node index > 1
+        //   2. currenting using the last two guide nodes
+        while (visible_nodes[guide_nodes_it+1] - visible_nodes[guide_nodes_it] == 1 && guide_nodes_it+1 <= guide_nodes.rows()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
+            guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
+            // now keep adding segment dists until the total seg dists exceed the current total guide node dists
+            while (guide_nodes_total_dist > total_seg_dist) {
+                // break condition
+                if (seg_dist_it == geodesic_coord.size()-1) {
+                    break;
+                }
+
+                total_seg_dist += fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
+                if (total_seg_dist <= guide_nodes_total_dist) {
+                    seg_dist_it += 1;
+                }
+                else {
+                    total_seg_dist -= fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it+1]);
+                    break;
+                }
+            }
+            // additional break condition
+            if (seg_dist_it == geodesic_coord.size()-1) {
+                break;
+            }
+            // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
+            // the node desired should be in between guide_nodes[guide_nodes_it] and guide_node[guide_nodes_it + 1]
+            // seg_dist_it will also be within guide_nodes_it and guide_nodes_it + 1
+            if (guide_nodes_it == 0 && seg_dist_it == 0) {
+                continue;
+            }
+            // if one guide nodes segment is not long enough
+            if (last_seg_dist_it == seg_dist_it) {
+                guide_nodes_it += 1;
+                continue;
+            }
+            double remaining_dist = total_seg_dist - (guide_nodes_total_dist - pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1)));
+            MatrixXf temp = (guide_nodes.row(guide_nodes_it + 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
+            node_pair(0, 0) = seg_dist_it;
+            node_pair(0, 1) = temp(0, 0) + guide_nodes(guide_nodes_it, 0);
+            node_pair(0, 2) = temp(0, 1) + guide_nodes(guide_nodes_it, 1);
+            node_pair(0, 3) = temp(0, 2) + guide_nodes(guide_nodes_it, 2);
+            node_pairs.push_back(node_pair);
+
+            // update guide_nodes_it at the very end
+            guide_nodes_it += 1;
+            last_seg_dist_it = seg_dist_it;
+        }
+    }
+    else {
+        // push back the first pair
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes.back(), guide_nodes(guide_nodes.rows()-1, 0), guide_nodes(guide_nodes.rows()-1, 1), guide_nodes(guide_nodes.rows()-1, 2);
+        node_pairs.push_back(node_pair);
+
+        // initialize iterators
+        int guide_nodes_it = guide_nodes.rows()-1;
+        int seg_dist_it = geodesic_coord.size()-1;
+        int last_seg_dist_it = seg_dist_it;
+
+        // ultimate terminating condition: run out of guide nodes to use. two conditions that can trigger this:
+        //   1. next visible node index - current visible node index > 1
+        //   2. currenting using the last two guide nodes
+        while (visible_nodes[guide_nodes_it] - visible_nodes[guide_nodes_it-1] == 1 && guide_nodes_it-1 >= 0 && seg_dist_it-1 >= 0) {
+            guide_nodes_total_dist += pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1));
+            // now keep adding segment dists until the total seg dists exceed the current total guide node dists
+            while (guide_nodes_total_dist > total_seg_dist) {
+                // break condition
+                if (seg_dist_it == 0) {
+                    break;
+                }
+
+                total_seg_dist += fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
+                if (total_seg_dist <= guide_nodes_total_dist) {
+                    seg_dist_it -= 1;
+                }
+                else {
+                    total_seg_dist -= fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
+                    break;
+                }
+            }
+            // additional break condition
+            if (seg_dist_it == 0) {
+                break;
+            }
+            // upon exit, seg_dist_it will be at the locaiton where the total seg dist is barely smaller than guide nodes total dist
+            // the node desired should be in between guide_nodes[guide_nodes_it] and guide_node[guide_nodes_it + 1]
+            // seg_dist_it will also be within guide_nodes_it and guide_nodes_it + 1
+            if (guide_nodes_it == 0 && seg_dist_it == 0) {
+                continue;
+            }
+            // if one guide nodes segment is not long enough
+            if (last_seg_dist_it == seg_dist_it) {
+                guide_nodes_it -= 1;
+                continue;
+            }
+            double remaining_dist = total_seg_dist - (guide_nodes_total_dist - pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1)));
+            MatrixXf temp = (guide_nodes.row(guide_nodes_it - 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1));
+            node_pair(0, 0) = seg_dist_it;
+            node_pair(0, 1) = temp(0, 0) + guide_nodes(guide_nodes_it, 0);
+            node_pair(0, 2) = temp(0, 1) + guide_nodes(guide_nodes_it, 1);
+            node_pair(0, 3) = temp(0, 2) + guide_nodes(guide_nodes_it, 2);
+            node_pairs.insert(node_pairs.begin(), node_pair);
+
+            // update guide_nodes_it at the very end
+            guide_nodes_it -= 1;
+            last_seg_dist_it = seg_dist_it;
+        }
+    }
+
+    return node_pairs;
+}
+
 void tracking_step (MatrixXf X_orig,
                     MatrixXf& Y,
                     double& sigma2,
@@ -609,6 +774,7 @@ void tracking_step (MatrixXf X_orig,
     std::vector<int> occluded_nodes = {};
     std::vector<int> visible_nodes = {};
     std::vector<MatrixXf> valid_nodes_vec = {};
+    priors_vec = {};
     int state = 0;
 
     // project Y onto the original image to determine occluded nodes
@@ -634,42 +800,99 @@ void tracking_step (MatrixXf X_orig,
         }
     }
 
-    if (valid_nodes_vec.size() == 0) {
-        ROS_ERROR("The current state is too different from the last state!");
-        ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
-        return;
-    }
-
     // copy valid guide nodes vec to guide nodes
     // not using topRows() because it caused weird bugs
     guide_nodes = MatrixXf::Zero(valid_nodes_vec.size(), 3);
-    for (int i = 0; i < valid_nodes_vec.size(); i ++) {
-        guide_nodes.row(i) = valid_nodes_vec[i];
+    if (occluded_nodes.size() != 0) {
+        for (int i = 0; i < valid_nodes_vec.size(); i ++) {
+            guide_nodes.row(i) = valid_nodes_vec[i];
+        }
+    }
+    else {
+        guide_nodes = Y.replicate(1, 1);
     }
 
-    // run rigid registration on guide nodes and X
-    double sigma2_pre_proc = sigma2;
-    ecpd_lle (X_orig, guide_nodes, sigma2_pre_proc, 10000, 1, 2, 0.05, 50, 0.000000001, false, true, true, false);
+    // aligning strength will be different for each case
+    double alpha = 1.3;
 
-    // copy guide nodes to priors_vec (this could be combined into one step in the future)
-    priors_vec = {};
-    for (int i = 0; i < guide_nodes.rows(); i ++) {
-        MatrixXf temp = MatrixXf::Zero(1, 4);
-        temp(0, 0) = visible_nodes[i];
-        temp(0, 1) = guide_nodes(i, 0);
-        temp(0, 2) = guide_nodes(i, 1);
-        temp(0, 3) = guide_nodes(i, 2);
-        priors_vec.push_back(temp);
+    // determine DLO state: heading visible, tail visible, both visible, or both occluded
+    // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
+    if (occluded_nodes.size() == 0) {
+        ROS_INFO("All nodes visible");
+
+        // method 1: just proceed like normal registration
+        // ecpd_lle(X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
+        // return;
+
+        // method 2: take the average position of two traversals
+        // register visible nodes (non-rigid registration)
+        bool converged = ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+
+        // signal(SIGINT, signal_callback_handler);
+        // while(true){
+        //     sleep(1);
+        // }
+
+        // get priors vec
+        std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
+        std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
+
+        std::cout << "Y len = " << Y.rows() << "; priors vec 1 len = " << priors_vec_1.size() << "; priors vec 2 len = " << priors_vec_2.size() << std::endl;
+
+        // take average
+        priors_vec = {};
+        for (int i = 0; i < Y.rows(); i ++) {
+            int pv1_index = i;
+            int pv2_index = i - (Y.rows() - priors_vec_2.size());
+            if (pv1_index >= priors_vec_1.size()) {
+                priors_vec.push_back(priors_vec_2[pv2_index]);
+            }
+            else if (pv2_index < 0) {
+                priors_vec.push_back(priors_vec_1[pv1_index]);
+            }
+            else {
+                priors_vec.push_back((priors_vec_1[pv1_index] + priors_vec_2[pv2_index]) / 2.0);
+            }
+        }
     }
+    else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
+        ROS_INFO("Mid-section occluded");
+        // register visible nodes (non-rigid registration)
+        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
+        std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
+        priors_vec.insert(priors_vec.end(), priors_vec_2.begin(), priors_vec_2.end());
+    }
+    else if (visible_nodes[0] == 0) {
+        ROS_INFO("Tip occluded");
+        // register visible nodes (non-rigid registration)
+        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
+    }
+    else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
+        ROS_INFO("Head occluded");
+        // register visible nodes (non-rigid registration)
+        ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
+    }
+    else {
+        ROS_INFO("Both ends occluded");
+    }
+
+    // if (valid_nodes_vec.size() == 0) {
+    //     ROS_ERROR("The current state is too different from the last state!");
+    //     ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    //     return;
+    // }
 
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 10, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
-    // params for long rope
-    // ecpd_lle (X_orig, Y, sigma2, 6, 1, 2, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.00001, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    // test 2nd order
+    // ecpd_lle (X_orig, Y, sigma2, 1.2, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "2nd order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 2, 1, 10, 0.05, 50, 0.00001, true, true, true, true, priors_vec, 0.000006, "Gaussian", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 0.7, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 }
