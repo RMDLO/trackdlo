@@ -2,16 +2,14 @@
 
 import rospy
 import ros_numpy
+from ros_numpy import point_cloud2
 from sensor_msgs.msg import PointCloud2, PointField, Image
 import sensor_msgs.point_cloud2 as pcl2
-import std_msgs.msg
-from rospy.numpy_msg import numpy_msg
-from rospy_tutorials.msg import Floats
+from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
 import struct
-import time
 import cv2
 import numpy as np
 
@@ -54,12 +52,14 @@ def rotation_matrix_from_vectors(vec1, vec2):
     rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
     return rotation_matrix
 
-def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
+def ndarray2MarkerArray (Y, node_color, line_color, head):
     results = MarkerArray()
+    Y_msg = PointCloud2()
+    pc_results_list = []
+
     for i in range (0, len(Y)):
         cur_node_result = Marker()
-        cur_node_result.header.frame_id = marker_frame
-        cur_node_result.header.stamp = rospy.Time.now()
+        cur_node_result.header = head
         cur_node_result.type = Marker.SPHERE
         cur_node_result.action = Marker.ADD
         cur_node_result.ns = "node_results" + str(i)
@@ -80,8 +80,6 @@ def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
         cur_node_result.color.g = node_color[1]
         cur_node_result.color.b = node_color[2]
         cur_node_result.color.a = node_color[3]
-        
-        numpy_pub.publish(Y)
 
         results.markers.append(cur_node_result)
 
@@ -89,7 +87,7 @@ def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
             break
 
         cur_line_result = Marker()
-        cur_line_result.header.frame_id = marker_frame
+        cur_line_result.header = head
         cur_line_result.type = Marker.CYLINDER
         cur_line_result.action = Marker.ADD
         cur_line_result.ns = "line_results" + str(i)
@@ -119,6 +117,15 @@ def ndarray2MarkerArray (Y, marker_frame, node_color, line_color):
         cur_line_result.color.a = line_color[3]
 
         results.markers.append(cur_line_result)
+        pt = np.array([Y[i,0],Y[i,1],Y[i,2]]).astype(np.float32)
+        pc_results_list.append(pt)
+    
+    pc = np.vstack(pc_results_list).astype(np.float32).T
+    rec_project = np.core.records.fromarrays(pc, 
+                                            names='x, y, z',
+                                            formats = 'float32, float32, float32')
+    Y_msg = point_cloud2.array_to_pointcloud2(rec_project, head.stamp, frame_id='camera_color_optical_frame') # include time stamp matching other time
+    track_pc_pub.publish(Y_msg)
     
     return results
 
@@ -514,14 +521,14 @@ def ecpd_lle (X_orig,                      # input point cloud
         # update Y
         if pt2pt_dis_sq(Y, Y_0 + np.matmul(G, W)) < tol:
             Y = Y_0 + np.matmul(G, W)
-            rospy.loginfo('Iteration until covnergence: ' + str(it) + '. Kernel used: ' + kernel)
+            rospy.loginfo('Iterations until convergence: ' + str(it) + '. Kernel: ' + kernel)
             break
         else:
             Y = Y_0 + np.matmul(G, W)
 
         if it == max_iter - 1:
             # print error messages if optimization did not compile
-            rospy.logerr('Optimization did not converge! ' + 'Kernel used: ' + kernel)
+            rospy.logerr('Optimization did not converge! ' + 'Kernel: ' + kernel)
 
     return Y, sigma2
 
@@ -572,6 +579,11 @@ def callback (rgb, pc):
     global params, read_params
     global occlusion_mask_rgb
 
+   # header
+    head = Header()
+    head.stamp = rgb.header.stamp
+    head.frame_id = 'camera_color_optical_frame'
+    
     if not read_params:
         setting_path = join(dirname(dirname(abspath(__file__))), "config/TrackDLO_params.yaml")
         with open(setting_path, 'r') as file:
@@ -627,6 +639,7 @@ def callback (rgb, pc):
 
     # publish mask
     mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
+    mask_img_msg.header = head
     mask_img_pub.publish(mask_img_msg)
 
     mask = (mask/255).astype(int)
@@ -650,9 +663,13 @@ def callback (rgb, pc):
     filtered_pc_colored = np.hstack((filtered_pc, pc_rgba_arr)).astype('O')
     filtered_pc_colored[:, 3] = filtered_pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
-    header.stamp = rospy.Time.now()
-    converted_points = pcl2.create_cloud(header, fields, filtered_pc_colored)
+    fields = [PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1),
+                PointField('rgba', 12, PointField.UINT32, 1)]
+    converted_points = pcl2.create_cloud(header=head,
+                                         fields=fields,
+                                         points=filtered_pc_colored)
     pc_pub.publish(converted_points)
 
     rospy.logwarn('callback before initialized: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
@@ -677,9 +694,6 @@ def callback (rgb, pc):
         total_len = np.sum(np.sqrt(np.sum(np.square(np.diff(init_nodes, axis=0)), axis=1)))
 
         initialized = True
-        # header.stamp = rospy.Time.now()
-        # converted_init_nodes = pcl2.create_cloud(header, fields, init_nodes)
-        # nodes_pub.publish(converted_init_nodes)
 
     # cpd
     if initialized:
@@ -712,8 +726,8 @@ def callback (rgb, pc):
 
         init_nodes = nodes.copy()
 
-        results = ndarray2MarkerArray(nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
-        guide_nodes_results = ndarray2MarkerArray(guide_nodes, "camera_color_optical_frame", [0, 0, 0, 0.5], [0, 0, 1, 0.5])
+        results = ndarray2MarkerArray(nodes, [255, 150, 0, 0.75], [0, 255, 0, 0.75], head)
+        guide_nodes_results = ndarray2MarkerArray(guide_nodes, [0, 0, 0, 0.5], [0, 0, 1, 0.5], head)
         results_pub.publish(results)
         guide_nodes_pub.publish(guide_nodes_results)
 
@@ -745,6 +759,7 @@ def callback (rgb, pc):
                         cv2.line(tracking_img, uv, (us[i+1], vs[i+1]), (255, 0, 0), 2)
             
             tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
+            tracking_img_msg.header = head
             tracking_img_pub.publish(tracking_img_msg)
 
         rospy.logwarn('callback total: ' + str((time.time() - cur_time_cb)*1000) + ' ms')
@@ -756,21 +771,12 @@ if __name__=='__main__':
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
 
-    # header
-    header = std_msgs.msg.Header()
-    header.stamp = rospy.Time.now()
-    header.frame_id = 'camera_color_optical_frame'
-    fields = [PointField('x', 0, PointField.FLOAT32, 1),
-                PointField('y', 4, PointField.FLOAT32, 1),
-                PointField('z', 8, PointField.FLOAT32, 1),
-                PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
     results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
-    numpy_pub = rospy.Publisher('/results_numpy', numpy_msg(Floats), queue_size=10)
+    track_pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=10)
     guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=10)
     tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
     mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
-
     opencv_mask_sub = rospy.Subscriber('/mask_with_occlusion', Image, update_occlusion_mask)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, pc_sub], 10)
