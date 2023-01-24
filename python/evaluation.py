@@ -31,7 +31,9 @@ class TrackDLOEvaluator:
     def callback(self, rgb_img, pc, track):
         Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track, head)
-        self.get_piecewise_curve(Y_true)
+        slopes, intercepts = self.get_piecewise_curve(Y_true)
+        distances = self.get_piecewise_error(Y_track, Y_true, slopes, intercepts)
+        # print(distances)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
 
@@ -102,33 +104,39 @@ class TrackDLOEvaluator:
         pc = point_cloud2.get_xyz_points(pc_data)
         return pc
 
-    def get_piecewise_curve(self,Y):
-        x = Y[:,0]
-        y = Y[:,1]
-        n_data = Y.shape[0]
-        n_seg = n_data - 1
-        print(n_data, n_seg)
-        dy = np.gradient(y, x)
-        rgr = DecisionTreeRegressor(max_leaf_nodes=n_seg)
-        rgr.fit(x.reshape(-1, 1), dy.reshape(-1, 1))
-        dy_dt = rgr.predict(x.reshape(-1, 1)).flatten()
-        y_sl = np.ones(len(x)) * np.nan
-        fig, ax0 = plt.subplots(1, 1)
-        for i in np.unique(dy_dt):
-            msk = dy_dt == i
-            lin_reg = LinearRegression()
-            lin_reg.fit(x[msk].reshape(-1, 1), y[msk].reshape(-1, 1))
-            y_sl[msk] = lin_reg.predict(x[msk].reshape(-1, 1)).flatten()
-            ax0.plot([x[msk][0], x[msk][-1]],
-                        [y_sl[msk][0], y_sl[msk][-1]],
-                        color='r', zorder=1)
-        ax0.scatter(x, y)
-        ax0.scatter(x, y_sl, color='g', zorder=5)
-        plt.savefig("./data/output/piecewise_linear.png")
+    def get_piecewise_curve(self, Y_true):
+        x = Y_true[:,0]
+        y = Y_true[:,1]
+        z = Y_true[:,2]
+        # 2D: 
+        slopes = np.divide(y[1:]-y[:-1], x[1:]-x[:-1])
+        intercepts = y[1:] - np.multiply(slopes, x[1:])
+        # 3D:
+        ##### IMPLEMENT ME #####
+        ## in parametric form, vector = Y_true[1:,:] - Y_true[:-1,:], intercept = Y[:-1,:], note this is not cartesian form!
+        return slopes, intercepts
 
-    def get_piecewise_error():
-        pass
-
+    def get_piecewise_error(self, Y_track, Y_true, slopes, intercepts):
+        print(Y_track.shape, Y_true.shape)
+        # Should probably replace this while loop with something more robust. In this bag file, the shapes are 35x3 and 37x3, respectively
+        while Y_track.shape != Y_true.shape:
+            Y_track = np.insert(Y_track, Y_track.shape[0], Y_track[-1,:], axis=0)
+        perpendicular_slopes = np.divide(-1,slopes)
+        # 2D:
+        x_track = Y_track[:,0]
+        y_track = Y_track[:,1]
+        perpendicular_intercepts = x_track[1:]+np.divide(1,slopes) # I'm not sure if we should use x_track[1:] here...
+        A = -perpendicular_slopes
+        B = np.ones(A.shape)
+        C = -perpendicular_intercepts
+        # Need to figure out structuring of this but the basic distance calculation between a point and a line should be correct
+        distances = []
+        for a,b,c in zip(A,B,C):
+            for x0, y0 in zip(x_track[1:], y_track[1:]):
+                distance = np.linalg.norm(a*x0+b*y0+c)/(np.sqrt(a**2+b**2))
+                distances.append(distance)
+        return distances
+            
 if __name__=='__main__':
     rospy.init_node('evaluator')
     e = TrackDLOEvaluator()
