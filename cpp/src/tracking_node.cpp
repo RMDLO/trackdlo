@@ -44,7 +44,7 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = true;
+bool use_eval_rope = false;
 int num_of_nodes = 30;
 double total_len = 0;
 bool visualize_dist = false;
