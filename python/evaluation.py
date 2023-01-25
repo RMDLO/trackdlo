@@ -32,8 +32,8 @@ class TrackDLOEvaluator:
         Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track, head)
         slopes, intercepts = self.get_piecewise_curve(Y_true)
-        distances = self.get_piecewise_error(Y_track, Y_true, slopes, intercepts)
-        # print(distances)
+        error = self.get_piecewise_error(Y_track, Y_true, slopes, intercepts)
+        print(error)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
 
@@ -130,12 +130,19 @@ class TrackDLOEvaluator:
         B = np.ones(A.shape)
         C = -perpendicular_intercepts
         # Need to figure out structuring of this but the basic distance calculation between a point and a line should be correct
-        distances = []
-        for a,b,c in zip(A,B,C):
-            for x0, y0 in zip(x_track[1:], y_track[1:]):
+        distances_closest_line = []
+        indices = []
+        for x0, y0 in zip(x_track[1:], y_track[1:]):
+            distances_all_lines = []
+            for a,b,c in zip(A,B,C):
                 distance = np.linalg.norm(a*x0+b*y0+c)/(np.sqrt(a**2+b**2))
-                distances.append(distance)
-        return distances
+                distances_all_lines.append(distance)
+            index = np.argmin(distances_all_lines)
+            indices.append(index)
+            distances_closest_line.append(distances_all_lines[index])
+        error = np.sum(distances_closest_line)
+        
+        return error
             
 if __name__=='__main__':
     rospy.init_node('evaluator')
