@@ -8,11 +8,9 @@ and the points predicted from a trackig algorithm node.
 # Python imports
 import numpy as np
 import cv2
-from math import sqrt
-import matplotlib.pyplot as plt
+from vedo import Line, Points, Arrow, Plotter
 
 # ROS imports
-import rosbag
 import rospy
 from ros_numpy import point_cloud2
 from ros_numpy import numpify
@@ -21,6 +19,7 @@ import message_filters
 
 # TrackDLO imports
 from trackdlo import sort_pts
+
 
 class TrackDLOEvaluator:
     """
@@ -51,8 +50,8 @@ class TrackDLOEvaluator:
         """
         Y_true = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track)
-        slopes, intercepts = self.get_piecewise_curve(Y_true)
-        error = self.get_piecewise_error(Y_track, Y_true, slopes, intercepts)
+        error, closest_pts, _ = self.get_piecewise_error(Y_track, Y_true)
+        self.viz_piecewise_error(Y_true, Y_track, closest_pts)
         print(error)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
@@ -131,84 +130,107 @@ class TrackDLOEvaluator:
         pc = point_cloud2.get_xyz_points(pc_data)
         return pc
 
-    def get_piecewise_curve(self, Y_true):
+    def minDistance(self, A, B, E):
         """
-        Create arrays of parameters describing line segments between subsequent
-        pairs of points describing the shape of a DLO
+        Returns:
+        distance: the minimum distance between point E and a line segment AB
+        closest_pt_on_AB_to_E: the closest point to E on the line segment AB
         """
-        x = Y_true[:, 0]
-        y = Y_true[:, 1]
-        z = Y_true[:, 2]
-        # 2D:
-        slopes = np.divide(y[1:] - y[:-1], x[1:] - x[:-1])
-        intercepts = y[1:] - np.multiply(slopes, x[1:])
-        ##### 3D: IMPLEMENT ME #####
-        ## in parametric form:
-        # vector = Y_true[1:,:] - Y_true[:-1,:]
-        # intercept = Y[:-1,:]
-        # Note this is not cartesian form!
-        return slopes, intercepts
- 
-    def minDistance(self, A, B, E) :
-        '''
-        Return the minimum distance between point E and a line segment defined
-        by points AB
-        '''
         # Define vectors
         AB = B - A
         BE = E - B
         AE = E - A
-    
+
         # Calculate the dot product
-        AB_BE = np.dot(AB,BE)
-        AB_AE = np.dot(AB,AE)
-    
+        AB_BE = np.dot(AB, BE)
+        AB_AE = np.dot(AB, AE)
+
         # Minimum distance from
         # point E to the line segment
         distance = 0
-    
-        # Case 1: 
+
+        # Case 1:
         # The nearest point from E on AB is point B if np.dot(AB,BE)>0
-        if (AB_BE > 0) :
-            distance = np.linalg.norm(E-B)
-    
+        if AB_BE > 0:
+            distance = np.linalg.norm(E - B)
+            closest_pt_on_AB_to_E = B
+            closest_vector_to_E = E - B
+
         # Case 2:
         # The nearest point from E on AB is point A if np.dot(AB,AE)<0
-        elif (AB_AE < 0) :
-            distance = np.linalg.norm(E-A)
-    
+        elif AB_AE < 0:
+            distance = np.linalg.norm(E - A)
+            closest_pt_on_AB_to_E = A
+            closest_vector_to_E = E - A
+
         # Case 3:
         # If np.dot(AB,BE) or np.dot(AB,AE) = 0, then E is perpendicular
         # to the segment AB and the the perpendicular distance to E from
         # segment AB is the shortest distance.
         else:
             # Find the perpendicular distance
-            distance = np.linalg.norm(np.cross(AB,AE))
-        
-        return distance
+            intermediate_vec = np.cross(AB, AE)
+            closest_vector_to_E = np.cross(AB, intermediate_vec)
+            closest_pt_on_AB_to_E = E - closest_vector_to_E
+            distance = np.linalg.norm(closest_vector_to_E)
 
-    def get_piecewise_error(self, Y_track, Y_true, slopes, intercepts):
+        return distance, closest_pt_on_AB_to_E, closest_vector_to_E
+
+    def get_piecewise_error(self, Y_track, Y_true):
         """
         Compute piecewise error between a set of tracked points and a set of
         ground truth points
         """
         # Should probably replace this while loop with something more robust.
         # In this bag file, the shapes are 35x3 and 37x3, respectively.
-        # Put for loops into matrix form if possible. 
+        # Put for loops into matrix form if possible.
         # For each point in Y_track, compute the distance to Y_true
         shortest_distances_to_curve = []
+        closest_pts_on_Y_true = []
+        closest_vectors_to_Y_true = []
         for Y in Y_track:
-            # Compute the distance from (x0,y0) to every line segment from Y_true:
             distances_all_line_segments = []
-            for i in range(len(Y_true[:-1,0])):
-                distance = self.minDistance(Y_true[i,:],Y_true[i+1,:],Y)
+            closest_pts = []
+            closest_vectors = []
+            for i in range(len(Y_true[:-1, 0])):
+                distance, closest_pt, closest_vector = self.minDistance(
+                    Y_true[i, :], Y_true[i + 1, :], Y
+                )
                 distances_all_line_segments.append(distance)
-            shortest_distance_to_curve = np.min(distances_all_line_segments)
-            shortest_distances_to_curve.append(shortest_distance_to_curve)
+                closest_pts.append(closest_pt)
+                closest_vectors.append(closest_vector)
+            shortest_distance_to_curve_idx = np.argmin(distances_all_line_segments)
+            shortest_distances_to_curve.append(
+                distances_all_line_segments[shortest_distance_to_curve_idx]
+            )
+            closest_pts_on_Y_true.append(closest_pts[shortest_distance_to_curve_idx])
+            closest_vectors_to_Y_true.append(
+                closest_vectors[shortest_distance_to_curve_idx]
+            )
+        closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
+        closest_vectors_on_curve = np.asarray(closest_vectors_to_Y_true)
         error = np.sum(shortest_distances_to_curve)
 
-        return error
+        return error, closest_pts_on_curve, closest_vectors_on_curve
 
+    def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
+        Y_true_pc = Points(Y_true, c=(255, 0, 0), r=15)  # red
+        Y_track_pc = Points(Y_track, c=(255, 255, 0), r=15)  # yellow
+        closest_pts_pc = Points(closest_pts, c=(0, 0, 255), r=15)  # blue
+        # Y_true_line = Line(Y_true_pc, c=(255, 0, 0), lw=15)
+        # Y_track_line = Line(Y_track_pc, c=(255,255,0), lw=15)
+
+        velocity_field = []
+
+        for i in range(len(closest_pts)):
+            arrow = Arrow(
+                start_pt=closest_pts[i, :], end_pt=Y_track[i, :], c=(255, 255, 255)
+            )
+            velocity_field.append(arrow)
+
+        plt = Plotter(N=2)
+        plt.show(Y_true_pc, Y_track_pc, closest_pts_pc, velocity_field)
+        plt.interactive().close()
 
 if __name__ == "__main__":
     rospy.init_node("evaluator")
@@ -217,27 +239,3 @@ if __name__ == "__main__":
         rospy.spin()
     except KeyboardInterrupt:
         print("Shutting down")
-
-# bag = '../data/rope_with_marker_folding.bag'
-# data = TrackDLONodes(bag)
-# nodes = data.get_data()
-# print(nodes)
-
-# ROOT_DIR = "."
-# img = cv2.imread(os.path.join(ROOT_DIR,"data/images/frame0000.jpg"))
-
-# def get_data(self):
-#     topic_data = "/trackdlo/results_numpy"
-#     # topic_time = "/trackdlo/results"
-#     msgs_data = self.bag.read_messages(topic_data)
-#     # msgs_time = self.bag.read_messages(topic_time)
-#     time = []
-#     nodes = []
-#     # for msg_data, msg_time in zip(msgs_data, msgs_time):
-#     for msg_data in msgs_data:
-#         nodes.append(msg_data[1].data)
-#         # time.append(msg_time[1].header.stamp.secs)
-#     # convert to numpy array
-#     self.nodes = np.asarray(nodes)
-#     # self.time = np.asarray(time)
-#     return self.nodes
