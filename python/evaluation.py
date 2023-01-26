@@ -8,6 +8,7 @@ and the points predicted from a trackig algorithm node.
 # Python imports
 import numpy as np
 import cv2
+from math import sqrt
 import matplotlib.pyplot as plt
 
 # ROS imports
@@ -147,42 +148,64 @@ class TrackDLOEvaluator:
         # intercept = Y[:-1,:]
         # Note this is not cartesian form!
         return slopes, intercepts
+ 
+    def minDistance(self, A, B, E) :
+        '''
+        Return the minimum distance between point E and a line segment defined
+        by points AB
+        '''
+        # Define vectors
+        AB = B - A
+        BE = E - B
+        AE = E - A
+    
+        # Calculate the dot product
+        AB_BE = np.dot(AB,BE)
+        AB_AE = np.dot(AB,AE)
+    
+        # Minimum distance from
+        # point E to the line segment
+        distance = 0
+    
+        # Case 1: 
+        # The nearest point from E on AB is point B if np.dot(AB,BE)>0
+        if (AB_BE > 0) :
+            distance = np.linalg.norm(E-B)
+    
+        # Case 2:
+        # The nearest point from E on AB is point A if np.dot(AB,AE)<0
+        elif (AB_AE < 0) :
+            distance = np.linalg.norm(E-A)
+    
+        # Case 3:
+        # If np.dot(AB,BE) or np.dot(AB,AE) = 0, then E is perpendicular
+        # to the segment AB and the the perpendicular distance to E from
+        # segment AB is the shortest distance.
+        else:
+            # Find the perpendicular distance
+            distance = np.linalg.norm(np.cross(AB,AE))
+        
+        return distance
 
     def get_piecewise_error(self, Y_track, Y_true, slopes, intercepts):
         """
         Compute piecewise error between a set of tracked points and a set of
         ground truth points
         """
-        print(Y_track.shape, Y_true.shape)
         # Should probably replace this while loop with something more robust.
         # In this bag file, the shapes are 35x3 and 37x3, respectively.
-        while Y_track.shape != Y_true.shape:
-            Y_track = np.insert(Y_track, Y_track.shape[0], Y_track[-1, :], axis=0)
-        perpendicular_slopes = np.divide(-1, slopes)
-        # 2D:
-        x_track = Y_track[:, 0]
-        y_track = Y_track[:, 1]
-        # I'm not sure if we should use x_track[1:] here...
-        perpendicular_intercepts = x_track[1:] + np.divide(1, slopes)
-        # Cartesian form for a line in 2D:
-        A = -perpendicular_slopes
-        B = np.ones(A.shape)
-        C = -perpendicular_intercepts
-        # Put for loops into matrix form if possible. The basic distance calculation between a
-        # point and a line should be correct.
-        distances_closest_line = []
-        indices = []
-        for x0, y0 in zip(x_track[1:], y_track[1:]):
-            distances_all_lines = []
-            for a, b, c in zip(A, B, C):
-                distance = np.linalg.norm(a * x0 + b * y0 + c) / (
-                    np.sqrt(a ** 2 + b ** 2)
-                )
-                distances_all_lines.append(distance)
-            index = np.argmin(distances_all_lines)
-            indices.append(index)
-            distances_closest_line.append(distances_all_lines[index])
-        error = np.sum(distances_closest_line)
+        # Put for loops into matrix form if possible. 
+        # For each point in Y_track, compute the distance to Y_true
+        shortest_distances_to_curve = []
+        for Y in Y_track:
+            # Compute the distance from (x0,y0) to every line segment from Y_true:
+            distances_all_line_segments = []
+            for i in range(len(Y_true[:-1,0])):
+                distance = self.minDistance(Y_true[i,:],Y_true[i+1,:],Y)
+                distances_all_line_segments.append(distance)
+            shortest_distance_to_curve = np.min(distances_all_line_segments)
+            shortest_distances_to_curve.append(shortest_distance_to_curve)
+        error = np.sum(shortest_distances_to_curve)
 
         return error
 
