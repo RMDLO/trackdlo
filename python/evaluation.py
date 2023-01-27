@@ -52,6 +52,8 @@ class TrackDLOEvaluator:
         Y_track = self.get_tracking_nodes(track)
         error, closest_pts = self.get_piecewise_error(Y_track, Y_true)
         self.viz_piecewise_error(Y_true, Y_track, closest_pts)
+        # error, closest_pts = self.get_piecewise_error(Y_true, Y_track)
+        # self.viz_piecewise_error(Y_track, Y_true, closest_pts)
         # print(error)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
@@ -140,8 +142,22 @@ class TrackDLOEvaluator:
         AB = B - A
         AE = E - A
         
-        distance = np.linalg.norm(np.cross(AB, AE))/np.linalg.norm(AB)
-        closest_pt_on_AB_to_E = A + AB*np.dot(AE, AB)/np.dot(AB,AB)
+        distance = np.linalg.norm(np.cross(AE, AB))/np.linalg.norm(AB)
+        closest_pt_on_AB_to_E = A + AB*np.dot(AE, AB)/np.dot(AB, AB)
+        
+        # Check whether point is on line segment.
+        # If point is not on line segment, find the nearest endpoint.
+        AP = closest_pt_on_AB_to_E - A
+        if np.dot(AP, AB) < 0 or np.dot(AP, AB) > np.dot(AB, AB):
+            BE = E - B
+            distance_AE = np.sqrt(np.dot(AE, AE))
+            distance_BE = np.sqrt(np.dot(BE, BE))
+            if distance_AE > distance_BE:
+                distance = distance_BE
+                closest_pt_on_AB_to_E = B
+            else:
+                distance = distance_AE
+                closest_pt_on_AB_to_E = A
 
         return distance, closest_pt_on_AB_to_E
 
@@ -157,42 +173,43 @@ class TrackDLOEvaluator:
         shortest_distances_to_curve = []
         closest_pts_on_Y_true = []
         for Y in Y_track:
-            distances_all_line_segments = []
-            closest_pts = []
+            dist = None
+            closest = None
             for i in range(len(Y_true)-1):
                 distance, closest_pt = self.minDistance(
                     Y_true[i, :], Y_true[i + 1, :], Y
                 )
-                distances_all_line_segments.append(distance)
-                closest_pts.append(closest_pt)
-            shortest_distance_to_curve_idx = np.argmin(distances_all_line_segments)
-            shortest_distances_to_curve.append(
-                distances_all_line_segments[shortest_distance_to_curve_idx]
-            )
-            closest_pts_on_Y_true.append(closest_pts[shortest_distance_to_curve_idx])
+                if dist == None or distance < dist:
+                    dist = distance
+                    closest = closest_pt
+            shortest_distances_to_curve.append(dist)
+            closest_pts_on_Y_true.append(closest)
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
         error = np.sum(shortest_distances_to_curve)
 
         return error, closest_pts_on_curve
 
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
-        Y_true_pc = Points(Y_true, c=(255, 0, 0), r=15)  # red
-        Y_track_pc = Points(Y_track, c=(255, 255, 0), r=15)  # yellow
-        closest_pts_pc = Points(closest_pts, c=(0, 0, 255), r=15)  # blue
-        # Y_true_line = Line(Y_true_pc, c=(255, 0, 0), lw=15)
-        # Y_track_line = Line(Y_track_pc, c=(255,255,0), lw=15)
+        Y_true_pc = Points(Y_true, c=(255, 220, 0), r=15)  # red
+        Y_track_pc = Points(Y_track, c=(0, 0, 0), r=15)  # yellow
+        closest_pts_pc = Points(closest_pts, c=(255, 0, 0), r=15)  # blue
+        Y_true_line = Line(Y_true_pc, c=(255, 220, 0), lw=5)
+        Y_track_line = Line(Y_track_pc, c=(0, 0, 0), lw=5)
 
         velocity_field = []
 
         for i in range(len(closest_pts)):
             arrow = Arrow(
-                start_pt=Y_track[i, :], end_pt=closest_pts[i, :], c=(255, 255, 255),
+                start_pt=Y_track[i, :], end_pt=closest_pts[i, :], c=(255, 0, 0),
             )
             velocity_field.append(arrow)
-
-        plt = Plotter(N=2)
-        plt.show(Y_true_pc, Y_track_pc, closest_pts_pc, velocity_field)
-        plt.interactive().close()
+        try:
+            plt = Plotter()
+            plt.show(Y_true_pc, Y_track_pc, Y_true_line, Y_track_line, closest_pts_pc, velocity_field)
+            plt.interactive().screenshot('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/viz.png')
+            plt.interactive().close()
+        except KeyboardInterrupt:
+            print("Shutting down")
 
 if __name__ == "__main__":
     rospy.init_node("evaluator")
