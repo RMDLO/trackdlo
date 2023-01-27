@@ -50,9 +50,9 @@ class TrackDLOEvaluator:
         """
         Y_true = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track)
-        error, closest_pts, _ = self.get_piecewise_error(Y_track, Y_true)
+        error, closest_pts = self.get_piecewise_error(Y_track, Y_true)
         self.viz_piecewise_error(Y_true, Y_track, closest_pts)
-        print(error)
+        # print(error)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
         """
@@ -138,43 +138,12 @@ class TrackDLOEvaluator:
         """
         # Define vectors
         AB = B - A
-        BE = E - B
         AE = E - A
+        
+        distance = np.linalg.norm(np.cross(AB, AE))/np.linalg.norm(AB)
+        closest_pt_on_AB_to_E = A + AB*np.dot(AE, AB)/np.dot(AB,AB)
 
-        # Calculate the dot product
-        AB_BE = np.dot(AB, BE)
-        AB_AE = np.dot(AB, AE)
-
-        # Minimum distance from
-        # point E to the line segment
-        distance = 0
-
-        # Case 1:
-        # The nearest point from E on AB is point B if np.dot(AB,BE)>0
-        if AB_BE > 0:
-            distance = np.linalg.norm(E - B)
-            closest_pt_on_AB_to_E = B
-            closest_vector_to_E = E - B
-
-        # Case 2:
-        # The nearest point from E on AB is point A if np.dot(AB,AE)<0
-        elif AB_AE < 0:
-            distance = np.linalg.norm(E - A)
-            closest_pt_on_AB_to_E = A
-            closest_vector_to_E = E - A
-
-        # Case 3:
-        # If np.dot(AB,BE) or np.dot(AB,AE) = 0, then E is perpendicular
-        # to the segment AB and the the perpendicular distance to E from
-        # segment AB is the shortest distance.
-        else:
-            # Find the perpendicular distance
-            intermediate_vec = np.cross(AB, AE)
-            closest_vector_to_E = np.cross(AB, intermediate_vec)
-            closest_pt_on_AB_to_E = E - closest_vector_to_E
-            distance = np.linalg.norm(closest_vector_to_E)
-
-        return distance, closest_pt_on_AB_to_E, closest_vector_to_E
+        return distance, closest_pt_on_AB_to_E
 
     def get_piecewise_error(self, Y_track, Y_true):
         """
@@ -187,31 +156,24 @@ class TrackDLOEvaluator:
         # For each point in Y_track, compute the distance to Y_true
         shortest_distances_to_curve = []
         closest_pts_on_Y_true = []
-        closest_vectors_to_Y_true = []
         for Y in Y_track:
             distances_all_line_segments = []
             closest_pts = []
-            closest_vectors = []
-            for i in range(len(Y_true[:-1, 0])):
-                distance, closest_pt, closest_vector = self.minDistance(
+            for i in range(len(Y_true)-1):
+                distance, closest_pt = self.minDistance(
                     Y_true[i, :], Y_true[i + 1, :], Y
                 )
                 distances_all_line_segments.append(distance)
                 closest_pts.append(closest_pt)
-                closest_vectors.append(closest_vector)
             shortest_distance_to_curve_idx = np.argmin(distances_all_line_segments)
             shortest_distances_to_curve.append(
                 distances_all_line_segments[shortest_distance_to_curve_idx]
             )
             closest_pts_on_Y_true.append(closest_pts[shortest_distance_to_curve_idx])
-            closest_vectors_to_Y_true.append(
-                closest_vectors[shortest_distance_to_curve_idx]
-            )
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
-        closest_vectors_on_curve = np.asarray(closest_vectors_to_Y_true)
         error = np.sum(shortest_distances_to_curve)
 
-        return error, closest_pts_on_curve, closest_vectors_on_curve
+        return error, closest_pts_on_curve
 
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
         Y_true_pc = Points(Y_true, c=(255, 0, 0), r=15)  # red
@@ -224,7 +186,7 @@ class TrackDLOEvaluator:
 
         for i in range(len(closest_pts)):
             arrow = Arrow(
-                start_pt=closest_pts[i, :], end_pt=Y_track[i, :], c=(255, 255, 255)
+                start_pt=Y_track[i, :], end_pt=closest_pts[i, :], c=(255, 255, 255),
             )
             velocity_field.append(arrow)
 
