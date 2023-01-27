@@ -890,6 +890,12 @@ void tracking_step (MatrixXf X_orig,
     // params for eval rope (short)
     ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
+    std::cout << "=====" << std::endl;
+    for (int i = 0; i < Y.rows(); i ++) {
+        std::cout << Y(i, 0) << ", " << Y(i, 1) << ", " << Y(1, 2) << "," << std::endl;
+    }
+    std::cout << "=====" << std::endl;
+
     // test 2nd order
     // ecpd_lle (X_orig, Y, sigma2, 1.2, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "2nd order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
 
