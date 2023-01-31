@@ -169,23 +169,36 @@ class TrackDLOEvaluator:
         # Should probably replace this while loop with something more robust.
         # In this bag file, the shapes are 35x3 and 37x3, respectively.
         # Put for loops into matrix form if possible.
-        # For each point in Y_track, compute the distance to Y_true
+        # For each point in Y_track, compute the distance to Y_true.
+        # Calculate weights based on line segment half-lengths.
         shortest_distances_to_curve = []
         closest_pts_on_Y_true = []
-        for Y in Y_track:
+        weights = []
+        for idx, Y in enumerate(Y_track):
             dist = None
-            closest = None
+            closest_pt = None
             for i in range(len(Y_true)-1):
-                distance, closest_pt = self.minDistance(
+                dist_i, closest_pt_i = self.minDistance(
                     Y_true[i, :], Y_true[i + 1, :], Y
                 )
-                if dist == None or distance < dist:
-                    dist = distance
-                    closest = closest_pt
+                if dist == None or dist_i < dist:
+                    dist = dist_i
+                    closest_pt = closest_pt_i
+            weight = 0
+            # For endpoints, only weight by one half-length.
+            # For all other points, weight by both adjoining half-lengths.
+            if idx == 0:
+                weight += np.linalg.norm(Y_track[i, :] - Y_track[i + 1, :]) / 2
+            elif idx == len(Y_track) - 1:
+                weight += np.linalg.norm(Y_track[i, :] - Y_track[i - 1, :]) / 2
+            else:
+                weight += np.linalg.norm(Y_track[i, :] - Y_track[i + 1, :]) / 2
+                weight += np.linalg.norm(Y_track[i, :] - Y_track[i - 1, :]) / 2
             shortest_distances_to_curve.append(dist)
-            closest_pts_on_Y_true.append(closest)
+            closest_pts_on_Y_true.append(closest_pt)
+            weights.append(weight)
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
-        error = np.sum(shortest_distances_to_curve)
+        error = np.sum(np.multiply(shortest_distances_to_curve, weights))
 
         return error, closest_pts_on_curve
 
