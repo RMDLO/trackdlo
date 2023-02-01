@@ -188,12 +188,12 @@ class TrackDLOEvaluator:
             # For endpoints, only weight by one half-length.
             # For all other points, weight by both adjoining half-lengths.
             if idx == 0:
-                weight += np.linalg.norm(Y_track[i, :] - Y_track[i + 1, :]) / 2
+                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx + 1, :]) / 2
             elif idx == len(Y_track) - 1:
-                weight += np.linalg.norm(Y_track[i, :] - Y_track[i - 1, :]) / 2
+                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx - 1, :]) / 2
             else:
-                weight += np.linalg.norm(Y_track[i, :] - Y_track[i + 1, :]) / 2
-                weight += np.linalg.norm(Y_track[i, :] - Y_track[i - 1, :]) / 2
+                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx + 1, :]) / 2
+                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx - 1, :]) / 2
             shortest_distances_to_curve.append(dist)
             closest_pts_on_Y_true.append(closest_pt)
             weights.append(weight)
