@@ -54,7 +54,7 @@ class TrackDLOEvaluator:
         Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
-        self.get_piecewise_error(Y_true, Y_track, head)
+        self.final_error(Y_true, Y_track, head)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
         """
@@ -220,7 +220,7 @@ class TrackDLOEvaluator:
 
         return distance, closest_pt_on_AB_to_E
 
-    def get_piecewise_error(self, Y_track, Y_true, head):
+    def get_piecewise_error(self, Y_track, Y_true):
         """
         Compute piecewise error between a set of tracked points and a set of
         ground truth points
@@ -258,17 +258,22 @@ class TrackDLOEvaluator:
             weights.append(weight)
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
         error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
-        self.cumulative_error = self.cumulative_error + error_frame
+
+        return error_frame
+
+    def final_error(self, Y_track, Y_true, head):
+        E1 = self.get_piecewise_error(Y_track, Y_true)
+        E2 = self.get_piecewise_error(Y_true, Y_track)
+        self.cumulative_error = self.cumulative_error + (E1 + E2)/2
 
         error_msg = Float64()
         error_msg.data = self.cumulative_error
         self.error_list.append(self.cumulative_error)
         self.error_pub.publish(error_msg)
 
-        timestamp = head.stamp.to_sec()
-
         print(len(self.error_list), self.length)
-        if len(self.error_list) == self.length:
+        if len(self.error_list) >= self.length-10:
+            plt.clf()
             plt.plot(self.error_list)
             plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/eval.png')
 
