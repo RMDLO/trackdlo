@@ -47,8 +47,10 @@ class TrackDLO:
 
         self.queue_size = 100
         self.pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=self.queue_size)
-        self.results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=self.queue_size)
-        self.track_pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=self.queue_size)
+        self.trackdlo_markerarray_pub = rospy.Publisher ('/trackdlo_results_marker_array', MarkerArray, queue_size=self.queue_size)
+        self.trackdlo_pc_pub = rospy.Publisher('/trackdlo_results_pc', PointCloud2, queue_size=self.queue_size)
+        self.gltp_markerarray_pub = rospy.Publisher ('/gltp_results_marker_array', MarkerArray, queue_size=self.queue_size)
+        self.gltp_pc_pub = rospy.Publisher('/gltp_results_pc', PointCloud2, queue_size=self.queue_size)
         self.guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=self.queue_size)
         self.tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=self.queue_size)
         self.mask_img_pub = rospy.Publisher('/mask', Image, queue_size=self.queue_size)
@@ -206,7 +208,7 @@ class TrackDLO:
 
             results = self.ndarray2MarkerArray(self.nodes, [255, 150, 0, 0.75], [0, 255, 0, 0.75], head)
             guide_nodes_results = self.ndarray2MarkerArray(guide_nodes, [0, 0, 0, 0.5], [0, 0, 1, 0.5], head)
-            self.results_pub.publish(results)
+            self.trackdlo_markerarray_pub.publish(results)
             self.guide_nodes_pub.publish(guide_nodes_results)
 
             if self.params["initialization_params"]["pub_tracking_image"]:
@@ -339,7 +341,7 @@ class TrackDLO:
                                                 names='x, y, z',
                                                 formats = 'float32, float32, float32')
         Y_msg = point_cloud2.array_to_pointcloud2(rec_project, head.stamp, frame_id='camera_color_optical_frame') # include time stamp matching other time
-        self.track_pc_pub.publish(Y_msg)
+        self.trackdlo_pc_pub.publish(Y_msg)
         
         return results
 
@@ -770,6 +772,10 @@ class TrackDLO:
         rospy.logwarn('tracking_step registration: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         return correspondence_priors[:, 1:4], Y, self.sigma2
+
+    def gltp_step(self, X_orig, Y_0, sigma2_0):
+        Y, self.sigma2 = self.ecpd_lle(X_orig, Y_0, sigma2_0, 1, 1, 1, 0.05, 50, 0.00001, True, False, True, False)
+        return Y, self.sigma2
 
 if __name__=='__main__':
     rospy.init_node('trackdlo')
