@@ -45,14 +45,15 @@ class TrackDLO:
         self.pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
         self.opencv_mask_sub = rospy.Subscriber('/mask_with_occlusion', Image, self.update_occlusion_mask)
 
-        self.pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-        self.results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
-        self.track_pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=10)
-        self.guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=10)
-        self.tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
-        self.mask_img_pub = rospy.Publisher('/mask', Image, queue_size=10)
+        self.queue_size = 100
+        self.pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=self.queue_size)
+        self.results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=self.queue_size)
+        self.track_pc_pub = rospy.Publisher('/results_pc', PointCloud2, queue_size=self.queue_size)
+        self.guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=self.queue_size)
+        self.tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=self.queue_size)
+        self.mask_img_pub = rospy.Publisher('/mask', Image, queue_size=self.queue_size)
 
-        self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub], 10)
+        self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub], queue_size=self.queue_size)
         self.ts.registerCallback(self.callback)
 
     def callback(self, rgb, pc):
