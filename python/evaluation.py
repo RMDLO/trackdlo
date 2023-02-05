@@ -2,59 +2,61 @@
 """
 This is a Robot Operating System (ROS) node for computing piecewise error between
 a set of ground truth points describing the shape of a deformable linear object
-and the points predicted from a trackig algorithm node.
+and the points predicted from a tracking algorithm node.
 """
 
 # Python imports
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from vedo import Line, Points, Arrow, Plotter
 
 # ROS imports
 import rospy
+import rosbag
 from ros_numpy import point_cloud2
 from ros_numpy import numpify
 from sensor_msgs.msg import PointCloud2, Image
+from std_msgs.msg import Float64
 import message_filters
-
-# TrackDLO imports
-from trackdlo import sort_pts
 
 
 class TrackDLOEvaluator:
     """
     Extracts predicted nodes published by the tracking algorithm,
-    obtains ground truth node positions through color thresholding and exttracting blob
+    obtains ground truth node positions through color thresholding and extracting blob
     centroids, and computes piecewise error.
     """
 
-    def __init__(self):
-        # self.bag = rosbag.Bag(bag)
+    def __init__(self, length):
         self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
         self.pc_sub = message_filters.Subscriber(
             "/camera/depth/color/points", PointCloud2
         )
+        self.algorithm = 'trackdlo'
         self.trackdlo_results_sub = message_filters.Subscriber(
-            "/results_pc", PointCloud2
+            f"/{self.algorithm}_results_pc", PointCloud2
         )
         self.ts = message_filters.TimeSynchronizer(
             [self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10
         )
         self.ts.registerCallback(self.callback)
-        self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=10)
+        self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=100)
+        self.error_pub = rospy.Publisher("/error", Float64, queue_size=100)
+        self.cumulative_error = 0
+        self.error_list = []
+        self.frame_error_list = []
+        self.length = length
 
     def callback(self, rgb_img, pc, track):
         """
         Callback function which processes raw RGB Image data, raw point cloud data, and
         tracked point cloud data for evaluation.
         """
-        Y_true = self.get_ground_truth_nodes(rgb_img, pc)
+        Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track)
-        error, closest_pts = self.get_piecewise_error(Y_track, Y_true)
-        self.viz_piecewise_error(Y_true, Y_track, closest_pts)
-        # error, closest_pts = self.get_piecewise_error(Y_true, Y_track)
-        # self.viz_piecewise_error(Y_track, Y_true, closest_pts)
-        # print(error)
+        # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
+        self.final_error(Y_true, Y_track, head)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
         """
@@ -63,7 +65,6 @@ class TrackDLOEvaluator:
         PointCloud2 message.
         """
         head = rgb_img.header
-
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         hsv_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV)
@@ -111,8 +112,8 @@ class TrackDLOEvaluator:
             Y_true[i, 2] = new_pt[2]
             pc_list.append(np.array(new_pt[0:3]).astype(np.float32))
         pc = np.vstack(pc_list).astype(np.float32).T
-        pc = sort_pts(pc)
-        Y_true = sort_pts(Y_true)
+        pc = self.sort_pts(pc)
+        Y_true = self.sort_pts(Y_true)
         rec_project = np.core.records.fromarrays(
             pc, names="x, y, z", formats="float32, float32, float32"
         )
@@ -122,7 +123,67 @@ class TrackDLOEvaluator:
         )
         self.gt_pub.publish(Y_true_msg)
 
-        return Y_true
+        return Y_true, head
+
+    def sort_pts(self, Y_0):
+        """
+        Sort points in a point cloud
+        """
+        diff = Y_0[:, None, :] - Y_0[None, :,  :]
+        diff = np.square(diff)
+        diff = np.sum(diff, 2)
+
+        N = len(diff)
+        G = diff.copy()
+
+        selected_node = np.zeros(N,).tolist()
+        selected_node[0] = True
+        Y_0_sorted = []
+            
+        reverse = 0
+        counter = 0
+        reverse_on = 0
+        insertion_counter = 0
+        last_visited_b = 0
+        while (counter < N - 1):
+            
+            minimum = 999999
+            a = 0
+            b = 0
+            for m in range(N):
+                if selected_node[m]:
+                    for n in range(N):
+                        if ((not selected_node[n]) and G[m][n]):  
+                            # not in selected and there is an edge
+                            if minimum > G[m][n]:
+                                minimum = G[m][n]
+                                a = m
+                                b = n
+
+            if len(Y_0_sorted) == 0:
+                Y_0_sorted.append(Y_0[a].tolist())
+                Y_0_sorted.append(Y_0[b].tolist())
+            else:
+                if last_visited_b != a:
+                    reverse += 1
+                    reverse_on = a
+                    insertion_counter = 0
+
+                if reverse % 2 == 1:
+                    # switch direction
+                    Y_0_sorted.insert(Y_0_sorted.index(Y_0[a].tolist()), Y_0[b].tolist())
+                elif reverse != 0:
+                    Y_0_sorted.insert(Y_0_sorted.index(Y_0[reverse_on].tolist())+1+insertion_counter, Y_0[b].tolist())
+                    insertion_counter += 1
+                else:
+                    Y_0_sorted.append(Y_0[b].tolist())
+
+            last_visited_b = b
+            selected_node[b] = True
+
+            counter += 1
+
+        return np.array(Y_0_sorted)
 
     def get_tracking_nodes(self, track):
         """
@@ -198,11 +259,34 @@ class TrackDLOEvaluator:
             closest_pts_on_Y_true.append(closest_pt)
             weights.append(weight)
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
-        error = np.sum(np.multiply(shortest_distances_to_curve, weights))
+        error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
 
-        return error, closest_pts_on_curve
+        return error_frame
+
+    def final_error(self, Y_track, Y_true, head):
+        E1 = self.get_piecewise_error(Y_track, Y_true)
+        E2 = self.get_piecewise_error(Y_true, Y_track)
+        self.cumulative_error = self.cumulative_error + (E1 + E2)/2
+
+        error_msg = Float64()
+        error_msg.data = self.cumulative_error
+        self.error_list.append(self.cumulative_error)
+        self.frame_error_list.append((E1+E2)/2)
+        self.error_pub.publish(error_msg)
+
+        print(len(self.error_list), self.length)
+        if len(self.error_list) >= self.length-10:
+            # plt.clf()
+            # plt.plot(self.error_list)
+            # plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/cumulativer_error_eval.png')
+            plt.clf()
+            plt.plot(self.frame_error_list)
+            plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/frame_error_eval.png')
 
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
+        '''
+        Visualize piecewise error using Vedo 3D plotting library
+        '''
         Y_true_pc = Points(Y_true, c=(255, 220, 0), r=15)  # red
         Y_track_pc = Points(Y_track, c=(0, 0, 0), r=15)  # yellow
         closest_pts_pc = Points(closest_pts, c=(255, 0, 0), r=15)  # blue
@@ -217,17 +301,20 @@ class TrackDLOEvaluator:
             )
             velocity_field.append(arrow)
         try:
-            plt = Plotter()
-            plt.show(Y_true_pc, Y_track_pc, Y_true_line, Y_track_line, closest_pts_pc, velocity_field)
-            plt.interactive().screenshot('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/viz.png')
-            plt.interactive().close()
+            plotter = Plotter()
+            plotter.show(Y_true_pc, Y_track_pc, Y_true_line, Y_track_line, closest_pts_pc, velocity_field)
+            plotter.interactive().close()
         except KeyboardInterrupt:
+            plotter.interactive().close()
             print("Shutting down")
-
+        
 if __name__ == "__main__":
+    bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/rope_with_marker_stationary_curved.bag')
+    rgb_length = bag.get_message_count('/camera/color/image_raw')
+    pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
-    e = TrackDLOEvaluator()
+    e = TrackDLOEvaluator(pc_length)
     try:
         rospy.spin()
-    except KeyboardInterrupt:
+    except:
         print("Shutting down")
