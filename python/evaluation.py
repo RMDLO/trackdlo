@@ -28,13 +28,14 @@ class TrackDLOEvaluator:
     centroids, and computes piecewise error.
     """
 
-    def __init__(self, rgb_length):
+    def __init__(self, length):
         self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
         self.pc_sub = message_filters.Subscriber(
             "/camera/depth/color/points", PointCloud2
         )
+        self.algorithm = 'trackdlo'
         self.trackdlo_results_sub = message_filters.Subscriber(
-            "/results_pc", PointCloud2
+            f"/{self.algorithm}_results_pc", PointCloud2
         )
         self.ts = message_filters.TimeSynchronizer(
             [self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10
@@ -44,7 +45,8 @@ class TrackDLOEvaluator:
         self.error_pub = rospy.Publisher("/error", Float64, queue_size=100)
         self.cumulative_error = 0
         self.error_list = []
-        self.length = rgb_length
+        self.frame_error_list = []
+        self.length = length
 
     def callback(self, rgb_img, pc, track):
         """
@@ -269,13 +271,17 @@ class TrackDLOEvaluator:
         error_msg = Float64()
         error_msg.data = self.cumulative_error
         self.error_list.append(self.cumulative_error)
+        self.frame_error_list.append((E1+E2)/2)
         self.error_pub.publish(error_msg)
 
         print(len(self.error_list), self.length)
         if len(self.error_list) >= self.length-10:
+            # plt.clf()
+            # plt.plot(self.error_list)
+            # plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/cumulativer_error_eval.png')
             plt.clf()
-            plt.plot(self.error_list)
-            plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/eval.png')
+            plt.plot(self.frame_error_list)
+            plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/frame_error_eval.png')
 
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
         '''
