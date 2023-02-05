@@ -13,6 +13,7 @@ from vedo import Line, Points, Arrow, Plotter
 
 # ROS imports
 import rospy
+import rosbag
 from ros_numpy import point_cloud2
 from ros_numpy import numpify
 from sensor_msgs.msg import PointCloud2, Image
@@ -27,8 +28,7 @@ class TrackDLOEvaluator:
     centroids, and computes piecewise error.
     """
 
-    def __init__(self):
-        # self.bag = rosbag.Bag(bag)
+    def __init__(self, rgb_length):
         self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
         self.pc_sub = message_filters.Subscriber(
             "/camera/depth/color/points", PointCloud2
@@ -42,18 +42,19 @@ class TrackDLOEvaluator:
         self.ts.registerCallback(self.callback)
         self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=100)
         self.error_pub = rospy.Publisher("/error", Float64, queue_size=100)
-        self.error = 0
+        self.cumulative_error = 0
+        self.error_list = []
+        self.length = rgb_length
 
     def callback(self, rgb_img, pc, track):
         """
         Callback function which processes raw RGB Image data, raw point cloud data, and
         tracked point cloud data for evaluation.
         """
-        Y_true = self.get_ground_truth_nodes(rgb_img, pc)
+        Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
-        self.get_piecewise_error(Y_true, Y_track)
-        print(self.error)
+        self.get_piecewise_error(Y_true, Y_track, head)
 
     def get_ground_truth_nodes(self, rgb_img, pc):
         """
@@ -120,9 +121,12 @@ class TrackDLOEvaluator:
         )
         self.gt_pub.publish(Y_true_msg)
 
-        return Y_true
+        return Y_true, head
 
     def sort_pts(self, Y_0):
+        """
+        Sort points in a point cloud
+        """
         diff = Y_0[:, None, :] - Y_0[None, :,  :]
         diff = np.square(diff)
         diff = np.sum(diff, 2)
@@ -216,7 +220,7 @@ class TrackDLOEvaluator:
 
         return distance, closest_pt_on_AB_to_E
 
-    def get_piecewise_error(self, Y_track, Y_true):
+    def get_piecewise_error(self, Y_track, Y_true, head):
         """
         Compute piecewise error between a set of tracked points and a set of
         ground truth points
@@ -254,13 +258,24 @@ class TrackDLOEvaluator:
             weights.append(weight)
         closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
         error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
-        self.error = self.error + error_frame
+        self.cumulative_error = self.cumulative_error + error_frame
 
         error_msg = Float64()
-        error_msg.data = self.error
+        error_msg.data = self.cumulative_error
+        self.error_list.append(self.cumulative_error)
         self.error_pub.publish(error_msg)
 
+        timestamp = head.stamp.to_sec()
+
+        print(len(self.error_list), self.length)
+        if len(self.error_list) == self.length:
+            plt.plot(self.error_list)
+            plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/eval.png')
+
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
+        '''
+        Visualize piecewise error using Vedo 3D plotting library
+        '''
         Y_true_pc = Points(Y_true, c=(255, 220, 0), r=15)  # red
         Y_track_pc = Points(Y_track, c=(0, 0, 0), r=15)  # yellow
         closest_pts_pc = Points(closest_pts, c=(255, 0, 0), r=15)  # blue
@@ -283,9 +298,12 @@ class TrackDLOEvaluator:
             print("Shutting down")
         
 if __name__ == "__main__":
+    bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/rope_with_marker_stationary_curved.bag')
+    rgb_length = bag.get_message_count('/camera/color/image_raw')
+    pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
-    e = TrackDLOEvaluator()
+    e = TrackDLOEvaluator(pc_length)
     try:
         rospy.spin()
-    except KeyboardInterrupt:
+    except:
         print("Shutting down")
