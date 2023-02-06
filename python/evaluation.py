@@ -8,8 +8,8 @@ and the points predicted from a tracking algorithm node.
 # Python imports
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 from vedo import Line, Points, Arrow, Plotter
+import json
 
 # ROS imports
 import rospy
@@ -34,6 +34,7 @@ class TrackDLOEvaluator:
             "/camera/depth/color/points", PointCloud2
         )
         self.algorithm = 'trackdlo'
+        self.trial = 3        
         self.trackdlo_results_sub = message_filters.Subscriber(
             f"/{self.algorithm}_results_pc", PointCloud2
         )
@@ -47,6 +48,9 @@ class TrackDLOEvaluator:
         self.error_list = []
         self.frame_error_list = []
         self.length = length
+        self.data_dict = {'algorithm': self.algorithm,
+                        'trial': self.trial,
+                        'error': []}
 
     def callback(self, rgb_img, pc, track):
         """
@@ -275,13 +279,11 @@ class TrackDLOEvaluator:
         self.error_pub.publish(error_msg)
 
         print(len(self.error_list), self.length)
-        if len(self.error_list) >= self.length-10:
-            # plt.clf()
-            # plt.plot(self.error_list)
-            # plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/cumulativer_error_eval.png')
-            plt.clf()
-            plt.plot(self.frame_error_list)
-            plt.savefig('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/frame_error_eval.png')
+        if len(self.error_list) == self.length:
+            self.data_dict['data']=self.frame_error_list
+            out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/{self.algorithm}/frame_error_eval_{self.algorithm}_{self.trial}.json', "w")
+            json.dump(self.data_dict, out_file, indent = 6)
+            out_file.close()
 
     def viz_piecewise_error(self, Y_true, Y_track, closest_pts):
         '''
