@@ -15,7 +15,7 @@ import json
 import rospy
 import rosbag
 from ros_numpy import point_cloud2
-from ros_numpy import numpify
+from ros_numpy import numpify, msgify
 from sensor_msgs.msg import PointCloud2, Image
 from std_msgs.msg import Float64
 import message_filters
@@ -29,12 +29,15 @@ class TrackDLOEvaluator:
     """
 
     def __init__(self, length):
+        self.algorithm = 'trackdlo'
+        self.trial = 3
+        self.percentage_occlusion = 0.5
+        self.occluion = True
+
         self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
         self.pc_sub = message_filters.Subscriber(
             "/camera/depth/color/points", PointCloud2
-        )
-        self.algorithm = 'trackdlo'
-        self.trial = 3        
+        )      
         self.trackdlo_results_sub = message_filters.Subscriber(
             f"/{self.algorithm}_results_pc", PointCloud2
         )
@@ -42,12 +45,17 @@ class TrackDLOEvaluator:
             [self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10
         )
         self.ts.registerCallback(self.callback)
+
         self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=100)
         self.error_pub = rospy.Publisher("/error", Float64, queue_size=100)
+        self.occlusion_mask_img_pub = rospy.Publisher("/mask_with_occlusion", Image, queue_size=100)
+
         self.cumulative_error = 0
         self.error_list = []
         self.frame_error_list = []
         self.length = length
+        self.pix_head_node = np.array([0,0,0])
+        self.pc_head_node = np.array([0,0,0])
         self.data_dict = {'algorithm': self.algorithm,
                         'trial': self.trial,
                         'error': []}
@@ -57,20 +65,22 @@ class TrackDLOEvaluator:
         Callback function which processes raw RGB Image data, raw point cloud data, and
         tracked point cloud data for evaluation.
         """
-        Y_true, head = self.get_ground_truth_nodes(rgb_img, pc)
+        head = rgb_img.header
+        rgb_img = numpify(rgb_img)
+        pc = numpify(pc)
+        Y_true, pixels, head = self.get_ground_truth_nodes(rgb_img, pc, head)
+        self.simulate_occlusion(rgb_img, Y_true, pixels)
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
         self.final_error(Y_true, Y_track, head)
 
-    def get_ground_truth_nodes(self, rgb_img, pc):
+    def get_ground_truth_nodes(self, rgb_img, pc, head):
         """
         Compute the ground truth node positions on rope with colored marker tape with
         color thresholding and extracting blob centroids and publish the nodes as a
         PointCloud2 message.
         """
-        head = rgb_img.header
-        rgb_img = numpify(rgb_img)
-        pc = numpify(pc)
+
         hsv_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV)
 
         # --- rope blue ---
@@ -106,6 +116,7 @@ class TrackDLOEvaluator:
         Y_true = np.empty((num_blobs, 3))  # Clarfiy variables/notation
         Y_true_msg = PointCloud2()
         pc_list = []
+        pixel_list = []
         for i in range(num_blobs):
             x = int(keypoints[i].pt[0])
             y = int(keypoints[i].pt[1])
@@ -115,8 +126,14 @@ class TrackDLOEvaluator:
             Y_true[i, 1] = new_pt[1]
             Y_true[i, 2] = new_pt[2]
             pc_list.append(np.array(new_pt[0:3]).astype(np.float32))
+            pixel_list.append([y, x, 0])
         pc = np.vstack(pc_list).astype(np.float32).T
-        pc = self.sort_pts(pc)
+        pixels = np.vstack(pixel_list)
+
+        pixels = self.sort_pts(pixels, pix=True)
+        pixels = pixels[:, 0:2]
+
+        # pc = self.sort_pts(pc)
         Y_true = self.sort_pts(Y_true)
         rec_project = np.core.records.fromarrays(
             pc, names="x, y, z", formats="float32, float32, float32"
@@ -127,9 +144,9 @@ class TrackDLOEvaluator:
         )
         self.gt_pub.publish(Y_true_msg)
 
-        return Y_true, head
+        return Y_true, pixels, head
 
-    def sort_pts(self, Y_0):
+    def sort_pts(self, Y_0, pix=None):
         """
         Sort points in a point cloud
         """
@@ -187,7 +204,26 @@ class TrackDLOEvaluator:
 
             counter += 1
 
-        return np.array(Y_0_sorted)
+        # Sort the point cloud so that the "head node" is always at the same end of the wire
+        head_node = np.asarray(Y_0_sorted)[0,:]
+        if pix==True:
+            if self.pix_head_node is not np.array([0,0,0]) and np.linalg.norm(head_node - self.pix_head_node) > 50:
+                Y_0_sorted.reverse()
+                Y_0_array = np.asarray(Y_0_sorted)
+                self.pix_head_node = Y_0_array[0,:]
+            else:
+                Y_0_array = np.asarray(Y_0_sorted)
+                self.pix_head_node = Y_0_array[0,:]
+        else:
+            if self.pc_head_node is not np.array([0,0,0]) and np.linalg.norm(head_node - self.pc_head_node) > 1:
+                Y_0_sorted.reverse()
+                Y_0_array = np.asarray(Y_0_sorted)
+                self.pc_head_node = Y_0_array[0,:]
+            else:
+                Y_0_array = np.asarray(Y_0_sorted)
+                self.pc_head_node = Y_0_array[0,:]
+            
+        return Y_0_array
 
     def get_tracking_nodes(self, track):
         """
@@ -262,8 +298,8 @@ class TrackDLOEvaluator:
             shortest_distances_to_curve.append(dist)
             closest_pts_on_Y_true.append(closest_pt)
             weights.append(weight)
-        closest_pts_on_curve = np.asarray(closest_pts_on_Y_true)
-        error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
+        error_frame = np.sum(shortest_distances_to_curve)
+        # error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
 
         return error_frame
 
@@ -278,7 +314,6 @@ class TrackDLOEvaluator:
         self.frame_error_list.append((E1+E2)/2)
         self.error_pub.publish(error_msg)
 
-        print(len(self.error_list), self.length)
         if len(self.error_list) == self.length:
             self.data_dict['data']=self.frame_error_list
             out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/{self.algorithm}/frame_error_eval_{self.algorithm}_{self.trial}.json', "w")
@@ -309,6 +344,24 @@ class TrackDLOEvaluator:
         except KeyboardInterrupt:
             plotter.interactive().close()
             print("Shutting down")
+
+    def simulate_occlusion(self, rgb_img, Y_true, pixels):
+        num_gt_nodes = len(pixels)
+        num_occluded_nodes = int(self.percentage_occlusion*num_gt_nodes)
+
+        x0 = int(np.min(pixels[0:num_occluded_nodes,0]))
+        y0 = int(np.min(pixels[0:num_occluded_nodes,1]))
+        x1 = int(np.max(pixels[0:num_occluded_nodes,0]))
+        y1 = int(np.max(pixels[0:num_occluded_nodes,1]))
+
+        rect = (y0, x0, y1, x1)
+        extra_border = 1
+        occlusion_mask = np.ones(rgb_img.shape)
+        rgb_img = (rgb_img * np.clip(occlusion_mask, 0.5, 1)).astype('uint8')
+        occlusion_mask[rect[1]-extra_border:rect[3]+extra_border, rect[0]-extra_border:rect[2]+extra_border, :] = 0
+        occlusion_mask = (occlusion_mask*255).astype('uint8')
+        occlusion_mask_img_msg = msgify(Image, occlusion_mask, 'rgb8')
+        self.occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
         
 if __name__ == "__main__":
     bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/rope_with_marker_stationary_curved.bag')
