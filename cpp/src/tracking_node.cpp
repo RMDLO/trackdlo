@@ -46,7 +46,7 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = false;
-int num_of_nodes = 40;
+int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
 
@@ -418,6 +418,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     cur_sum += (Y.row(i+1) - Y.row(i)).norm();
                     converted_node_coord.push_back(cur_sum);
                 }
+                // // record geodesic coord
+                // double total_len = 0;
+                // for (int i = 0; i < Y.rows()-1; i ++) {
+                //     total_len += (Y.row(i+1) - Y.row(i)).norm();
+                // }
+                // double seg_dis = total_len / (Y.rows()-1);
+                // for (int i = 0; i < Y.rows(); i ++) {
+                //     converted_node_coord.push_back(seg_dis*i);
+                // }
             }
 
             initialized = true;
