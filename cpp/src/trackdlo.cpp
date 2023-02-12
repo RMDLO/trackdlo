@@ -855,7 +855,7 @@ void tracking_step (MatrixXf X_orig,
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
         std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
         priors_vec.insert(priors_vec.end(), priors_vec_2.begin(), priors_vec_2.end());
@@ -863,13 +863,13 @@ void tracking_step (MatrixXf X_orig,
     else if (visible_nodes[0] == 0) {
         ROS_INFO("Tip occluded");
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
     }
     else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Head occluded");
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
     }
     else {
@@ -885,7 +885,7 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for 0.8m long rope
-    ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
 
     // std::cout << pow(sigma2, 2)/0.00001 << std::endl;
