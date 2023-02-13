@@ -31,6 +31,7 @@ ros::Publisher pc_pub;
 ros::Publisher results_pub;
 ros::Publisher guide_nodes_pub;
 ros::Publisher error_pub;
+ros::Publisher result_pc_pub;
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -45,7 +46,7 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = false;
-int num_of_nodes = 30;
+int num_of_nodes = 40;
 double total_len = 0;
 bool visualize_dist = false;
 
@@ -644,9 +645,23 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
         visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
 
+        // convert to pointcloud2 for eval
+        pcl::PointCloud<pcl::PointXYZ> trackdlo_pc;
+        // fill cloud with random points
+        for (int i = 0; i < Y.rows(); i++) {
+            pcl::PointXYZ temp;
+            temp.x = Y(i, 0);
+            temp.y = Y(i, 1);
+            temp.z = Y(i, 2);
+            trackdlo_pc.points.push_back(temp);
+        }
+        trackdlo_pc.header.frame_id = "camera_color_optical_frame";
+        trackdlo_pc.header.stamp = cloud->header.stamp;
+
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
         pc_pub.publish(output);
+        result_pc_pub.publish(trackdlo_pc.makeShared());
 
         // reset all guide nodes
         for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
@@ -676,9 +691,12 @@ int main(int argc, char **argv) {
     image_transport::Publisher mask_pub = it.advertise("/mask", 10);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
-    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results", 1);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
     error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 1);
+
+    // trackdlo point cloud topic
+    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", 1);
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);

@@ -291,8 +291,6 @@ bool ecpd_lle (MatrixXf X_orig,
                Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
                double mat_max = 0) {
 
-    // log time            
-    clock_t cur_time = clock();
     bool converged = true;
 
     if (correspondence_priors.size() == 0) {
@@ -826,7 +824,7 @@ void tracking_step (MatrixXf X_orig,
 
         // method 2: take the average position of two traversals
         // register visible nodes (non-rigid registration)
-        bool converged = ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, false, false, {}, 0.0, "Gaussian");
+        bool converged = ecpd_lle(X_orig, guide_nodes, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
 
         // signal(SIGINT, signal_callback_handler);
         // while(true){
@@ -836,8 +834,6 @@ void tracking_step (MatrixXf X_orig,
         // get priors vec
         std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
         std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
-
-        std::cout << "Y len = " << Y.rows() << "; priors vec 1 len = " << priors_vec_1.size() << "; priors vec 2 len = " << priors_vec_2.size() << std::endl;
 
         // take average
         priors_vec = {};
@@ -888,7 +884,7 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for eval rope (short)
-    ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "1st order", occluded_nodes, 0.01, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 8, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
 
     std::cout << "=====" << std::endl;
     for (int i = 0; i < Y.rows(); i ++) {
