@@ -12,6 +12,7 @@ from visualization_msgs.msg import MarkerArray
 import struct
 import cv2
 import numpy as np
+import sys
 
 import time
 import yaml
@@ -27,7 +28,7 @@ class TrackDLO:
     """
     Performs deformable linear object tracking with motion coherence
     """
-    def __init__(self):
+    def __init__(self, alg):
         self.proj_matrix = np.array([[918.359130859375, 0.0, 645.8908081054688, 0.0],
                                     [0.0, 916.265869140625, 354.02392578125, 0.0],
                                     [0.0, 0.0, 1.0, 0.0]])
@@ -45,7 +46,7 @@ class TrackDLO:
         self.opencv_mask_sub = rospy.Subscriber('/mask_with_occlusion', Image, self.update_occlusion_mask)
 
         self.queue_size = 100
-        self.algorithm='trackdlo' # values: 'trackdlo' or 'gltp'
+        self.algorithm=alg # 'trackdlo' or 'gltp'
         self.pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=self.queue_size)
         self.trackdlo_markerarray_pub = rospy.Publisher ('/trackdlo_results_marker_array', MarkerArray, queue_size=self.queue_size)
         self.trackdlo_pc_pub = rospy.Publisher('/trackdlo_results_pc', PointCloud2, queue_size=self.queue_size)
@@ -813,7 +814,7 @@ class TrackDLO:
 
 if __name__=='__main__':
     rospy.init_node('trackdlo')
-    t = TrackDLO()
+    t = TrackDLO(str(sys.argv[3]))
     try:
         rospy.spin()
     except KeyboardInterrupt:

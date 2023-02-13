@@ -71,7 +71,7 @@ class TrackDLOEvaluator:
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         Y_true, pixels, head = self.get_ground_truth_nodes(rgb_img, pc, head)
-        if self.frame_idx==200:
+        if self.frame_idx==200 and pct_occlusion!=0:
             self.simulate_occlusion(rgb_img, Y_true, pixels)
         self.frame_idx+=1
         Y_track = self.get_tracking_nodes(track)
