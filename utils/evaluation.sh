@@ -7,11 +7,10 @@ do
     do
         for alg in trackdlo gltp
         do
-            cd
             terminator -e 'roscore' &
-            terminator -e "cd && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo trackdlo.py $alg" &
-            terminator -e "cd && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg" &
-            terminator -e 'cd && cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
+            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo trackdlo.py $alg" &
+            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg" &
+            terminator -e 'cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
             wait
             rosnode kill -a
             killall -9 roscore
@@ -19,11 +18,10 @@ do
         done
         for alg in cdcpd
         do
-            cd
             terminator -e 'roscore' &
-            terminator -e "cd && cd rmdlo_tracking/ && source devel/setup.bash && python src/cdcpd/simple_cpd_node.py" &
-            terminator -e "cd && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg" &
-            terminator -e 'cd && cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
+            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && python src/cdcpd/simple_cpd_node.py" &
+            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg" &
+            terminator -e 'cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
             wait
             rosnode kill -a
             killall -9 roscore
