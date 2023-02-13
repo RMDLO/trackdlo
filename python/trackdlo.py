@@ -52,7 +52,7 @@ class TrackDLO:
         self.gltp_markerarray_pub = rospy.Publisher ('/gltp_results_marker_array', MarkerArray, queue_size=self.queue_size)
         self.gltp_pc_pub = rospy.Publisher('/gltp_results_pc', PointCloud2, queue_size=self.queue_size)
         self.guide_nodes_pub = rospy.Publisher ('/guide_nodes', MarkerArray, queue_size=self.queue_size)
-        self.tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=self.queue_size)
+        self.tracking_img_pub = rospy.Publisher (f'/{self.algorithm}_tracking_img', Image, queue_size=self.queue_size)
         self.mask_img_pub = rospy.Publisher('/mask', Image, queue_size=self.queue_size)
 
         self.ts = message_filters.TimeSynchronizer([self.rgb_sub, self.pc_sub], queue_size=self.queue_size)
