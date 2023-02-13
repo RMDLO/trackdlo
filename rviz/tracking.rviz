@@ -92,13 +92,91 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /results_marker
       Name: MarkerArray
       Namespaces:
-        {}
+        line_results0: true
+        line_results1: true
+        line_results10: true
+        line_results11: true
+        line_results12: true
+        line_results13: true
+        line_results14: true
+        line_results15: true
+        line_results16: true
+        line_results17: true
+        line_results18: true
+        line_results19: true
+        line_results2: true
+        line_results20: true
+        line_results21: true
+        line_results22: true
+        line_results23: true
+        line_results24: true
+        line_results25: true
+        line_results26: true
+        line_results27: true
+        line_results28: true
+        line_results29: true
+        line_results3: true
+        line_results30: true
+        line_results31: true
+        line_results32: true
+        line_results33: true
+        line_results34: true
+        line_results35: true
+        line_results36: true
+        line_results37: true
+        line_results38: true
+        line_results4: true
+        line_results5: true
+        line_results6: true
+        line_results7: true
+        line_results8: true
+        line_results9: true
+        node_results0: true
+        node_results1: true
+        node_results10: true
+        node_results11: true
+        node_results12: true
+        node_results13: true
+        node_results14: true
+        node_results15: true
+        node_results16: true
+        node_results17: true
+        node_results18: true
+        node_results19: true
+        node_results2: true
+        node_results20: true
+        node_results21: true
+        node_results22: true
+        node_results23: true
+        node_results24: true
+        node_results25: true
+        node_results26: true
+        node_results27: true
+        node_results28: true
+        node_results29: true
+        node_results3: true
+        node_results30: true
+        node_results31: true
+        node_results32: true
+        node_results33: true
+        node_results34: true
+        node_results35: true
+        node_results36: true
+        node_results37: true
+        node_results38: true
+        node_results39: true
+        node_results4: true
+        node_results5: true
+        node_results6: true
+        node_results7: true
+        node_results8: true
+        node_results9: true
       Queue Size: 100
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
       Enabled: false
       Marker Topic: /guide_nodes
@@ -165,7 +243,7 @@ Visualization Manager:
       Value: false
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 136; 138; 133
     Default Light: true
     Fixed Frame: base_link
     Frame Rate: 30
@@ -191,7 +269,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.43326008319854736
+      Distance: 0.729062020778656
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -199,17 +277,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.43962937593460083
-        Y: 0.04379865899682045
-        Z: -0.04760633036494255
+        X: 0.4501248300075531
+        Y: -0.12447553873062134
+        Z: -0.011135928332805634
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.849794328212738
+      Pitch: 0.6547946333885193
       Target Frame: <Fixed Frame>
-      Yaw: 4.715399265289307
+      Yaw: 3.260396957397461
     Saved: ~
 Window Geometry:
   Displays:

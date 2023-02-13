@@ -46,7 +46,7 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 bool use_eval_rope = false;
-int num_of_nodes = 35;
+int num_of_nodes = 40;
 double total_len = 0;
 bool visualize_dist = false;
 
@@ -304,7 +304,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-    double mask_dist_threshold = 15;
+    double mask_dist_threshold = 10;
 
     sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
@@ -412,12 +412,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             else {
                 reg(X, Y, sigma2, num_of_nodes, 0.05, 100);
                 Y = sort_pts(Y);
+
                 // record geodesic coord
                 double cur_sum = 0;
                 for (int i = 0; i < Y.rows()-1; i ++) {
                     cur_sum += (Y.row(i+1) - Y.row(i)).norm();
                     converted_node_coord.push_back(cur_sum);
                 }
+                
                 // // record geodesic coord
                 // double total_len = 0;
                 // for (int i = 0; i < Y.rows()-1; i ++) {
