@@ -814,7 +814,7 @@ class TrackDLO:
 
 if __name__=='__main__':
     rospy.init_node('trackdlo')
-    t = TrackDLO(str(sys.argv[3]))
+    t = TrackDLO(str(sys.argv[1]))
     try:
         rospy.spin()
     except KeyboardInterrupt:

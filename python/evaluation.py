@@ -15,6 +15,7 @@ import sys
 # ROS imports
 import rospy
 import rosbag
+import rosnode
 from ros_numpy import point_cloud2
 from ros_numpy import numpify, msgify
 from sensor_msgs.msg import PointCloud2, Image
@@ -71,8 +72,11 @@ class TrackDLOEvaluator:
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         Y_true, pixels, head = self.get_ground_truth_nodes(rgb_img, pc, head)
-        if self.frame_idx==200 and pct_occlusion!=0:
+        print("alg: ", self.algorithm, "idx: ", self.frame_idx)
+        if self.frame_idx>=200 and self.percentage_occlusion!=0:
             self.simulate_occlusion(rgb_img, Y_true, pixels)
+        if self.frame_idx>=self.length:
+            rosnode.kill_nodes(["evaluator", "trackdlo"])
         self.frame_idx+=1
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
@@ -368,13 +372,12 @@ class TrackDLOEvaluator:
         self.occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
         
 if __name__ == "__main__":
-    print("evaluator")
     bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/rope_with_marker_stationary_curved.bag')
     rgb_length = bag.get_message_count('/camera/color/image_raw')
     pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
     # Pass trial and percent occlusion arguments from command
-    e = TrackDLOEvaluator(pc_length, int(sys.argv[1]), int(sys.argv[2], str(sys.argv[3])))
+    e = TrackDLOEvaluator(pc_length, int(sys.argv[1]), int(sys.argv[2]), str(sys.argv[3]))
     try:
         rospy.spin()
     except:

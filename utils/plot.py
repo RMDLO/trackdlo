@@ -5,7 +5,7 @@ import os
 import numpy as np
 from labellines import labelLine, labelLines
 # , 'gltp', 'cdcpd'
-algorithms = ['trackdlo']
+algorithms = ['trackdlo', 'gltp', 'cdcpd']
 algorithms_plot = {'trackdlo': 'TrackDLO',
                     'gltp': 'GLTP',
                     'cdcpd': 'CDCPD'}
