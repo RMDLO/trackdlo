@@ -17,7 +17,7 @@ do
             third_teminal=$!
             terminator -e 'sleep 2; cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
             fourth_teminal=$!
-            sleep 600
+            sleep 545
             killall -9 rosmaster
             kill $first_terminal
             kill $second_terminal
@@ -30,13 +30,13 @@ do
             terminator -e 'roscore' &
             first_teminal=$!
             echo "starting nodes for $alg evaluation" &
-            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && python src/cdcpd/simple_cpd_node.py" &
+            terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && python src/cdcpd/ros_nodes/simple_cdcpd_node.py" &
             second_teminal=$!
             terminator -e "cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg" &
             third_teminal=$!
             terminator -e 'sleep 2; cd rmdlo_tracking/ && rosbag play -r 0.1 src/trackdlo/data/rope_with_marker_stationary_curved.bag'
             fourth_teminal=$!
-            sleep 600
+            sleep 545
             killall -9 rosmaster
             kill $first_terminal
             kill $second_terminal
