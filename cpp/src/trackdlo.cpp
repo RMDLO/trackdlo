@@ -885,14 +885,14 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for 0.8m long rope
-    ecpd_lle (X_orig, Y, sigma2, 8, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 8, 1, 10, 0.1, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
 
     // std::cout << pow(sigma2, 2)/0.00001 << std::endl;
 
     // std::cout << "=====" << std::endl;
     // for (int i = 0; i < Y.rows(); i ++) {
-    //     std::cout << Y(i, 0) << ", " << Y(i, 1) << ", " << Y(1, 2) << "," << std::endl;
+    //     std::cout << Y(i, 0) << ", " << Y(i, 1) << ", " << Y(i, 2) << "," << std::endl;
     // }
     // std::cout << "=====" << std::endl;
 

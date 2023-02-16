@@ -45,8 +45,8 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = false;
-int num_of_nodes = 40;
+bool use_eval_rope = true;
+int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
 
@@ -242,7 +242,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
-    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
+    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask_markers, mask, mask_rgb;
     Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
     Mat cur_image_hsv;
@@ -259,6 +259,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     std::vector<int> lower_red_2 = {0, 60, 40};
     std::vector<int> upper_red_2 = {10, 255, 255};
 
+    std::vector<int> lower_yellow = {15, 100, 80};
+    std::vector<int> upper_yellow = {40, 255, 255};
+
     Mat mask_without_occlusion_block;
 
     if (use_eval_rope) {
@@ -269,10 +272,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cv::inRange(cur_image_hsv, cv::Scalar(lower_red_1[0], lower_red_1[1], lower_red_1[2]), cv::Scalar(upper_red_1[0], upper_red_1[1], upper_red_1[2]), mask_red_1);
         cv::inRange(cur_image_hsv, cv::Scalar(lower_red_2[0], lower_red_2[1], lower_red_2[2]), cv::Scalar(upper_red_2[0], upper_red_2[1], upper_red_2[2]), mask_red_2);
 
+        // filter yellow
+        cv::inRange(cur_image_hsv, cv::Scalar(lower_yellow[0], lower_yellow[1], lower_yellow[2]), cv::Scalar(upper_yellow[0], upper_yellow[1], upper_yellow[2]), mask_yellow);
+
         // combine red mask
         cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
         // combine overall mask
         cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
+        cv::bitwise_or(mask_yellow, mask_without_occlusion_block, mask_without_occlusion_block);
+        cv::bitwise_or(mask_red, mask_yellow, mask_markers);
     }
     else {
         // filter blue
@@ -355,8 +363,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         if (!initialized) {
             if (use_eval_rope) {
                 // simple blob detector
-                std::vector<cv::KeyPoint> keypoints_red;
-                std::vector<cv::KeyPoint> keypoints_blue;
+                std::vector<cv::KeyPoint> keypoints_markers;
+                // std::vector<cv::KeyPoint> keypoints_blue;
                 cv::SimpleBlobDetector::Params blob_params;
                 blob_params.filterByColor = false;
                 blob_params.filterByArea = true;
@@ -366,15 +374,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 blob_params.filterByConvexity = false;
                 cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
                 // detect
-                detector->detect(mask_red, keypoints_red);
-                detector->detect(mask_blue, keypoints_blue);
+                detector->detect(mask_markers, keypoints_markers);
+                // detector->detect(mask_blue, keypoints_blue);
 
-                for (cv::KeyPoint key_point : keypoints_red) {
+                for (cv::KeyPoint key_point : keypoints_markers) {
                     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
                 }
-                for (cv::KeyPoint key_point : keypoints_blue) {
-                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-                }
+                // for (cv::KeyPoint key_point : keypoints_blue) {
+                //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                // }
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
@@ -444,8 +452,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // compute error
         if (compute_eval_error) {
             // simple blob detector
-            std::vector<cv::KeyPoint> keypoints_red;
-            std::vector<cv::KeyPoint> keypoints_blue;
+            std::vector<cv::KeyPoint> keypoints_markers;
+            // std::vector<cv::KeyPoint> keypoints_blue;
             cv::SimpleBlobDetector::Params blob_params;
             blob_params.filterByColor = false;
             blob_params.filterByArea = true;
@@ -455,15 +463,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             blob_params.filterByConvexity = false;
             cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
             // detect
-            detector->detect(mask_red, keypoints_red);
-            detector->detect(mask_blue, keypoints_blue);
+            detector->detect(mask_markers, keypoints_markers);
+            // detector->detect(mask_blue, keypoints_blue);
 
-            for (cv::KeyPoint key_point : keypoints_red) {
+            for (cv::KeyPoint key_point : keypoints_markers) {
                 cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
             }
-            for (cv::KeyPoint key_point : keypoints_blue) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
+            // for (cv::KeyPoint key_point : keypoints_blue) {
+            //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+            // }
 
             MatrixXf Y_gt = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
             MatrixXf Y_gt_sorted = sort_pts(Y_gt);
