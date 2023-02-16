@@ -386,7 +386,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
-                Y = Y_0_sorted.replicate(1, 1);
+                // Y = Y_0_sorted.replicate(1, 1);
+
+                //temp test
+                Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
+                for (int i = 1; i <= Y_0_sorted.rows(); i++) {
+                    Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
+                }
+
                 sigma2 = 0;
 
                 // record geodesic coord
@@ -442,7 +449,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 5, 1, 1, 0.05, 50, 0.0000001, false, true, false, false, {}, 0, "1st order");
+            // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 

@@ -71,7 +71,7 @@ def callback (rgb, pc):
     # mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR).astype('uint8')
 
     # test
-    # mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
+    mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
     # bmask = mask.copy()
     # mask = mask_red.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)

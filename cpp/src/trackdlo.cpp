@@ -810,27 +810,15 @@ void tracking_step (MatrixXf X_orig,
         guide_nodes = Y.replicate(1, 1);
     }
 
-    // aligning strength will be different for each case
-    double alpha = 1.3;
-
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
-    double sigma2_pre_proc = sigma2;
+    double sigma2_pre_proc = sigma2/10.0;
+    ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
+
+    bool mid_section_occlusion = false;
+
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
-
-        // method 1: just proceed like normal registration
-        // ecpd_lle(X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
-        // return;
-
-        // method 2: take the average position of two traversals
-        // register visible nodes (non-rigid registration)
-        bool converged = ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
-
-        // signal(SIGINT, signal_callback_handler);
-        // while(true){
-        //     sleep(1);
-        // }
 
         // get priors vec
         std::vector<MatrixXf> priors_vec_1 = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
@@ -854,8 +842,9 @@ void tracking_step (MatrixXf X_orig,
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
+        mid_section_occlusion = true;
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
+        // ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
         std::vector<MatrixXf> priors_vec_2 = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
         priors_vec.insert(priors_vec.end(), priors_vec_2.begin(), priors_vec_2.end());
@@ -863,13 +852,13 @@ void tracking_step (MatrixXf X_orig,
     else if (visible_nodes[0] == 0) {
         ROS_INFO("Tip occluded");
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
+        // ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 0);
     }
     else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Head occluded");
         // register visible nodes (non-rigid registration)
-        ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
+        // ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "Gaussian");
         priors_vec = traverse(geodesic_coord, guide_nodes, visible_nodes, 1);
     }
     else {
@@ -885,8 +874,12 @@ void tracking_step (MatrixXf X_orig,
     // ----- for quick test -----
 
     // params for 0.8m long rope
-    ecpd_lle (X_orig, Y, sigma2, 8, 1, 10, 0.1, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
-    // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    // if (!mid_section_occlusion) {
+    ecpd_lle (X_orig, Y, sigma2, 10, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "1st order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    // }
+    // else {
+    //     ecpd_lle (X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.8, "Gaussian", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
+    // }
 
     // std::cout << pow(sigma2, 2)/0.00001 << std::endl;
 
@@ -897,8 +890,8 @@ void tracking_step (MatrixXf X_orig,
     // std::cout << "=====" << std::endl;
 
     // test 2nd order
-    // ecpd_lle (X_orig, Y, sigma2, 4, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "2nd order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 3, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.7, "2nd order", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 0.7, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 0.5, 1, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.1, bmask_transformed_normalized, mat_max);
 }
