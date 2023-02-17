@@ -10,10 +10,12 @@ import numpy as np
 import cv2
 from vedo import Line, Points, Arrow, Plotter
 import json
+import sys
 
 # ROS imports
 import rospy
 import rosbag
+import rosnode
 from ros_numpy import point_cloud2
 from ros_numpy import numpify, msgify
 from sensor_msgs.msg import PointCloud2, Image
@@ -28,10 +30,10 @@ class TrackDLOEvaluator:
     centroids, and computes piecewise error.
     """
 
-    def __init__(self, length):
-        self.algorithm = 'trackdlo'
-        self.trial = 3
-        self.percentage_occlusion = 0.5
+    def __init__(self, length, trial, pct_occlusion, alg):
+        self.algorithm = alg
+        self.trial = trial
+        self.percentage_occlusion = pct_occlusion
         self.occluion = True
 
         self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
@@ -53,6 +55,7 @@ class TrackDLOEvaluator:
         self.cumulative_error = 0
         self.error_list = []
         self.frame_error_list = []
+        self.frame_idx = 0
         self.length = length
         self.pix_head_node = np.array([0,0,0])
         self.pc_head_node = np.array([0,0,0])
@@ -69,7 +72,12 @@ class TrackDLOEvaluator:
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         Y_true, pixels, head = self.get_ground_truth_nodes(rgb_img, pc, head)
-        self.simulate_occlusion(rgb_img, Y_true, pixels)
+        print("alg: ", self.algorithm, "idx: ", self.frame_idx)
+        if self.frame_idx>=200 and self.percentage_occlusion!=0:
+            self.simulate_occlusion(rgb_img, Y_true, pixels)
+        if self.frame_idx>=self.length:
+            rosnode.kill_nodes(["evaluator", "trackdlo"])
+        self.frame_idx+=1
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
         self.final_error(Y_true, Y_track, head)
@@ -298,7 +306,7 @@ class TrackDLOEvaluator:
             shortest_distances_to_curve.append(dist)
             closest_pts_on_Y_true.append(closest_pt)
             weights.append(weight)
-        error_frame = np.sum(shortest_distances_to_curve)
+        error_frame = np.sum(shortest_distances_to_curve)/len(Y_true)
         # error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
 
         return error_frame
@@ -315,8 +323,8 @@ class TrackDLOEvaluator:
         self.error_pub.publish(error_msg)
 
         if len(self.error_list) == self.length:
-            self.data_dict['data']=self.frame_error_list
-            out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/{self.algorithm}/frame_error_eval_{self.algorithm}_{self.trial}.json', "w")
+            self.data_dict['error']=self.frame_error_list
+            out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/{self.algorithm}/frame_error_eval_{self.algorithm}_{self.trial}_{self.percentage_occlusion}.json', "w")
             json.dump(self.data_dict, out_file, indent = 6)
             out_file.close()
 
@@ -347,7 +355,7 @@ class TrackDLOEvaluator:
 
     def simulate_occlusion(self, rgb_img, Y_true, pixels):
         num_gt_nodes = len(pixels)
-        num_occluded_nodes = int(self.percentage_occlusion*num_gt_nodes)
+        num_occluded_nodes = int((self.percentage_occlusion/100)*num_gt_nodes)
 
         x0 = int(np.min(pixels[0:num_occluded_nodes,0]))
         y0 = int(np.min(pixels[0:num_occluded_nodes,1]))
@@ -368,7 +376,8 @@ if __name__ == "__main__":
     rgb_length = bag.get_message_count('/camera/color/image_raw')
     pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
-    e = TrackDLOEvaluator(pc_length)
+    # Pass trial and percent occlusion arguments from command
+    e = TrackDLOEvaluator(pc_length, int(sys.argv[1]), int(sys.argv[2]), str(sys.argv[3]))
     try:
         rospy.spin()
     except:
