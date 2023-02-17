@@ -42,11 +42,14 @@ def callback (rgb, pc):
     # lower = (98, 100, 100)
     # upper = (130, 255, 255)
     # --- rope blue ---
-    lower = (90, 60, 40)
-    upper = (130, 255, 255)
+    # lower = (90, 60, 40)
+    # upper = (130, 255, 255)
     # --- background green ---
     # lower = (0, 0, 0)
     # upper = (220, 255, 210)
+    # --- tape yellow ---
+    lower = (15, 100, 80)
+    upper = (40, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
 
     # --- wire green ---
@@ -69,41 +72,42 @@ def callback (rgb, pc):
 
     # test
     mask = cv2.bitwise_or(mask.copy(), mask_red.copy())
-    bmask = mask.copy()
+    # bmask = mask.copy()
+    # mask = mask_red.copy()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2RGB)
 
-    # test distance transform
-    bmask_transformed = cv2.distanceTransform(255-bmask, cv2.DIST_L2, cv2.DIST_MASK_3)
-    print(np.amax(bmask_transformed))
-    print(bmask_transformed)
-    bmask_transformed[bmask_transformed > 255] = 255
-    bmask_transformed_rgb = cv2.cvtColor(bmask_transformed.copy().astype('uint8'), cv2.COLOR_GRAY2RGB)
-    # cv2.imshow('frame', bmask_transformed)
-    # cv2.waitKey(3)
+    # # test distance transform
+    # bmask_transformed = cv2.distanceTransform(255-bmask, cv2.DIST_L2, cv2.DIST_MASK_3)
+    # print(np.amax(bmask_transformed))
+    # print(bmask_transformed)
+    # bmask_transformed[bmask_transformed > 255] = 255
+    # bmask_transformed_rgb = cv2.cvtColor(bmask_transformed.copy().astype('uint8'), cv2.COLOR_GRAY2RGB)
+    # # cv2.imshow('frame', bmask_transformed)
+    # # cv2.waitKey(3)
 
-    # blob detection
-    params = cv2.SimpleBlobDetector_Params()
-    params.filterByColor = False
-    params.filterByArea = True
-    params.filterByCircularity = False
-    params.filterByInertia = True
-    params.filterByConvexity = False
+    # # blob detection
+    # params = cv2.SimpleBlobDetector_Params()
+    # params.filterByColor = False
+    # params.filterByArea = True
+    # params.filterByCircularity = False
+    # params.filterByInertia = True
+    # params.filterByConvexity = False
 
-    # Create a detector with the parameters
-    detector = cv2.SimpleBlobDetector_create(params)
-    keypoints = detector.detect(mask)
+    # # Create a detector with the parameters
+    # detector = cv2.SimpleBlobDetector_create(params)
+    # keypoints = detector.detect(mask)
 
-    # Find blob centers in the image coordinates
-    blob_image_center = []
-    nodes = []
-    num_blobs = len(keypoints)
-    tracking_img = cur_image.copy()
-    for i in range(num_blobs):
-        blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
-        nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])])
-        # draw image
-        uv = (int(keypoints[i].pt[0]), int(keypoints[i].pt[1]))
-        cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
+    # # Find blob centers in the image coordinates
+    # blob_image_center = []
+    # nodes = []
+    # num_blobs = len(keypoints)
+    # tracking_img = cur_image.copy()
+    # for i in range(num_blobs):
+    #     blob_image_center.append((keypoints[i].pt[0],keypoints[i].pt[1]))
+    #     nodes.append(cur_pc[int(keypoints[i].pt[1]), int(keypoints[i].pt[0])])
+    #     # draw image
+    #     uv = (int(keypoints[i].pt[0]), int(keypoints[i].pt[1]))
+    #     cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
 
     # # add color
     # nodes_rgba = struct.unpack('I', struct.pack('BBBB', 0, 0, 0, 255))[0]
@@ -114,12 +118,12 @@ def callback (rgb, pc):
     # converted_nodes = pcl2.create_cloud(header, fields, nodes_colored)
     # nodes_pub.publish(converted_nodes)
     
-    tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
-    tracking_img_pub.publish(tracking_img_msg)
+    # tracking_img_msg = ros_numpy.msgify(Image, tracking_img, 'rgb8')
+    # tracking_img_pub.publish(tracking_img_msg)
 
     # publish mask
-    # mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
-    mask_img_msg = ros_numpy.msgify(Image, bmask_transformed_rgb, 'rgb8')
+    mask_img_msg = ros_numpy.msgify(Image, mask, 'rgb8')
+    # mask_img_msg = ros_numpy.msgify(Image, bmask_transformed_rgb, 'rgb8')
     mask_img_pub.publish(mask_img_msg)
 
 
