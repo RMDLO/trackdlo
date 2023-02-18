@@ -967,7 +967,6 @@ void tracking_step (MatrixXf X_orig,
         std::vector<MatrixXf> priors_vec_2 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
         // std::vector<MatrixXf> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
         // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
-        std::cout << "finished traversal" << std::endl;
 
         // take average
         priors_vec = {};
@@ -1001,16 +1000,12 @@ void tracking_step (MatrixXf X_orig,
 
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-
-        std::cout << "finished traversal" << std::endl;
     }
     else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Head occluded");
 
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
-
-        std::cout << "finished traversal" << std::endl;
     }
     else {
         ROS_INFO("Both ends occluded");
@@ -1025,7 +1020,7 @@ void tracking_step (MatrixXf X_orig,
             }
         }
 
-        std::cout << "alignment node index: " << alignment_node_idx << std::endl;
+        // std::cout << "alignment node index: " << alignment_node_idx << std::endl;
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 2, alignment_node_idx);
     }
 
