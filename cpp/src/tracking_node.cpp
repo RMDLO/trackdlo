@@ -24,6 +24,7 @@
 #include <thread>
 
 #include "../include/trackdlo.h"
+#include "../include/utils.h"
 
 using cv::Mat;
 
@@ -49,9 +50,6 @@ bool use_eval_rope = true;
 int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
-
-bool compute_eval_error = false;
-MatrixXf last_Y_gt_head = MatrixXf::Zero(1, 3);
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -386,13 +384,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
-                // Y = Y_0_sorted.replicate(1, 1);
+                Y = Y_0_sorted.replicate(1, 1);
 
-                //temp test
-                Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
-                for (int i = 1; i <= Y_0_sorted.rows(); i++) {
-                    Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
-                }
+                // //temp test
+                // Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
+                // for (int i = 1; i <= Y_0_sorted.rows(); i++) {
+                //     Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
+                // }
 
                 sigma2 = 0;
 
@@ -411,13 +409,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     temp(0, 2) = Y_0_sorted(i, 1);
                     temp(0, 3) = Y_0_sorted(i, 2);
                     priors.push_back(temp);
-
-                    if (compute_eval_error && i == 0) {
-                        last_Y_gt_head = Y_0_sorted.row(0).replicate(1, 1);
-                    }
                 }
 
                 ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
+                guide_nodes = Y.replicate(1, 1);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -456,56 +451,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
-        // compute error
-        if (compute_eval_error) {
-            // simple blob detector
-            std::vector<cv::KeyPoint> keypoints_markers;
-            // std::vector<cv::KeyPoint> keypoints_blue;
-            cv::SimpleBlobDetector::Params blob_params;
-            blob_params.filterByColor = false;
-            blob_params.filterByArea = true;
-            blob_params.minArea = 10;
-            blob_params.filterByCircularity = false;
-            blob_params.filterByInertia = true;
-            blob_params.filterByConvexity = false;
-            cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
-            // detect
-            detector->detect(mask_markers, keypoints_markers);
-            // detector->detect(mask_blue, keypoints_blue);
-
-            for (cv::KeyPoint key_point : keypoints_markers) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-            // for (cv::KeyPoint key_point : keypoints_blue) {
-            //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            // }
-
-            MatrixXf Y_gt = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-            MatrixXf Y_gt_sorted = sort_pts(Y_gt);
-            
-            MatrixXf Y_gt_reversed = Y_gt_sorted.replicate(1, 1);
-
-            double temp = sqrt(pow(last_Y_gt_head(0, 0)-Y_gt_sorted(0, 0), 2) + pow(last_Y_gt_head(0, 1)-Y_gt_sorted(0, 1), 2) + pow(last_Y_gt_head(0, 2)-Y_gt_sorted(0, 2), 2));
-            if (temp > 0.02) {
-                for (int i = 0; i < Y_gt_sorted.rows(); i ++) {
-                    Y_gt_sorted.row(Y_gt_sorted.rows()-1-i) = Y_gt_reversed.row(i);
-                }
-            }
-
-            float error = 0;
-            for (int i = 0; i < Y.rows(); i ++) {
-                error += pt2pt_dis(Y_gt_sorted.row(i), Y.row(i));
-            }
-            error = error / Y.rows();
-            std_msgs::Float64 error_msg;
-            error_msg.data = error;
-            error_pub.publish(error_msg);
-
-            last_Y_gt_head = Y_gt_sorted.row(0);
-        }
-
-        // projection and image
+        // projection and pub image
         MatrixXf nodes_h = Y.replicate(1, 1);
+        // MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
 

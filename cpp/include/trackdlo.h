@@ -14,11 +14,6 @@ using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using cv::Mat;
 
-template <typename T>
-void print_1d_vector (std::vector<T> vec);
-
-void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu = 0, int max_iter = 50);
-
 bool ecpd_lle (MatrixXf X_orig,
                MatrixXf& Y,
                double& sigma2,
@@ -39,9 +34,6 @@ bool ecpd_lle (MatrixXf X_orig,
                double k_vis = 0,
                Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
                double mat_max = 0);
-
-MatrixXf sort_pts (MatrixXf Y_0);
-double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
 
 void tracking_step (MatrixXf X_orig,
                     MatrixXf& Y,
