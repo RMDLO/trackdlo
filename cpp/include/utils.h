@@ -26,4 +26,6 @@ void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu = 0, int m
 void remove_row(MatrixXf& matrix, unsigned int rowToRemove);
 MatrixXf sort_pts (MatrixXf Y_0);
 
+std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point_B, MatrixXf sphere_center, double radius);
+
 #endif

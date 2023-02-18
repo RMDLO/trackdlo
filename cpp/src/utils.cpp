@@ -200,3 +200,74 @@ MatrixXf sort_pts (MatrixXf Y_0) {
 
     return Y_0_sorted;
 }
+
+bool isBetween (MatrixXf x, MatrixXf a, MatrixXf b) {
+    bool in_bound = true;
+
+    for (int i = 0; i < 3; i ++) {
+        if (!(a(0, i)-0.0001 <= x(0, i) && x(0, i) <= b(0, i)+0.0001) && 
+            !(b(0, i)-0.0001 <= x(0, i) && x(0, i) <= a(0, i)+0.0001)) {
+            in_bound = false;
+        }
+    }
+    
+    return in_bound;
+}
+
+std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point_B, MatrixXf sphere_center, double radius) {
+    std::vector<MatrixXf> intersections = {};
+    
+    double a = pt2pt_dis_sq(point_A, point_B);
+    double b = 2 * ((point_B(0, 0) - point_A(0, 0))*(point_A(0, 0) - sphere_center(0, 0)) + 
+                    (point_B(0, 1) - point_A(0, 1))*(point_A(0, 1) - sphere_center(0, 1)) + 
+                    (point_B(0, 2) - point_A(0, 2))*(point_A(0, 2) - sphere_center(0, 2)));
+    double c = pt2pt_dis_sq(point_A, sphere_center) - pow(radius, 2);
+    
+    double delta = pow(b, 2) - 4*a*c;
+
+    double d1 = (-b + sqrt(delta)) / (2*a);
+    double d2 = (-b - sqrt(delta)) / (2*a);
+
+    if (delta < 0) {
+        // no solution
+        return {};
+    }
+    else if (delta > 0) {
+        // two solutions
+        // the first one
+        double x1 = point_A(0, 0) + d1*(point_B(0, 0) - point_A(0, 0));
+        double y1 = point_A(0, 1) + d1*(point_B(0, 1) - point_A(0, 1));
+        double z1 = point_A(0, 2) + d1*(point_B(0, 2) - point_A(0, 2));
+        MatrixXf pt1(1, 3);
+        pt1 << x1, y1, z1;
+
+        // the second one
+        double x2 = point_A(0, 0) + d2*(point_B(0, 0) - point_A(0, 0));
+        double y2 = point_A(0, 1) + d2*(point_B(0, 1) - point_A(0, 1));
+        double z2 = point_A(0, 2) + d2*(point_B(0, 2) - point_A(0, 2));
+        MatrixXf pt2(1, 3);
+        pt2 << x2, y2, z2;
+
+        if (isBetween(pt1, point_A, point_B)) {
+            intersections.push_back(pt1);
+        }
+        if (isBetween(pt2, point_A, point_B)) {
+            intersections.push_back(pt2);
+        }
+    }
+    else {
+        // one solution
+        d1 = -b / (2*a);
+        double x1 = point_A(0, 0) + d1*(point_B(0, 0) - point_A(0, 0));
+        double y1 = point_A(0, 1) + d1*(point_B(0, 1) - point_A(0, 1));
+        double z1 = point_A(0, 2) + d1*(point_B(0, 2) - point_A(0, 2));
+        MatrixXf pt1(1, 3);
+        pt1 << x1, y1, z1;
+
+        if (isBetween(pt1, point_A, point_B)) {
+            intersections.push_back(pt1);
+        }
+    }
+    
+    return intersections;
+}
