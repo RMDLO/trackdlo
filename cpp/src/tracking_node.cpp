@@ -24,6 +24,7 @@
 #include <thread>
 
 #include "../include/trackdlo.h"
+#include "../include/utils.h"
 
 using cv::Mat;
 
