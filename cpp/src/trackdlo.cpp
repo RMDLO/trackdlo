@@ -564,7 +564,7 @@ std::vector<MatrixXf> traverse_geodesic (std::vector<double> geodesic_coord, con
 }
 
 // overload
-std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
+std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment, int alignment_node_idx = -1) {
     std::vector<MatrixXf> node_pairs = {};
 
     // extreme cases: only one guide node available
@@ -652,7 +652,7 @@ std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, co
             }
         }
     }
-    else {
+    else if (alignment == 1){
         // push back the first pair
         MatrixXf node_pair(1, 4);
         node_pair << visible_nodes.back(), guide_nodes(guide_nodes.rows()-1, 0), guide_nodes(guide_nodes.rows()-1, 1), guide_nodes(guide_nodes.rows()-1, 2);
@@ -694,6 +694,153 @@ std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, co
 
                     if (intersections.size() == 2) {
                         if (pt2pt_dis(intersections[0], guide_nodes.row(consecutive_visible_nodes[i-1])) <= pt2pt_dis(intersections[1], guide_nodes.row(consecutive_visible_nodes[i-1]))) {
+                            // the first solution is closer
+                            intersection = {intersections[0](0, 0), intersections[0](0, 1), intersections[0](0, 2)};
+                            cur_center = intersections[0];
+                        }
+                        else {
+                            // the second one is closer
+                            intersection = {intersections[1](0, 0), intersections[1](0, 1), intersections[1](0, 2)};
+                            cur_center = intersections[1];
+                        }
+                    }
+                    else {
+                        intersection = {intersections[0](0, 0), intersections[0](0, 1), intersections[0](0, 2)};
+                        cur_center = intersections[0];
+                    }
+                    break;
+                }
+            }
+
+            if (!found_intersection) {
+                break;
+            }
+            else {
+                MatrixXf temp = MatrixXf::Zero(1, 4);
+                temp(0, 0) = seg_dist_it - 1;
+                temp(0, 1) = intersection[0];
+                temp(0, 2) = intersection[1];
+                temp(0, 3) = intersection[2];
+                node_pairs.push_back(temp);
+
+                seg_dist_it -= 1;
+            }
+        }
+    }
+    else {
+        // push back the first pair
+        MatrixXf node_pair(1, 4);
+        node_pair << visible_nodes[alignment_node_idx], guide_nodes(alignment_node_idx, 0), guide_nodes(alignment_node_idx, 1), guide_nodes(alignment_node_idx, 2);
+        node_pairs.push_back(node_pair);
+
+        std::vector<int> consecutive_visible_nodes_2 = {visible_nodes[alignment_node_idx]};
+        for (int i = alignment_node_idx+1; i < visible_nodes.size(); i ++) {
+            if (visible_nodes[i] - visible_nodes[i-1] == 1) {
+                consecutive_visible_nodes_2.push_back(visible_nodes[i]);
+            }
+            else {
+                break;
+            }
+        }
+
+        // ----- traverse from the alignment node to the tail node -----
+        int last_found_index = alignment_node_idx;
+        int seg_dist_it = visible_nodes[alignment_node_idx];
+        MatrixXf cur_center = guide_nodes.row(alignment_node_idx);
+
+        // basically pure pursuit lol
+        while (last_found_index+1 <= alignment_node_idx+consecutive_visible_nodes_2.size()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
+            double look_ahead_dist = fabs(geodesic_coord[seg_dist_it+1] - geodesic_coord[seg_dist_it]);
+            bool found_intersection = false;
+            std::vector<double> intersection = {};
+
+            for (int i = last_found_index; i+1 <= alignment_node_idx+consecutive_visible_nodes_2.size()-1; i ++) {
+                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i+1), cur_center, look_ahead_dist);
+
+                // if no intersection found
+                if (intersections.size() == 0) {
+                    continue;
+                }
+                else if (intersections.size() == 1 && pt2pt_dis(intersections[0], guide_nodes.row(i+1)) > pt2pt_dis(cur_center, guide_nodes.row(i+1))) {
+                    continue;
+                }
+                else {
+                    found_intersection = true;
+                    last_found_index = i;
+
+                    if (intersections.size() == 2) {
+                        if (pt2pt_dis(intersections[0], guide_nodes.row(i+1)) <= pt2pt_dis(intersections[1], guide_nodes.row(i+1))) {
+                            // the first solution is closer
+                            intersection = {intersections[0](0, 0), intersections[0](0, 1), intersections[0](0, 2)};
+                            cur_center = intersections[0];
+                        }
+                        else {
+                            // the second one is closer
+                            intersection = {intersections[1](0, 0), intersections[1](0, 1), intersections[1](0, 2)};
+                            cur_center = intersections[1];
+                        }
+                    }
+                    else {
+                        intersection = {intersections[0](0, 0), intersections[0](0, 1), intersections[0](0, 2)};
+                        cur_center = intersections[0];
+                    }
+                    break;
+                }
+            }
+
+            if (!found_intersection) {
+                break;
+            }
+            else {
+                MatrixXf temp = MatrixXf::Zero(1, 4);
+                temp(0, 0) = seg_dist_it + 1;
+                temp(0, 1) = intersection[0];
+                temp(0, 2) = intersection[1];
+                temp(0, 3) = intersection[2];
+                node_pairs.push_back(temp);
+
+                seg_dist_it += 1;
+            }
+        }
+
+
+        // ----- traverse from alignment node to head node -----
+        std::vector<int> consecutive_visible_nodes_1 = {visible_nodes[alignment_node_idx]};
+        for (int i = alignment_node_idx-1; i >= 0; i ++) {
+            if (visible_nodes[i+1] - visible_nodes[i] == 1) {
+                consecutive_visible_nodes_1.push_back(visible_nodes[i]);
+            }
+            else {
+                break;
+            }
+        }
+
+        last_found_index = alignment_node_idx;
+        seg_dist_it = visible_nodes[alignment_node_idx];
+        cur_center = guide_nodes.row(alignment_node_idx);
+
+        // basically pure pursuit lol
+        while (last_found_index-1 >= alignment_node_idx-consecutive_visible_nodes_1.size() && seg_dist_it-1 >= 0) {
+            double look_ahead_dist = fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
+            bool found_intersection = false;
+            std::vector<double> intersection = {};
+
+            for (int i = last_found_index; i-1 >= 0; i --) {
+                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
+
+                // if no intersection found
+                if (intersections.size() == 0) {
+                    continue;
+                }
+                else if (intersections.size() == 1 && pt2pt_dis(intersections[0], guide_nodes.row(i-1)) > pt2pt_dis(cur_center, guide_nodes.row(i-1))) {
+                    continue;
+                }
+                else {
+                    found_intersection = true;
+                    last_found_index = i;
+
+                    if (intersections.size() == 2) {
+                        if (pt2pt_dis(intersections[0], guide_nodes.row(i-1)) <= pt2pt_dis(intersections[1], guide_nodes.row(i-1))) {
                             // the first solution is closer
                             intersection = {intersections[0](0, 0), intersections[0](0, 1), intersections[0](0, 2)};
                             cur_center = intersections[0];
@@ -783,19 +930,43 @@ void tracking_step (MatrixXf X_orig,
         guide_nodes = Y.replicate(1, 1);
     }
 
+    // double XY_dist_threshold = 0.05;
+    // MatrixXf X_temp = MatrixXf::Zero(X_orig.rows(), 3);
+    // int X_temp_counter = 0;
+    // for (int i = 0; i < X_orig.rows(); i ++) {
+    //     bool close = false;
+    //     for (int j = 0; j < guide_nodes.rows(); j ++) {
+    //         if (pt2pt_dis(X_orig.row(i), guide_nodes.row(j)) < XY_dist_threshold) {
+    //             close = true;
+    //             break;
+    //         }
+    //     }
+    //     if (close) {
+    //         X_temp.row(X_temp_counter) = X_orig.row(i);
+    //         X_temp_counter += 1;
+    //     }
+    // }
+    // std::cout << X_temp_counter << std::endl;
+    // MatrixXf X_guide = X_temp.topRows(X_temp_counter);
+
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
-    double sigma2_pre_proc = sigma2/10.0;
-    ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
+    double sigma2_pre_proc = sigma2;
+    ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
 
-    bool mid_section_occlusion = false;
+    double alpha = 3;
+    double lambda = 3000;
 
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
+        lambda = 500;
+        alpha = 0.5;
 
         // get priors vec
         std::vector<MatrixXf> priors_vec_1 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
         std::vector<MatrixXf> priors_vec_2 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
+        // std::vector<MatrixXf> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
+        // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
         std::cout << "finished traversal" << std::endl;
 
         // take average
@@ -816,24 +987,46 @@ void tracking_step (MatrixXf X_orig,
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
-        mid_section_occlusion = true;
+
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
         std::vector<MatrixXf> priors_vec_2 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
+        // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
+        // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
+
         std::cout << "finished traversal" << std::endl;
         priors_vec.insert(priors_vec.end(), priors_vec_2.begin(), priors_vec_2.end());
     }
     else if (visible_nodes[0] == 0) {
         ROS_INFO("Tail occluded");
+
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
+        // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
+
         std::cout << "finished traversal" << std::endl;
     }
     else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Head occluded");
+
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
+        // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
+
         std::cout << "finished traversal" << std::endl;
     }
     else {
         ROS_INFO("Both ends occluded");
+
+        // determine which node moved the least
+        int alignment_node_idx = -1;
+        double moved_dist = 999999;
+        for (int i = 0; i < visible_nodes.size(); i ++) {
+            if (pt2pt_dis(Y.row(visible_nodes[i]), guide_nodes.row(i)) < moved_dist) {
+                moved_dist = pt2pt_dis(Y.row(visible_nodes[i]), guide_nodes.row(i));
+                alignment_node_idx = i;
+            }
+        }
+
+        std::cout << "alignment node index: " << alignment_node_idx << std::endl;
+        priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 2, alignment_node_idx);
     }
 
     // if (valid_nodes_vec.size() == 0) {
@@ -861,7 +1054,8 @@ void tracking_step (MatrixXf X_orig,
     // std::cout << "=====" << std::endl;
 
     // test 2nd order
-    ecpd_lle (X_orig, Y, sigma2, 1, 3000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 3, "2nd order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 1, lambda, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, alpha, "2nd order", occluded_nodes, 1, bmask_transformed_normalized, mat_max);
+    std::cout << "finished tracking step" << std::endl;
 
     // test Gaussian
     // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);

@@ -412,6 +412,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
 
                 ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
+                guide_nodes = Y.replicate(1, 1);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -450,8 +451,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
-        // projection and image
+        // projection and pub image
         MatrixXf nodes_h = Y.replicate(1, 1);
+        // MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
 
