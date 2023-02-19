@@ -372,7 +372,7 @@ class TrackDLOEvaluator:
         self.occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
         
 if __name__ == "__main__":
-    bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/rope_with_marker_stationary_curved.bag')
+    bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/stationary.bag')
     rgb_length = bag.get_message_count('/camera/color/image_raw')
     pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
