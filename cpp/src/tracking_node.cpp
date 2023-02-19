@@ -24,6 +24,7 @@
 #include <thread>
 
 #include "../include/trackdlo.h"
+#include "../include/utils.h"
 
 using cv::Mat;
 
@@ -45,13 +46,10 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = false;
-int num_of_nodes = 40;
+bool use_eval_rope = true;
+int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
-
-bool compute_eval_error = false;
-MatrixXf last_Y_gt_head = MatrixXf::Zero(1, 3);
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -242,7 +240,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
-    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask, mask_rgb;
+    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask_markers, mask, mask_rgb;
     Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
     Mat cur_image_hsv;
@@ -259,6 +257,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     std::vector<int> lower_red_2 = {0, 60, 40};
     std::vector<int> upper_red_2 = {10, 255, 255};
 
+    std::vector<int> lower_yellow = {15, 100, 80};
+    std::vector<int> upper_yellow = {40, 255, 255};
+
     Mat mask_without_occlusion_block;
 
     if (use_eval_rope) {
@@ -269,10 +270,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cv::inRange(cur_image_hsv, cv::Scalar(lower_red_1[0], lower_red_1[1], lower_red_1[2]), cv::Scalar(upper_red_1[0], upper_red_1[1], upper_red_1[2]), mask_red_1);
         cv::inRange(cur_image_hsv, cv::Scalar(lower_red_2[0], lower_red_2[1], lower_red_2[2]), cv::Scalar(upper_red_2[0], upper_red_2[1], upper_red_2[2]), mask_red_2);
 
+        // filter yellow
+        cv::inRange(cur_image_hsv, cv::Scalar(lower_yellow[0], lower_yellow[1], lower_yellow[2]), cv::Scalar(upper_yellow[0], upper_yellow[1], upper_yellow[2]), mask_yellow);
+
         // combine red mask
         cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
         // combine overall mask
         cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
+        cv::bitwise_or(mask_yellow, mask_without_occlusion_block, mask_without_occlusion_block);
+        cv::bitwise_or(mask_red, mask_yellow, mask_markers);
     }
     else {
         // filter blue
@@ -355,8 +361,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         if (!initialized) {
             if (use_eval_rope) {
                 // simple blob detector
-                std::vector<cv::KeyPoint> keypoints_red;
-                std::vector<cv::KeyPoint> keypoints_blue;
+                std::vector<cv::KeyPoint> keypoints_markers;
+                // std::vector<cv::KeyPoint> keypoints_blue;
                 cv::SimpleBlobDetector::Params blob_params;
                 blob_params.filterByColor = false;
                 blob_params.filterByArea = true;
@@ -366,19 +372,26 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 blob_params.filterByConvexity = false;
                 cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
                 // detect
-                detector->detect(mask_red, keypoints_red);
-                detector->detect(mask_blue, keypoints_blue);
+                detector->detect(mask_markers, keypoints_markers);
+                // detector->detect(mask_blue, keypoints_blue);
 
-                for (cv::KeyPoint key_point : keypoints_red) {
+                for (cv::KeyPoint key_point : keypoints_markers) {
                     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
                 }
-                for (cv::KeyPoint key_point : keypoints_blue) {
-                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-                }
+                // for (cv::KeyPoint key_point : keypoints_blue) {
+                //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                // }
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
+
+                // //temp test
+                // Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
+                // for (int i = 1; i <= Y_0_sorted.rows(); i++) {
+                //     Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
+                // }
+
                 sigma2 = 0;
 
                 // record geodesic coord
@@ -396,13 +409,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     temp(0, 2) = Y_0_sorted(i, 1);
                     temp(0, 3) = Y_0_sorted(i, 2);
                     priors.push_back(temp);
-
-                    if (compute_eval_error && i == 0) {
-                        last_Y_gt_head = Y_0_sorted.row(0).replicate(1, 1);
-                    }
                 }
 
                 ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
+                guide_nodes = Y.replicate(1, 1);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -412,74 +422,39 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             else {
                 reg(X, Y, sigma2, num_of_nodes, 0.05, 100);
                 Y = sort_pts(Y);
+
                 // record geodesic coord
                 double cur_sum = 0;
                 for (int i = 0; i < Y.rows()-1; i ++) {
                     cur_sum += (Y.row(i+1) - Y.row(i)).norm();
                     converted_node_coord.push_back(cur_sum);
                 }
+                
+                // // record geodesic coord
+                // double total_len = 0;
+                // for (int i = 0; i < Y.rows()-1; i ++) {
+                //     total_len += (Y.row(i+1) - Y.row(i)).norm();
+                // }
+                // double seg_dis = total_len / (Y.rows()-1);
+                // for (int i = 0; i < Y.rows(); i ++) {
+                //     converted_node_coord.push_back(seg_dis*i);
+                // }
             }
 
             initialized = true;
         } 
         else {
-            // ecpd_lle (X, Y, sigma2, 5, 1, 1, 0.05, 50, 0.0000001, false, true, false, false, {}, 0, "1st order");
+            // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
             tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
-        // compute error
-        if (compute_eval_error) {
-            // simple blob detector
-            std::vector<cv::KeyPoint> keypoints_red;
-            std::vector<cv::KeyPoint> keypoints_blue;
-            cv::SimpleBlobDetector::Params blob_params;
-            blob_params.filterByColor = false;
-            blob_params.filterByArea = true;
-            blob_params.minArea = 10;
-            blob_params.filterByCircularity = false;
-            blob_params.filterByInertia = true;
-            blob_params.filterByConvexity = false;
-            cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
-            // detect
-            detector->detect(mask_red, keypoints_red);
-            detector->detect(mask_blue, keypoints_blue);
-
-            for (cv::KeyPoint key_point : keypoints_red) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-            for (cv::KeyPoint key_point : keypoints_blue) {
-                cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            }
-
-            MatrixXf Y_gt = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-            MatrixXf Y_gt_sorted = sort_pts(Y_gt);
-            
-            MatrixXf Y_gt_reversed = Y_gt_sorted.replicate(1, 1);
-
-            double temp = sqrt(pow(last_Y_gt_head(0, 0)-Y_gt_sorted(0, 0), 2) + pow(last_Y_gt_head(0, 1)-Y_gt_sorted(0, 1), 2) + pow(last_Y_gt_head(0, 2)-Y_gt_sorted(0, 2), 2));
-            if (temp > 0.02) {
-                for (int i = 0; i < Y_gt_sorted.rows(); i ++) {
-                    Y_gt_sorted.row(Y_gt_sorted.rows()-1-i) = Y_gt_reversed.row(i);
-                }
-            }
-
-            float error = 0;
-            for (int i = 0; i < Y.rows(); i ++) {
-                error += pt2pt_dis(Y_gt_sorted.row(i), Y.row(i));
-            }
-            error = error / Y.rows();
-            std_msgs::Float64 error_msg;
-            error_msg.data = error;
-            error_pub.publish(error_msg);
-
-            last_Y_gt_head = Y_gt_sorted.row(0);
-        }
-
-        // projection and image
+        // projection and pub image
         MatrixXf nodes_h = Y.replicate(1, 1);
+        // MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
 
