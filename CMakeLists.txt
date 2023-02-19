@@ -151,7 +151,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(
-  trackdlo_node cpp/src/tracking_node.cpp cpp/src/trackdlo.cpp cpp/src/utils.cpp
+  trackdlo cpp/src/tracking_node.cpp cpp/src/trackdlo.cpp cpp/src/utils.cpp
 )
 
 # add_executable(
@@ -180,7 +180,7 @@ add_executable(
 #   Eigen3::Eigen
 # )
 
-target_link_libraries(trackdlo_node
+target_link_libraries(trackdlo
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenCV_LIBS}

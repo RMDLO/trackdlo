@@ -1,0 +1,5 @@
+<launch>
+  <node name="trackdlo" pkg="trackdlo" type="trackdlo.py"/> 
+  <node name="evaluator" pkg="trackdlo" type="evaluation.py"/>
+  <node pkg="rosbag" type="play" name="rosbag" args="$(find trackdlo)/data/stationary.bag"/>
+</launch>
