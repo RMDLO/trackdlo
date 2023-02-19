@@ -36,21 +36,17 @@ class TrackDLOEvaluator:
         self.percentage_occlusion = pct_occlusion
         self.occluion = True
 
-        self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
-        self.pc_sub = message_filters.Subscriber(
-            "/camera/depth/color/points", PointCloud2
-        )      
-        self.trackdlo_results_sub = message_filters.Subscriber(
-            f"/{self.algorithm}_results_pc", PointCloud2
-        )
+        self.rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image, buff_size=length)
+        self.pc_sub = message_filters.Subscriber("/camera/depth/color/points", PointCloud2, buff_size=length)      
+        self.trackdlo_results_sub = message_filters.Subscriber(f"/{self.algorithm}_results_pc", PointCloud2, buff_size=length)
         self.ts = message_filters.TimeSynchronizer(
-            [self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], 10
+            [self.rgb_sub, self.pc_sub, self.trackdlo_results_sub], queue_size=length
         )
         self.ts.registerCallback(self.callback)
 
-        self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=100)
-        self.error_pub = rospy.Publisher("/error", Float64, queue_size=100)
-        self.occlusion_mask_img_pub = rospy.Publisher("/mask_with_occlusion", Image, queue_size=100)
+        self.gt_pub = rospy.Publisher("/gt_pts", PointCloud2, queue_size=length)
+        self.error_pub = rospy.Publisher("/error", Float64, queue_size=length)
+        self.occlusion_mask_img_pub = rospy.Publisher("/mask_with_occlusion", Image, queue_size=length)
 
         self.cumulative_error = 0
         self.error_list = []
@@ -68,19 +64,19 @@ class TrackDLOEvaluator:
         Callback function which processes raw RGB Image data, raw point cloud data, and
         tracked point cloud data for evaluation.
         """
+        print("alg: ", self.algorithm, "idx: ", self.frame_idx, "/", self.length)
         head = rgb_img.header
         rgb_img = numpify(rgb_img)
         pc = numpify(pc)
         Y_true, pixels, head = self.get_ground_truth_nodes(rgb_img, pc, head)
-        print("alg: ", self.algorithm, "idx: ", self.frame_idx)
         if self.frame_idx>=200 and self.percentage_occlusion!=0:
-            self.simulate_occlusion(rgb_img, Y_true, pixels)
+            self.simulate_occlusion(rgb_img, pixels)
         if self.frame_idx>=self.length:
-            rosnode.kill_nodes(["evaluator", "trackdlo"])
+            rosnode.kill_nodes(["evaluator", "trackdlo", "cdcpd", "gltp", "cdcpd2"])
         self.frame_idx+=1
         Y_track = self.get_tracking_nodes(track)
         # self.viz_piecewise_error(Y_true, Y_track, closest_pts)
-        self.final_error(Y_true, Y_track, head)
+        self.final_error(Y_true, Y_track)
 
     def get_ground_truth_nodes(self, rgb_img, pc, head):
         """
@@ -282,8 +278,7 @@ class TrackDLOEvaluator:
         # Calculate weights based on line segment half-lengths.
         shortest_distances_to_curve = []
         closest_pts_on_Y_true = []
-        weights = []
-        for idx, Y in enumerate(Y_track):
+        for Y in Y_track:
             dist = None
             closest_pt = None
             for i in range(len(Y_true)-1):
@@ -293,25 +288,13 @@ class TrackDLOEvaluator:
                 if dist == None or dist_i < dist:
                     dist = dist_i
                     closest_pt = closest_pt_i
-            weight = 0
-            # For endpoints, only weight by one half-length.
-            # For all other points, weight by both adjoining half-lengths.
-            if idx == 0:
-                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx + 1, :]) / 2
-            elif idx == len(Y_track) - 1:
-                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx - 1, :]) / 2
-            else:
-                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx + 1, :]) / 2
-                weight += np.linalg.norm(Y_track[idx, :] - Y_track[idx - 1, :]) / 2
             shortest_distances_to_curve.append(dist)
             closest_pts_on_Y_true.append(closest_pt)
-            weights.append(weight)
-        error_frame = np.sum(shortest_distances_to_curve)/len(Y_true)
-        # error_frame = np.sum(np.multiply(shortest_distances_to_curve, weights))
 
+        error_frame = np.sum(shortest_distances_to_curve)/len(Y_true)
         return error_frame
 
-    def final_error(self, Y_track, Y_true, head):
+    def final_error(self, Y_track, Y_true):
         E1 = self.get_piecewise_error(Y_track, Y_true)
         E2 = self.get_piecewise_error(Y_true, Y_track)
         self.cumulative_error = self.cumulative_error + (E1 + E2)/2
@@ -353,7 +336,7 @@ class TrackDLOEvaluator:
             plotter.interactive().close()
             print("Shutting down")
 
-    def simulate_occlusion(self, rgb_img, Y_true, pixels):
+    def simulate_occlusion(self, rgb_img, pixels):
         num_gt_nodes = len(pixels)
         num_occluded_nodes = int((self.percentage_occlusion/100)*num_gt_nodes)
 
