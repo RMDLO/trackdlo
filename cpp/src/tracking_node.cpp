@@ -313,6 +313,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     double mask_dist_threshold = 10;
 
     sensor_msgs::PointCloud2 output;
+    sensor_msgs::PointCloud2 result_pc;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
 
     // Convert to PCL data type
@@ -622,7 +623,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // convert to pointcloud2 for eval
         pcl::PointCloud<pcl::PointXYZ> trackdlo_pc;
-        // fill cloud with random points
         for (int i = 0; i < Y.rows(); i++) {
             pcl::PointXYZ temp;
             temp.x = Y(i, 0);
@@ -630,13 +630,17 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             temp.z = Y(i, 2);
             trackdlo_pc.points.push_back(temp);
         }
-        trackdlo_pc.header.frame_id = "camera_color_optical_frame";
-        trackdlo_pc.header.stamp = cloud->header.stamp;
+
+        pcl::PCLPointCloud2 result_pc_pclpoincloud2;
+        
+        pcl::toPCLPointCloud2(trackdlo_pc, result_pc_pclpoincloud2);
+        pcl_conversions::moveFromPCL(result_pc_pclpoincloud2, result_pc);
+        result_pc.header = pc_msg->header;
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
         pc_pub.publish(output);
-        result_pc_pub.publish(trackdlo_pc.makeShared());
+        result_pc_pub.publish(result_pc);
 
         // reset all guide nodes
         for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
@@ -662,9 +666,9 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
-    image_transport::Publisher mask_pub = it.advertise("/mask", 10);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 100, update_opencv_mask);
+    image_transport::Publisher mask_pub = it.advertise("/mask", 100);
+    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 100);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
@@ -673,9 +677,9 @@ int main(int argc, char **argv) {
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", 1);
 
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
-    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 10);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 100);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 100);
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 100);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
                                              const sensor_msgs::PointCloud2ConstPtr&,
