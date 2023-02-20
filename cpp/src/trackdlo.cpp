@@ -972,8 +972,8 @@ void tracking_step (MatrixXf X_orig,
     double sigma2_pre_proc = sigma2;
     ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
 
-    double alpha = 5;
-    double lambda = 8000;
+    double alpha = 0.5;
+    double lambda = 80000;
 
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
@@ -1077,7 +1077,7 @@ void tracking_step (MatrixXf X_orig,
 
     // params for 0.8m long rope
     // if (!mid_section_occlusion) {
-    // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.5, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
+    // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
     // }
     // else {
     //     ecpd_lle (X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.8, "Gaussian", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);

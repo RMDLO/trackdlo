@@ -42,14 +42,14 @@ def callback (rgb, pc):
     # lower = (98, 100, 100)
     # upper = (130, 255, 255)
     # --- rope blue ---
-    # lower = (90, 80, 80)
-    # upper = (130, 255, 255)
+    lower = (90, 90, 90)
+    upper = (130, 255, 255)
     # --- background green ---
     # lower = (0, 0, 0)
     # upper = (220, 255, 210)
     # --- tape yellow ---
-    lower = (15, 100, 80)
-    upper = (40, 255, 255)
+    # lower = (15, 100, 80)
+    # upper = (40, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
 
     # --- wire green ---

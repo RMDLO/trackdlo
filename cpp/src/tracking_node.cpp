@@ -15,6 +15,8 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/conditional_removal.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <std_msgs/Float64.h>
@@ -251,10 +253,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     std::vector<int> lower_blue = {90, 80, 80};
     std::vector<int> upper_blue = {130, 255, 255};
 
-    std::vector<int> lower_red_1 = {130, 60, 65};
+    std::vector<int> lower_red_1 = {130, 60, 50};
     std::vector<int> upper_red_1 = {255, 255, 255};
 
-    std::vector<int> lower_red_2 = {0, 60, 65};
+    std::vector<int> lower_red_2 = {0, 60, 50};
     std::vector<int> upper_red_2 = {10, 255, 255};
 
     std::vector<int> lower_yellow = {15, 100, 80};
@@ -329,14 +331,19 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> downsampled_xyz;
+        pcl::PointCloud<pcl::PointXYZRGB> downsampled_filtered_xyz;
 
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
                 // should not pick up points from the gripper
+                // if (cloud_xyz(j, i).z < 0.58 || cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.02 && cloud_xyz(j, i).y < 0.0)) {
+                //     continue;
+                // }
                 if (cloud_xyz(j, i).z < 0.58) {
                     continue;
                 }
+
 
                 if (mask.at<uchar>(i, j) != 0) {
                     cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
@@ -353,8 +360,21 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         sor.setInputCloud (cloudPtr);
         sor.setLeafSize (0.005, 0.005, 0.005);
         sor.filter (cur_pc_downsampled);
-
         pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
+
+        // pcl::PCLPointCloud2* cur_pc_2 = new pcl::PCLPointCloud2;
+        // // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+        // pcl::toPCLPointCloud2(downsampled_xyz, *cur_pc_2);
+        // pcl::PCLPointCloud2ConstPtr cloudPtr2(cur_pc);
+        // pcl::PCLPointCloud2 cur_pc_downsampled_filtered;
+        // pcl::RadiusOutlierRemoval<pcl::PCLPointCloud2> outrem;
+        // outrem.setInputCloud(cloudPtr2);
+        // outrem.setRadiusSearch(0.1);
+        // outrem.setMinNeighborsInRadius (2);
+        // outrem.setKeepOrganized(true);
+        // outrem.filter (cur_pc_downsampled_filtered);
+        // pcl::fromPCLPointCloud2(cur_pc_downsampled_filtered, downsampled_filtered_xyz);
+
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
@@ -401,7 +421,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 //     Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
                 // }
 
-                sigma2 = 0;
+                sigma2 = 0.0001;
 
                 // record geodesic coord
                 double cur_sum = 0;
@@ -420,7 +440,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
+                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 100, "1st order", {}, 0.0, bmask_transformed_normalized, mat_max);
                 guide_nodes = Y.replicate(1, 1);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
@@ -665,6 +685,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
     ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
+
+    // ros::shutdown();
         
     return tracking_img_msg;
 }
