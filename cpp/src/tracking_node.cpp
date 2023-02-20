@@ -248,13 +248,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // convert color
     cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
-    std::vector<int> lower_blue = {90, 90, 90};
+    std::vector<int> lower_blue = {90, 80, 80};
     std::vector<int> upper_blue = {130, 255, 255};
 
-    std::vector<int> lower_red_1 = {130, 60, 40};
+    std::vector<int> lower_red_1 = {130, 60, 65};
     std::vector<int> upper_red_1 = {255, 255, 255};
 
-    std::vector<int> lower_red_2 = {0, 60, 40};
+    std::vector<int> lower_red_2 = {0, 60, 65};
     std::vector<int> upper_red_2 = {10, 255, 255};
 
     std::vector<int> lower_yellow = {15, 100, 80};
@@ -333,6 +333,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
+                // should not pick up points from the gripper
+                if (cloud_xyz(j, i).z < 0.58) {
+                    continue;
+                }
+
                 if (mask.at<uchar>(i, j) != 0) {
                     cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
                 }
@@ -377,7 +382,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 // detector->detect(mask_blue, keypoints_blue);
 
                 for (cv::KeyPoint key_point : keypoints_markers) {
-                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                    auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
+                    if (keypoint_pc.z > 0.58) {
+                        cur_nodes_xyz.push_back(keypoint_pc);
+                    }
                 }
                 // for (cv::KeyPoint key_point : keypoints_blue) {
                 //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
