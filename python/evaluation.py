@@ -11,6 +11,7 @@ import cv2
 from vedo import Line, Points, Arrow, Plotter
 import json
 import sys
+import os
 
 # ROS imports
 import rospy
@@ -30,7 +31,8 @@ class TrackDLOEvaluator:
     centroids, and computes piecewise error.
     """
 
-    def __init__(self, length, trial, pct_occlusion, alg):
+    def __init__(self, length, name, trial, pct_occlusion, alg):
+        self.bag = name
         self.algorithm = alg
         self.trial = trial
         self.percentage_occlusion = pct_occlusion
@@ -55,7 +57,8 @@ class TrackDLOEvaluator:
         self.length = length
         self.pix_head_node = np.array([0,0,0])
         self.pc_head_node = np.array([0,0,0])
-        self.data_dict = {'algorithm': self.algorithm,
+        self.data_dict = {'bag': self.bag,
+                        'algorithm': self.algorithm,
                         'trial': self.trial,
                         'error': []}
 
@@ -307,7 +310,7 @@ class TrackDLOEvaluator:
 
         if len(self.error_list) == self.length:
             self.data_dict['error']=self.frame_error_list
-            out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/{self.algorithm}/frame_error_eval_{self.algorithm}_{self.trial}_{self.percentage_occlusion}.json', "w")
+            out_file = open(f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/output/error_{self.bag}_{self.algorithm}_{self.percentage_occlusion}_{self.trial}.json', "w")
             json.dump(self.data_dict, out_file, indent = 6)
             out_file.close()
 
@@ -346,7 +349,7 @@ class TrackDLOEvaluator:
         y1 = int(np.max(pixels[0:num_occluded_nodes,1]))
 
         rect = (y0, x0, y1, x1)
-        extra_border = 1
+        extra_border = 100
         occlusion_mask = np.ones(rgb_img.shape)
         rgb_img = (rgb_img * np.clip(occlusion_mask, 0.5, 1)).astype('uint8')
         occlusion_mask[rect[1]-extra_border:rect[3]+extra_border, rect[0]-extra_border:rect[2]+extra_border, :] = 0
@@ -355,12 +358,14 @@ class TrackDLOEvaluator:
         self.occlusion_mask_img_pub.publish(occlusion_mask_img_msg)
         
 if __name__ == "__main__":
-    bag = rosbag.Bag('/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/stationary.bag')
+    bag_file = f'/home/hollydinkel/rmdlo_tracking/src/trackdlo/data/bags/{str(sys.argv[4])}'
+    bag = rosbag.Bag(bag_file)
+    name = os.path.splitext(sys.argv[4])[0]
     rgb_length = bag.get_message_count('/camera/color/image_raw')
     pc_length = bag.get_message_count('/camera/depth/color/points')
     rospy.init_node("evaluator")
     # Pass trial and percent occlusion arguments from command
-    e = TrackDLOEvaluator(pc_length, int(sys.argv[1]), int(sys.argv[2]), str(sys.argv[3]))
+    e = TrackDLOEvaluator(pc_length, str(name), int(sys.argv[1]), int(sys.argv[2]), str(sys.argv[3]))
     try:
         rospy.spin()
     except:
