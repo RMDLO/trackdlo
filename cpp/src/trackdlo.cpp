@@ -1,35 +1,11 @@
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <cmath>
-#include <iostream>
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/features2d.hpp>
-#include <opencv2/imgproc.hpp>
-#include <ctime>
-#include <sensor_msgs/PointCloud2.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
-
-#include <ctime>
-#include <chrono>
-#include <thread>
-
-#include <unistd.h>
-#include <cstdlib>
-#include <signal.h>
+#include "../include/utils.h"
+#include "../include/trackdlo.h"
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
-
-#include "../include/utils.h"
 
 std::vector<int> get_nearest_indices (int k, int M, int idx) {
     std::vector<int> indices_arr;
@@ -107,19 +83,19 @@ bool ecpd_lle (MatrixXf X_orig,
                double lambda,
                double gamma,
                double mu,
-               int max_iter = 30,
-               double tol = 0.00001,
-               bool include_lle = true,
-               bool use_geodesic = false,
-               bool use_prev_sigma2 = false,
-               bool use_ecpd = false,
-               std::vector<MatrixXf> correspondence_priors = {},
-               double alpha = 0,
-               std::string kernel = "Gaussian",
-               std::vector<int> occluded_nodes = {},
-               double k_vis = 0,
-               Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
-               double mat_max = 0) {
+               int max_iter,
+               double tol,
+               bool include_lle,
+               bool use_geodesic,
+               bool use_prev_sigma2,
+               bool use_ecpd,
+               std::vector<MatrixXf> correspondence_priors,
+               double alpha,
+               std::string kernel,
+               std::vector<int> occluded_nodes,
+               double k_vis,
+               Mat bmask_transformed_normalized,
+               double mat_max) {
 
     bool converged = true;
 
@@ -668,36 +644,20 @@ std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, co
             }
         }
 
-        std::cout << "consecutive_visible_nodes size: " << consecutive_visible_nodes.size() << std::endl;
-        for (int i = 0; i < consecutive_visible_nodes.size(); i ++) {
-            std::cout << consecutive_visible_nodes[i] << " ";
-        }
-        std::cout << std::endl;
-
         int last_found_index = guide_nodes.rows()-1;
         int seg_dist_it = geodesic_coord.size()-1;
         MatrixXf cur_center = guide_nodes.row(guide_nodes.rows()-1);
 
-        std::cout << "guide node size: " << guide_nodes.rows() << std::endl;
-        std::cout << "guide_nodes.rows() - consecutive_visible_nodes.size(): " << guide_nodes.rows() - consecutive_visible_nodes.size() << std::endl;
-
         // basically pure pursuit lol
         while (last_found_index-1 >= (guide_nodes.rows() - consecutive_visible_nodes.size()) && seg_dist_it-1 >= 0) {
-            std::cout << "last found index: " << last_found_index << std::endl;
 
             double look_ahead_dist = fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
-            std::cout << "look ahead dist: " << look_ahead_dist << std::endl;
 
             bool found_intersection = false;
             std::vector<double> intersection = {};
 
             for (int i = last_found_index; i >= (guide_nodes.rows() - consecutive_visible_nodes.size() + 1); i --) {
                 std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
-
-                std::cout << "i = " << i << std::endl;
-                signal(SIGINT, signal_callback_handler);
-
-                std::cout << "num of intersections: " << intersections.size() << std::endl;
 
                 // if no intersection found
                 if (intersections.size() == 0) {
@@ -972,13 +932,8 @@ void tracking_step (MatrixXf X_orig,
     double sigma2_pre_proc = sigma2;
     ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
 
-    double alpha = 0.5;
-    double lambda = 80000;
-
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
-        // lambda = 1000;
-        // alpha = 0.5;
 
         // get priors vec
         std::vector<MatrixXf> priors_vec_1 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
@@ -986,26 +941,8 @@ void tracking_step (MatrixXf X_orig,
         // std::vector<MatrixXf> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
         // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
-        std::cout << "finished traversal" << std::endl;
-
-        std::cout << "prior 1 size = " << priors_vec_1.size() << std::endl;
-        std::cout << "prior 2 size = " << priors_vec_2.size() << std::endl;
-
         // take average
         priors_vec = {};
-        // for (int i = 0; i < Y.rows(); i ++) {
-        //     int pv1_index = i;
-        //     int pv2_index = i - (Y.rows() - priors_vec_1.size());
-        //     if (pv1_index >= priors_vec_1.size()) {
-        //         priors_vec.push_back(priors_vec_2[pv2_index]);
-        //     }
-        //     else if (pv2_index < 0) {
-        //         priors_vec.push_back(priors_vec_1[pv1_index]);
-        //     }
-        //     else {
-        //         priors_vec.push_back((priors_vec_1[pv1_index] + priors_vec_2[pv2_index]) / 2.0);
-        //     }
-        // }
         for (int i = 0; i < Y.rows(); i ++) {
             if (i < priors_vec_2[0](0, 0) && i < priors_vec_1.size()) {
                 priors_vec.push_back(priors_vec_1[i]);
@@ -1017,8 +954,6 @@ void tracking_step (MatrixXf X_orig,
                 priors_vec.push_back((priors_vec_1[i] + priors_vec_2[i-(Y.rows()-priors_vec_2.size())]) / 2.0);
             }
         }
-
-        std::cout << "finished taking average" << std::endl;
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Mid-section occluded");
@@ -1028,10 +963,6 @@ void tracking_step (MatrixXf X_orig,
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
         // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
-        std::cout << "prior 1 size = " << priors_vec.size() << std::endl;
-        std::cout << "prior 2 size = " << priors_vec_2.size() << std::endl;
-
-        // std::cout << "finished traversal" << std::endl;
         priors_vec.insert(priors_vec.end(), priors_vec_2.begin(), priors_vec_2.end());
     }
     else if (visible_nodes[0] == 0) {
@@ -1039,16 +970,12 @@ void tracking_step (MatrixXf X_orig,
 
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-
-        std::cout << "prior size = " << priors_vec.size() << std::endl;
     }
     else if (visible_nodes[visible_nodes.size()-1] == Y.rows()-1) {
         ROS_INFO("Head occluded");
 
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 1);
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
-
-        std::cout << "prior size = " << priors_vec.size() << std::endl;
     }
     else {
         ROS_INFO("Both ends occluded");
@@ -1066,6 +993,7 @@ void tracking_step (MatrixXf X_orig,
         // std::cout << "alignment node index: " << alignment_node_idx << std::endl;
         priors_vec = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 2, alignment_node_idx);
     }
+        std::cout << "prior size = " << priors_vec.size() << std::endl;
 
     // if (valid_nodes_vec.size() == 0) {
     //     ROS_ERROR("The current state is too different from the last state!");
@@ -1075,26 +1003,19 @@ void tracking_step (MatrixXf X_orig,
 
     // ----- for quick test -----
 
-    // params for 0.8m long rope
-    // if (!mid_section_occlusion) {
+    // test 1st order
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
-    // }
-    // else {
-    //     ecpd_lle (X_orig, Y, sigma2, 4, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.8, "Gaussian", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
-    // }
 
-    // std::cout << pow(sigma2, 2)/0.00001 << std::endl;
+    // test 2nd order
+    ecpd_lle (X_orig, Y, sigma2, 0.5, 80000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 0.5, "2nd order", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
+    // std::cout << "finished tracking step" << std::endl;
+
+    // test Gaussian
+    // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
 
     // std::cout << "=====" << std::endl;
     // for (int i = 0; i < Y.rows(); i ++) {
     //     std::cout << Y(i, 0) << ", " << Y(i, 1) << ", " << Y(i, 2) << "," << std::endl;
     // }
     // std::cout << "=====" << std::endl;
-
-    // test 2nd order
-    ecpd_lle (X_orig, Y, sigma2, 0.5, lambda, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, alpha, "2nd order", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
-    // std::cout << "finished tracking step" << std::endl;
-
-    // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
 }

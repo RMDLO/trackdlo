@@ -1,11 +1,6 @@
 #pragma once
 
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <Eigen/Geometry>
-#include <vector>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include "trackdlo.h"
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -29,5 +24,8 @@ void remove_row(MatrixXf& matrix, unsigned int rowToRemove);
 MatrixXf sort_pts (MatrixXf Y_0);
 
 std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point_B, MatrixXf sphere_center, double radius);
+
+visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
+visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
 
 #endif

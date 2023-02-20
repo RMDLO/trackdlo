@@ -1,5 +1,36 @@
 #pragma once
 
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
+
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_cloud.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/conditional_removal.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <std_msgs/Float64.h>
+
+#include <ctime>
+#include <chrono>
+#include <thread>
+
+#include <unistd.h>
+#include <cstdlib>
+#include <signal.h>
+
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
