@@ -19,6 +19,8 @@ void signal_callback_handler(int signum);
 template <typename T>
 void print_1d_vector (std::vector<T> vec);
 
+void print_1d_vector_eigen (std::vector<MatrixXf> vec);
+
 double pt2pt_dis_sq (MatrixXf pt1, MatrixXf pt2);
 double pt2pt_dis (MatrixXf pt1, MatrixXf pt2);
 

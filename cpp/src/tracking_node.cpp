@@ -674,9 +674,9 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 100, update_opencv_mask);
-    image_transport::Publisher mask_pub = it.advertise("/mask", 100);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 100);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
+    image_transport::Publisher mask_pub = it.advertise("/mask", 10);
+    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
@@ -685,9 +685,9 @@ int main(int argc, char **argv) {
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", 1);
 
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 100);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 100);
-    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 100);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 10);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
                                              const sensor_msgs::PointCloud2ConstPtr&,

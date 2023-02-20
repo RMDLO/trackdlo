@@ -42,6 +42,13 @@ void print_1d_vector (std::vector<T> vec) {
     std::cout << std::endl;
 }
 
+void print_1d_vector_eigen (std::vector<MatrixXf> vec) {
+    for (int i = 0; i < vec.size(); i ++) {
+        std::cout << vec[i] << " ";
+    }
+    std::cout << std::endl;
+}
+
 double pt2pt_dis_sq (MatrixXf pt1, MatrixXf pt2) {
     return (pt1 - pt2).rowwise().squaredNorm().sum();
 }
