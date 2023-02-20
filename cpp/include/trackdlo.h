@@ -76,4 +76,80 @@ void tracking_step (MatrixXf X_orig,
                     double mask_dist_threshold,
                     double mat_max);
 
+class trackdlo
+{
+    public:
+        // default constructor
+        trackdlo(int num_of_nodes);
+        // fancy constructor
+        trackdlo(int num_of_nodes,
+                 MatrixXf Y,
+                 double sigma2,
+                 double beta,
+                 double lambda,
+                 double alpha,
+                 double gamma,
+                 double k_vis,
+                 double mu,
+                 int max_iter,
+                 double tol,
+                 bool include_lle,
+                 bool use_geodesic,
+                 bool use_prev_sigma2,
+                 std::string kernel);
+
+        double get_sigma2();
+        MatrixXf get_tracking_result();
+        MatrixXf get_guide_nodes();
+        std::vector<MatrixXf> get_correspondence_pairs();
+        void set_geodesic_coord (std::vector<double> geodesic_coord);
+
+        bool ecpd_lle (MatrixXf X_orig,
+                        MatrixXf& Y,
+                        double& sigma2,
+                        double beta,
+                        double lambda,
+                        double gamma,
+                        double mu,
+                        int max_iter = 30,
+                        double tol = 0.00001,
+                        bool include_lle = true,
+                        bool use_geodesic = false,
+                        bool use_prev_sigma2 = false,
+                        bool use_ecpd = false,
+                        std::vector<MatrixXf> correspondence_priors = {},
+                        double alpha = 0,
+                        std::string kernel = "Gaussian",
+                        std::vector<int> occluded_nodes = {},
+                        double k_vis = 0,
+                        Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
+                        double mat_max = 0);
+        void tracking_step (MatrixXf X_orig, Mat bmask_transformed_normalized, double mask_dist_threshold, double mat_max);
+
+    private:
+        MatrixXf Y_;
+        double sigma2_;
+        double beta_;
+        double lambda_;
+        double alpha_;
+        double gamma_;
+        double k_vis_;
+        double mu_;
+        int max_iter_;
+        double tol_;
+        bool include_lle_;
+        bool use_geodesic_;
+        bool use_prev_sigma2_;
+        std::string kernel_;
+        std::vector<double> geodesic_coord_;
+
+        std::vector<int> get_nearest_indices (int k, int M, int idx);
+        MatrixXf calc_LLE_weights (int k, MatrixXf X);
+        std::vector<MatrixXf> traverse_geodesic (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, 
+                                                 const std::vector<int> visible_nodes, int alignment);
+        std::vector<MatrixXf> traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, 
+                                                  const std::vector<int> visible_nodes, int alignment, int alignment_node_idx = -1);
+
+};
+
 #endif
