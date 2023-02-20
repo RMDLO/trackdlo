@@ -34,6 +34,11 @@ void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
 }
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
+
+    MatrixXf proj_matrix(3, 4);
+    proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
+                    0.0, 916.265869140625, 354.02392578125, 0.0,
+                    0.0, 0.0, 1.0, 0.0;
     
     // log time
     std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
@@ -155,15 +160,46 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         // Perform downsampling
-        pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cur_pc_xyz.makeShared());
+        // pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cur_pc_xyz.makeShared());
+        pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cloud_xyz.makeShared());
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PointXYZRGB> sor;
         sor.setInputCloud (cloudPtr);
         sor.setLeafSize (0.005, 0.005, 0.005);
         sor.filter (downsampled_xyz);
         pcl::toPCLPointCloud2(downsampled_xyz, cur_pc_downsampled);
-
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
+
+        // MatrixXf X_unfiltered = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
+        // std::vector<MatrixXf> X_vec;
+        // MatrixXf points_h = X_unfiltered.replicate(1, 1);
+
+        // points_h.conservativeResize(points_h.rows(), points_h.cols()+1);
+        // points_h.col(points_h.cols()-1) = MatrixXf::Ones(points_h.rows(), 1);
+        // MatrixXf image_coords_points = (proj_matrix * points_h.transpose()).transpose();
+
+        // for (int i = 0; i < image_coords_points.rows(); i ++) {
+
+        //     if (X_unfiltered(i, 2) < 0.58) {
+        //         continue;
+        //     }
+
+        //     int row = static_cast<int>(image_coords_points(i, 0)/image_coords_points(i, 2));
+        //     int col = static_cast<int>(image_coords_points(i, 1)/image_coords_points(i, 2));
+
+        //     if (mask.at<uchar>(col, row) != 0) {
+        //         X_vec.push_back(X_unfiltered.row(i));
+        //     }
+        // }
+
+        // // copy to eigen3 matrix
+        // MatrixXf X = MatrixXf::Zero(X_vec.size(), 3);
+        // for (int i = 0; i < X_vec.size(); i ++) {
+        //     X(i, 0) = X_vec[i](0, 0);
+        //     X(i, 1) = X_vec[i](0, 1);
+        //     X(i, 2) = X_vec[i](0, 2);
+        // }
+
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         // log time
@@ -269,10 +305,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
 
         // project and pub image
-        MatrixXf proj_matrix(3, 4);
-        proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
-                       0.0, 916.265869140625, 354.02392578125, 0.0,
-                       0.0, 0.0, 1.0, 0.0;
         MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
         Mat tracking_img;
