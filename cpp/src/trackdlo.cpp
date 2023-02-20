@@ -973,12 +973,12 @@ void tracking_step (MatrixXf X_orig,
     ecpd_lle(X_orig, guide_nodes, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
 
     double alpha = 5;
-    double lambda = 2000;
+    double lambda = 8000;
 
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
-        lambda = 500;
-        alpha = 1;
+        // lambda = 1000;
+        // alpha = 0.5;
 
         // get priors vec
         std::vector<MatrixXf> priors_vec_1 = traverse_euclidean(geodesic_coord, guide_nodes, visible_nodes, 0);
@@ -1092,7 +1092,7 @@ void tracking_step (MatrixXf X_orig,
     // std::cout << "=====" << std::endl;
 
     // test 2nd order
-    ecpd_lle (X_orig, Y, sigma2, 1, lambda, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, alpha, "2nd order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y, sigma2, 0.5, lambda, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, alpha, "2nd order", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
     // std::cout << "finished tracking step" << std::endl;
 
     // test Gaussian
