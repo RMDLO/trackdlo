@@ -15,18 +15,18 @@ The TrackDLO algorithm estimates the state of Deformable Linear Objects (DLOs), 
 Instructions for running the C++ implementation of TrackDLO are below.
 
 ### Test TrackDLO with a RGB-D Camera Stream:
-1. Run ```roslaunch trackdlo realsense_node.launch```. This will bring up an RViz window visualizing the color image, mask, and tracking result (in both the image and a 3D pointcloud).
-2. Open a new terminal and run ```rosrun trackdlo trackdlo_node```. This will start the TrackDLO algorithm and publish messages containing the estimated node positions defining the object shape.
+1. Run ```roslaunch trackdlo realsense_node.launch```. This will bring up an RViz window visualizing the color image, mask, and tracking result (in both the image and the 3D pointcloud).
+2. Open a new terminal and run ```roslaunch trackdlo trackdlo.launch```. This will start the TrackDLO algorithm and publish messages containing the estimated node positions defining the object shape.
 
 ### Test TrackDLO with Recorded ROS Bag Data:
 1. Download the bag files from [here](https://drive.google.com/drive/folders/1AwMXysdzRQLz7w8umj66rrKa-Bh0XlVJ?usp=share_link) and place them in your ROS workspace.
 2. Open a new terminal and run ```roslaunch trackdlo replay_bag.launch```.
-3. In another terminal, run ```rosrun trackdlo trackdlo_node```. This will start the tracking algorithm.
+3. In another terminal, run ```roslaunch trackdlo trackdlo.launch```. This will start the tracking algorithm.
 4. Finally, open another ternimal and run ```rosbag play <name_of_the_bag_file>.bag```. This will replay the bag file and all results will be published in rviz.
 
 ### Important:
 1. Run ```catkin build``` to create the executable file. Do this every time after modifying any of the .cpp files.
-2. Set the boolean variable ```use_eval_rope``` in ```tracking_node.cpp``` to switch between regular rope and marker rope.
+2. Set the parameter ```use_eval_rope``` in ```trackdlo.launch``` to switch between regular rope and marker rope.
 3. Run ```rosrun trackdlo opencv_interactive.py``` alongside with the camera node and the tracking node to user interactive OpenCV visualization to manually synthetically create occlusions.
 
 
