@@ -21,11 +21,11 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = true;
-int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
 
+bool use_eval_rope;
+int num_of_nodes;
 double beta;
 double lambda;
 double alpha;
@@ -38,6 +38,7 @@ bool include_lle;
 bool use_geodesic;
 bool use_prev_sigma2;
 int kernel;
+double downsample_leaf_size;
 
 trackdlo tracker;
 
@@ -174,7 +175,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PointXYZRGB> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.005, 0.005, 0.005);
+        sor.setLeafSize (downsample_leaf_size, downsample_leaf_size, downsample_leaf_size);
         sor.filter (downsampled_xyz);
         pcl::toPCLPointCloud2(downsampled_xyz, cur_pc_downsampled);
 
@@ -509,6 +510,10 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/use_geodesic", use_geodesic); 
     nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
     nh.getParam("/trackdlo/kernel", kernel); 
+
+    nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
+    nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
+    nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);

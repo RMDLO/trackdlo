@@ -991,25 +991,6 @@ void trackdlo::tracking_step (MatrixXf X_orig,
         guide_nodes_ = Y_.replicate(1, 1);
     }
 
-    // double XY_dist_threshold = 0.05;
-    // MatrixXf X_temp = MatrixXf::Zero(X_orig.rows(), 3);
-    // int X_temp_counter = 0;
-    // for (int i = 0; i < X_orig.rows(); i ++) {
-    //     bool close = false;
-    //     for (int j = 0; j < guide_nodes.rows(); j ++) {
-    //         if (pt2pt_dis(X_orig.row(i), guide_nodes.row(j)) < XY_dist_threshold) {
-    //             close = true;
-    //             break;
-    //         }
-    //     }
-    //     if (close) {
-    //         X_temp.row(X_temp_counter) = X_orig.row(i);
-    //         X_temp_counter += 1;
-    //     }
-    // }
-    // std::cout << X_temp_counter << std::endl;
-    // MatrixXf X_guide = X_temp.topRows(X_temp_counter);
-
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
@@ -1076,15 +1057,8 @@ void trackdlo::tracking_step (MatrixXf X_orig,
         // std::cout << "alignment node index: " << alignment_node_idx << std::endl;
         correspondence_priors_ = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 2, alignment_node_idx);
     }
-    // std::cout << "prior size = " << correspondence_priors_.size() << std::endl;
 
-    // if (valid_nodes_vec.size() == 0) {
-    //     ROS_ERROR("The current state is too different from the last state!");
-    //     ecpd_lle (X_orig, Y, sigma2, 6, 1, 10, 0.05, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order", occluded_nodes, 0.02, bmask_transformed_normalized, mat_max);
-    //     return;
-    // }
-
-    // ----- for quick test -----
+    // ----- quick test -----
 
     // test 1st order
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
@@ -1094,10 +1068,4 @@ void trackdlo::tracking_step (MatrixXf X_orig,
 
     // test Gaussian
     // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
-
-    // std::cout << "=====" << std::endl;
-    // for (int i = 0; i < Y.rows(); i ++) {
-    //     std::cout << Y(i, 0) << ", " << Y(i, 1) << ", " << Y(i, 2) << "," << std::endl;
-    // }
-    // std::cout << "=====" << std::endl;
 }
