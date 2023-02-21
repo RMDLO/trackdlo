@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 268
   - Class: rviz/Selection
@@ -85,7 +84,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.009999999776482582
+      Size (m): 0.007000000216066837
       Style: Spheres
       Topic: /pts
       Unreliable: false
@@ -130,6 +129,7 @@ Visualization Manager:
         line_results36: true
         line_results37: true
         line_results38: true
+        line_results39: true
         line_results4: true
         line_results5: true
         line_results6: true
@@ -171,6 +171,7 @@ Visualization Manager:
         node_results38: true
         node_results39: true
         node_results4: true
+        node_results40: true
         node_results5: true
         node_results6: true
         node_results7: true

@@ -158,7 +158,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             for (int j = 0; j < cloud->width; j ++) {
                 // should not pick up points from the gripper
                 if (extra_outlier_filtering) {
-                    if (cloud_xyz(j, i).z < 0.58 || cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.02 && cloud_xyz(j, i).y < 0.0)) {
+                    if ((cloud_xyz(j, i).x < 0.0 && cloud_xyz(j, i).y < 0.05) || cloud_xyz(j, i).z < 0.58 || 
+                         cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.1 && cloud_xyz(j, i).y < -0.05)) {
                         continue;
                     }
                 }
