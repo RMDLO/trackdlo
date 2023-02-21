@@ -60,11 +60,11 @@ class trackdlo
                  double k_vis,
                  double mu,
                  int max_iter,
-                 double tol,
+                 const double tol,
                  bool include_lle,
                  bool use_geodesic,
                  bool use_prev_sigma2,
-                 std::string kernel);
+                 int kernel);
 
         double get_sigma2();
         MatrixXf get_tracking_result();
@@ -89,7 +89,7 @@ class trackdlo
                         bool use_ecpd = false,
                         std::vector<MatrixXf> correspondence_priors = {},
                         double alpha = 0,
-                        std::string kernel = "Gaussian",
+                        int kernel = 3,
                         std::vector<int> occluded_nodes = {},
                         double k_vis = 0,
                         Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
@@ -111,7 +111,7 @@ class trackdlo
         bool include_lle_;
         bool use_geodesic_;
         bool use_prev_sigma2_;
-        std::string kernel_;
+        int kernel_;
         std::vector<double> geodesic_coord_;
         std::vector<MatrixXf> correspondence_priors_;
 

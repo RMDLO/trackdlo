@@ -25,7 +25,7 @@ trackdlo::trackdlo(int num_of_nodes) {
     include_lle_ = true;
     use_geodesic_ = true;
     use_prev_sigma2_ = true;
-    kernel_ = "1st order";
+    kernel_ = 1;
     geodesic_coord_ = {};
     correspondence_priors_ = {};
 }
@@ -42,7 +42,7 @@ trackdlo::trackdlo(int num_of_nodes,
                     bool include_lle,
                     bool use_geodesic,
                     bool use_prev_sigma2,
-                    std::string kernel) 
+                    int kernel) 
 {
     Y_ = MatrixXf::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
@@ -178,7 +178,7 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
                         bool use_ecpd,
                         std::vector<MatrixXf> correspondence_priors,
                         double alpha,
-                        std::string kernel,
+                        int kernel,
                         std::vector<int> occluded_nodes,
                         double k_vis,
                         Mat bmask_transformed_normalized,
@@ -214,16 +214,16 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
 
     MatrixXf G = MatrixXf::Zero(M, M);
     if (!use_geodesic) {
-        if (kernel == "Gaussian") {
+        if (kernel == 3) {
             G = (-diff_yy / (2 * beta * beta)).array().exp();
         }
-        else if (kernel == "Laplacian") {
+        else if (kernel == 0) {
             G = (-diff_yy_sqrt / (2 * beta * beta)).array().exp();
         }
-        else if (kernel == "1st order") {
+        else if (kernel == 1) {
             G = 1/(2*beta * 2*beta) * (-sqrt(2)*diff_yy_sqrt/beta).array().exp() * (sqrt(2)*diff_yy_sqrt.array() + beta);
         }
-        else if (kernel == "2nd order") {
+        else if (kernel == 2) {
             G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*diff_yy_sqrt/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*diff_yy_sqrt.array() + sqrt(3)*diff_yy.array());
         }
         else { // default to gaussian
@@ -244,16 +244,16 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
             }
         }
 
-        if (kernel == "Gaussian") {
+        if (kernel == 3) {
             G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
         }
-        else if (kernel == "Laplacian") {
+        else if (kernel == 0) {
             G = (-converted_node_dis / (2 * beta * beta)).array().exp();
         }
-        else if (kernel == "1st order") {
+        else if (kernel == 1) {
             G = 1/(2*beta * 2*beta) * (-sqrt(2)*converted_node_dis/beta).array().exp() * (sqrt(2)*converted_node_dis.array() + beta);
         }
-        else if (kernel == "2nd order") {
+        else if (kernel == 2) {
             G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*converted_node_dis/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*converted_node_dis.array() + sqrt(3)*converted_node_dis_sq.array());
         }
         else { // default to gaussian
@@ -1013,7 +1013,7 @@ void trackdlo::tracking_step (MatrixXf X_orig,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    ecpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, "1st order");
+    ecpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, 1);
 
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");
@@ -1090,7 +1090,7 @@ void trackdlo::tracking_step (MatrixXf X_orig,
     // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
 
     // test 2nd order
-    ecpd_lle (X_orig, Y_, sigma2_, 0.5, 80000, 10, 0.05, 50, 0.00001, false, true, true, true, correspondence_priors_, 0.5, "2nd order", occluded_nodes, 0.5, bmask_transformed_normalized, mat_max);
+    ecpd_lle (X_orig, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, include_lle_, use_geodesic_, use_prev_sigma2_, true, correspondence_priors_, alpha_, kernel_, occluded_nodes, k_vis_, bmask_transformed_normalized, mat_max);
 
     // test Gaussian
     // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);

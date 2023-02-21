@@ -1,5 +1,5 @@
 <launch>
-    <node name="tracker" pkg="trackdlo" type="trackdlo">
+    <node name="trackdlo" pkg="trackdlo" type="trackdlo" output="screen">
         <param name="beta" value="0.5" />
         <param name="lambda" value="80000" />
         <param name="alpha" value="0.5" />
@@ -11,6 +11,7 @@
         <param name="include_lle" value="false" />
         <param name="use_geodesic" value="true" />
         <param name="use_prev_sigma2" value="true" />
-        <param name="kernel" value="2nd order" />
+        <!-- 0: Laplacian; 1: 1st order; 2: 2nd order; 3: Gaussian -->
+        <param name="kernel" value="1" />
     </node>
 </launch>

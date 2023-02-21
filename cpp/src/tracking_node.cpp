@@ -26,19 +26,6 @@ int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
 
-// trackdlo params
-// double beta = 0.5;
-// double lambda = 80000;
-// double alpha = 0.5;
-// double lle_weight = 10.0;
-// double mu = 0.05;
-// int max_iter = 50;
-// double tol = 0.00001;
-// double k_vis = 0.5;
-// bool include_lle = false;
-// bool use_geodesic = true;
-// bool use_prev_sigma2 = true;
-// std::string kernel = "2rd order";
 double beta;
 double lambda;
 double alpha;
@@ -50,7 +37,7 @@ double k_vis;
 bool include_lle;
 bool use_geodesic;
 bool use_prev_sigma2;
-std::string kernel;
+int kernel;
 
 trackdlo tracker;
 
@@ -255,7 +242,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors.push_back(temp);
                 }
 
-                tracker.ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 1, "1st order", {}, 0.0, bmask_transformed_normalized, mat_max);
+                tracker.ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 1, 1, {}, 0.0, bmask_transformed_normalized, mat_max);
                 tracker.initialize_nodes(Y);
                 tracker.initialize_geodesic_coord(converted_node_coord);
 
