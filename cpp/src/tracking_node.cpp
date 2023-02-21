@@ -26,6 +26,22 @@ int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
 
+// trackdlo params
+double beta = 0.5;
+double lambda = 80000;
+double alpha = 0.5;
+double lle_weight = 10.0;
+double mu = 0.05;
+int max_iter = 50;
+double tol = 0.00001;
+double k_vis = 0.5;
+bool include_lle = false;
+bool use_geodesic = true;
+bool use_prev_sigma2 = true;
+std::string kernel = "2rd order";
+
+trackdlo tracker;
+
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
     if (!occlusion_mask.empty()) {
@@ -205,12 +221,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
-
-                // //temp test
-                // Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
-                // for (int i = 1; i <= Y_0_sorted.rows(); i++) {
-                //     Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
-                // }
+                
+                tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
 
                 sigma2 = 0.0001;
 
@@ -231,8 +243,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 100, "1st order", {}, 0.0, bmask_transformed_normalized, mat_max);
-                guide_nodes = Y.replicate(1, 1);
+                tracker.ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 1, "1st order", {}, 0.0, bmask_transformed_normalized, mat_max);
+                tracker.initialize_nodes(Y);
+                tracker.initialize_geodesic_coord(converted_node_coord);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -249,14 +262,21 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     cur_sum += (Y.row(i+1) - Y.row(i)).norm();
                     converted_node_coord.push_back(cur_sum);
                 }
+
+                tracker = trackdlo(num_of_nodes, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+                tracker.initialize_nodes(Y);
+                tracker.initialize_geodesic_coord(converted_node_coord);
             }
 
             initialized = true;
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
+
+        Y = tracker.get_tracking_result();
+        guide_nodes = tracker.get_guide_nodes();
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");

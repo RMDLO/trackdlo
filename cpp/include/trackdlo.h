@@ -45,46 +45,14 @@ using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using cv::Mat;
 
-bool ecpd_lle (MatrixXf X_orig,
-               MatrixXf& Y,
-               double& sigma2,
-               double beta,
-               double alpha,
-               double gamma,
-               double mu,
-               int max_iter = 30,
-               double tol = 0.00001,
-               bool include_lle = true,
-               bool use_geodesic = false,
-               bool use_prev_sigma2 = false,
-               bool use_ecpd = false,
-               std::vector<MatrixXf> correspondence_priors = {},
-               double omega = 0,
-               std::string kernel = "Gaussian",
-               std::vector<int> occluded_nodes = {},
-               double k_vis = 0,
-               Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
-               double mat_max = 0);
-
-void tracking_step (MatrixXf X_orig,
-                    MatrixXf& Y,
-                    double& sigma2,
-                    MatrixXf& gn_result,
-                    std::vector<MatrixXf>& priors_result,
-                    std::vector<double> geodesic_coord,
-                    Mat bmask_transformed_normalized,
-                    double mask_dist_threshold,
-                    double mat_max);
-
 class trackdlo
 {
     public:
         // default constructor
+        trackdlo();
         trackdlo(int num_of_nodes);
         // fancy constructor
         trackdlo(int num_of_nodes,
-                 MatrixXf Y,
-                 double sigma2,
                  double beta,
                  double lambda,
                  double alpha,
@@ -102,7 +70,9 @@ class trackdlo
         MatrixXf get_tracking_result();
         MatrixXf get_guide_nodes();
         std::vector<MatrixXf> get_correspondence_pairs();
-        void set_geodesic_coord (std::vector<double> geodesic_coord);
+        void initialize_geodesic_coord (std::vector<double> geodesic_coord);
+        void initialize_nodes (MatrixXf Y_init);
+        void set_sigma2 (double sigma2);
 
         bool ecpd_lle (MatrixXf X_orig,
                         MatrixXf& Y,
@@ -128,11 +98,12 @@ class trackdlo
 
     private:
         MatrixXf Y_;
+        MatrixXf guide_nodes_;
         double sigma2_;
         double beta_;
         double lambda_;
         double alpha_;
-        double gamma_;
+        double lle_weight_;
         double k_vis_;
         double mu_;
         int max_iter_;
@@ -142,6 +113,7 @@ class trackdlo
         bool use_prev_sigma2_;
         std::string kernel_;
         std::vector<double> geodesic_coord_;
+        std::vector<MatrixXf> correspondence_priors_;
 
         std::vector<int> get_nearest_indices (int k, int M, int idx);
         MatrixXf calc_LLE_weights (int k, MatrixXf X);
