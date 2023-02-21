@@ -1,0 +1,16 @@
+<launch>
+    <node name="tracker" pkg="trackdlo" type="trackdlo">
+        <param name="beta" value="0.5" />
+        <param name="lambda" value="80000" />
+        <param name="alpha" value="0.5" />
+        <param name="lle_weight" value="10.0" />
+        <param name="mu" value="0.05" />
+        <param name="max_iter" value="50" />
+        <param name="tol" value="0.00001" />
+        <param name="k_vis" value="0.5" />
+        <param name="include_lle" value="false" />
+        <param name="use_geodesic" value="true" />
+        <param name="use_prev_sigma2" value="true" />
+        <param name="kernel" value="2nd order" />
+    </node>
+</launch>
