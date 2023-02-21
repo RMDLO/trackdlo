@@ -1,28 +1,3 @@
-#include <ros/ros.h>
-#include <image_transport/image_transport.h>
-#include <opencv2/highgui/highgui.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/features2d.hpp>
-#include <opencv2/imgproc.hpp>
-
-#include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
-
-#include <sensor_msgs/PointCloud2.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_cloud.h>
-#include <pcl/filters/voxel_grid.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <std_msgs/Float64.h>
-
-#include <ctime>
-#include <chrono>
-#include <thread>
-
 #include "../include/trackdlo.h"
 #include "../include/utils.h"
 
@@ -46,10 +21,26 @@ std::vector<double> converted_node_coord = {0.0};
 Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
-bool use_eval_rope = true;
-int num_of_nodes = 35;
 double total_len = 0;
 bool visualize_dist = false;
+
+bool use_eval_rope;
+int num_of_nodes;
+double beta;
+double lambda;
+double alpha;
+double lle_weight;
+double mu;
+int max_iter;
+double tol;
+double k_vis;
+bool include_lle;
+bool use_geodesic;
+bool use_prev_sigma2;
+int kernel;
+double downsample_leaf_size;
+
+trackdlo tracker;
 
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
@@ -58,185 +49,12 @@ void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     }
 }
 
-// node color and object color are in rgba format and range from 0-1
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
-    // publish the results as a marker array
-    visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
-    for (int i = 0; i < Y.rows(); i ++) {
-        visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
-    
-        // add header
-        cur_node_result.header.frame_id = marker_frame;
-        // cur_node_result.header.stamp = ros::Time::now();
-        cur_node_result.type = visualization_msgs::Marker::SPHERE;
-        cur_node_result.action = visualization_msgs::Marker::ADD;
-        cur_node_result.ns = marker_ns + std::to_string(i);
-        cur_node_result.id = i;
-
-        // add position
-        cur_node_result.pose.position.x = Y(i, 0);
-        cur_node_result.pose.position.y = Y(i, 1);
-        cur_node_result.pose.position.z = Y(i, 2);
-
-        // add orientation
-        cur_node_result.pose.orientation.w = 1.0;
-        cur_node_result.pose.orientation.x = 0.0;
-        cur_node_result.pose.orientation.y = 0.0;
-        cur_node_result.pose.orientation.z = 0.0;
-
-        // set scale
-        cur_node_result.scale.x = 0.01;
-        cur_node_result.scale.y = 0.01;
-        cur_node_result.scale.z = 0.01;
-
-        // set color
-        cur_node_result.color.r = node_color[0];
-        cur_node_result.color.g = node_color[1];
-        cur_node_result.color.b = node_color[2];
-        cur_node_result.color.a = node_color[3];
-
-        results.markers.push_back(cur_node_result);
-
-        // don't add line if at the last node
-        if (i == Y.rows()-1) {
-            break;
-        }
-
-        visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
-
-        // add header
-        cur_line_result.header.frame_id = "camera_color_optical_frame";
-        cur_line_result.type = visualization_msgs::Marker::CYLINDER;
-        cur_line_result.action = visualization_msgs::Marker::ADD;
-        cur_line_result.ns = "line_results" + std::to_string(i);
-        cur_line_result.id = i;
-
-        // add position
-        cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
-        cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
-        cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
-
-        // add orientation
-        Eigen::Quaternionf q;
-        Eigen::Vector3f vec1(0.0, 0.0, 1.0);
-        Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
-        q.setFromTwoVectors(vec1, vec2);
-
-        cur_line_result.pose.orientation.w = q.w();
-        cur_line_result.pose.orientation.x = q.x();
-        cur_line_result.pose.orientation.y = q.y();
-        cur_line_result.pose.orientation.z = q.z();
-
-        // set scale
-        cur_line_result.scale.x = 0.005;
-        cur_line_result.scale.y = 0.005;
-        cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
-
-        // set color
-        cur_line_result.color.r = line_color[0];
-        cur_line_result.color.g = line_color[1];
-        cur_line_result.color.b = line_color[2];
-        cur_line_result.color.a = line_color[3];
-
-        results.markers.push_back(cur_line_result);
-    }
-
-    return results;
-}
-
-// overload function
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
-    // publish the results as a marker array
-    visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
-    for (int i = 0; i < Y.size(); i ++) {
-        visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
-
-        int dim = Y[0].cols();
-    
-        // add header
-        cur_node_result.header.frame_id = marker_frame;
-        // cur_node_result.header.stamp = ros::Time::now();
-        cur_node_result.type = visualization_msgs::Marker::SPHERE;
-        cur_node_result.action = visualization_msgs::Marker::ADD;
-        cur_node_result.ns = marker_ns + std::to_string(i);
-        cur_node_result.id = i;
-
-        // add position
-        cur_node_result.pose.position.x = Y[i](0, dim-3);
-        cur_node_result.pose.position.y = Y[i](0, dim-2);
-        cur_node_result.pose.position.z = Y[i](0, dim-1);
-
-        // add orientation
-        cur_node_result.pose.orientation.w = 1.0;
-        cur_node_result.pose.orientation.x = 0.0;
-        cur_node_result.pose.orientation.y = 0.0;
-        cur_node_result.pose.orientation.z = 0.0;
-
-        // set scale
-        cur_node_result.scale.x = 0.01;
-        cur_node_result.scale.y = 0.01;
-        cur_node_result.scale.z = 0.01;
-
-        // set color
-        cur_node_result.color.r = node_color[0];
-        cur_node_result.color.g = node_color[1];
-        cur_node_result.color.b = node_color[2];
-        cur_node_result.color.a = node_color[3];
-
-        results.markers.push_back(cur_node_result);
-
-        // don't add line if at the last node
-        if (i == Y.size()-1) {
-            break;
-        }
-
-        visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
-
-        // add header
-        cur_line_result.header.frame_id = "camera_color_optical_frame";
-        cur_line_result.type = visualization_msgs::Marker::CYLINDER;
-        cur_line_result.action = visualization_msgs::Marker::ADD;
-        cur_line_result.ns = "line_results" + std::to_string(i);
-        cur_line_result.id = i;
-
-        // add position
-        cur_line_result.pose.position.x = (Y[i](0, dim-3) + Y[i+1](0, dim-3)) / 2.0;
-        cur_line_result.pose.position.y = (Y[i](0, dim-2) + Y[i+1](0, dim-2)) / 2.0;
-        cur_line_result.pose.position.z = (Y[i](0, dim-1) + Y[i+1](0, dim-1)) / 2.0;
-
-        // add orientation
-        Eigen::Quaternionf q;
-        Eigen::Vector3f vec1(0.0, 0.0, 1.0);
-        Eigen::Vector3f vec2(Y[i+1](0, dim-3) - Y[i](0, dim-3), Y[i+1](0, dim-2) - Y[i](0, dim-2), Y[i+1](0, dim-1) - Y[i](0, dim-1));
-        q.setFromTwoVectors(vec1, vec2);
-
-        cur_line_result.pose.orientation.w = q.w();
-        cur_line_result.pose.orientation.x = q.x();
-        cur_line_result.pose.orientation.y = q.y();
-        cur_line_result.pose.orientation.z = q.z();
-
-        // set scale
-        cur_line_result.scale.x = 0.005;
-        cur_line_result.scale.y = 0.005;
-        cur_line_result.scale.z = sqrt(pow(Y[i+1](0, dim-3) - Y[i](0, dim-3), 2) + pow(Y[i+1](0, dim-2) - Y[i](0, dim-2), 2) + pow(Y[i+1](0, dim-1) - Y[i](0, dim-1), 2));
-
-        // set color
-        cur_line_result.color.r = line_color[0];
-        cur_line_result.color.g = line_color[1];
-        cur_line_result.color.b = line_color[2];
-        cur_line_result.color.a = line_color[3];
-
-        results.markers.push_back(cur_line_result);
-    }
-
-    return results;
-}
-
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
     // log time
     std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
     double time_diff;
+    std::chrono::steady_clock::time_point cur_time;
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
@@ -248,13 +66,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     // convert color
     cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
-    std::vector<int> lower_blue = {90, 90, 90};
+    std::vector<int> lower_blue = {90, 80, 80};
     std::vector<int> upper_blue = {130, 255, 255};
 
-    std::vector<int> lower_red_1 = {130, 60, 40};
+    std::vector<int> lower_red_1 = {130, 60, 50};
     std::vector<int> upper_red_1 = {255, 255, 255};
 
-    std::vector<int> lower_red_2 = {0, 60, 40};
+    std::vector<int> lower_red_2 = {0, 60, 50};
     std::vector<int> upper_red_2 = {10, 255, 255};
 
     std::vector<int> lower_yellow = {15, 100, 80};
@@ -312,6 +130,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
     double mask_dist_threshold = 10;
 
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
+    ROS_INFO_STREAM("Before pcl operations: " + std::to_string(time_diff) + " ms");
+
     sensor_msgs::PointCloud2 output;
     sensor_msgs::PointCloud2 result_pc;
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
@@ -329,35 +150,46 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::PointCloud<pcl::PointXYZRGB> cur_pc_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> cur_nodes_xyz;
         pcl::PointCloud<pcl::PointXYZRGB> downsampled_xyz;
+        pcl::PointCloud<pcl::PointXYZRGB> downsampled_filtered_xyz;
 
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
+                // should not pick up points from the gripper
+                // if (cloud_xyz(j, i).z < 0.58 || cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.02 && cloud_xyz(j, i).y < 0.0)) {
+                //     continue;
+                // }
+                if (cloud_xyz(j, i).z < 0.58) {
+                    continue;
+                }
+
+
                 if (mask.at<uchar>(i, j) != 0) {
                     cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
                 }
             }
         }
 
-        // convert back to pointcloud2 message
-        pcl::toPCLPointCloud2(cur_pc_xyz, *cur_pc);
         // Perform downsampling
-        pcl::PCLPointCloud2ConstPtr cloudPtr(cur_pc);
+        pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cur_pc_xyz.makeShared());
         pcl::PCLPointCloud2 cur_pc_downsampled;
-        pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+        pcl::VoxelGrid<pcl::PointXYZRGB> sor;
         sor.setInputCloud (cloudPtr);
-        sor.setLeafSize (0.005, 0.005, 0.005);
-        sor.filter (cur_pc_downsampled);
+        sor.setLeafSize (downsample_leaf_size, downsample_leaf_size, downsample_leaf_size);
+        sor.filter (downsampled_xyz);
+        pcl::toPCLPointCloud2(downsampled_xyz, cur_pc_downsampled);
 
-        pcl::fromPCLPointCloud2(cur_pc_downsampled, downsampled_xyz);
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
         // log time
-        std::chrono::steady_clock::time_point cur_time = std::chrono::steady_clock::now();
+        cur_time = std::chrono::steady_clock::now();
 
         MatrixXf guide_nodes;
         std::vector<MatrixXf> priors;
+
+        time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
+        ROS_INFO_STREAM("Before tracking step: " + std::to_string(time_diff) + " ms");
 
         if (!initialized) {
             if (use_eval_rope) {
@@ -377,7 +209,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 // detector->detect(mask_blue, keypoints_blue);
 
                 for (cv::KeyPoint key_point : keypoints_markers) {
-                    cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                    auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
+                    if (keypoint_pc.z > 0.58) {
+                        cur_nodes_xyz.push_back(keypoint_pc);
+                    }
                 }
                 // for (cv::KeyPoint key_point : keypoints_blue) {
                 //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
@@ -386,14 +221,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
+                
+                tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
 
-                // //temp test
-                // Y = MatrixXf::Zero(Y_0_sorted.rows(), 3);
-                // for (int i = 1; i <= Y_0_sorted.rows(); i++) {
-                //     Y.row(Y_0_sorted.rows()-i) = Y_0_sorted.row(i-1);
-                // }
-
-                sigma2 = 0;
+                sigma2 = 0.0001;
 
                 // record geodesic coord
                 double cur_sum = 0;
@@ -412,8 +243,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     priors.push_back(temp);
                 }
 
-                ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 0.01, "Gaussian", {}, 0.0, bmask_transformed_normalized, mat_max);
-                guide_nodes = Y.replicate(1, 1);
+                tracker.ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 1, 1, {}, 0.0, bmask_transformed_normalized, mat_max);
+                tracker.initialize_nodes(Y);
+                tracker.initialize_geodesic_coord(converted_node_coord);
 
                 for (int i = 0; i < Y.rows() - 1; i ++) {
                     total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
@@ -430,24 +262,21 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     cur_sum += (Y.row(i+1) - Y.row(i)).norm();
                     converted_node_coord.push_back(cur_sum);
                 }
-                
-                // // record geodesic coord
-                // double total_len = 0;
-                // for (int i = 0; i < Y.rows()-1; i ++) {
-                //     total_len += (Y.row(i+1) - Y.row(i)).norm();
-                // }
-                // double seg_dis = total_len / (Y.rows()-1);
-                // for (int i = 0; i < Y.rows(); i ++) {
-                //     converted_node_coord.push_back(seg_dis*i);
-                // }
+
+                tracker = trackdlo(num_of_nodes, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+                tracker.initialize_nodes(Y);
+                tracker.initialize_geodesic_coord(converted_node_coord);
             }
 
             initialized = true;
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
-            tracking_step(X, Y, sigma2, guide_nodes, priors, converted_node_coord, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
+
+        Y = tracker.get_tracking_result();
+        guide_nodes = tracker.get_guide_nodes();
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
@@ -604,10 +433,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
 
-        // fill in header
-        cur_pc->header.frame_id = "camera_color_optical_frame";
-        cur_pc->header.seq = cloud->header.seq;
-        cur_pc->fields = cloud->fields;
+        // // fill in header
+        // cur_pc->header.frame_id = "camera_color_optical_frame";
+        // cur_pc->header.seq = cloud->header.seq;
+        // cur_pc->fields = cloud->fields;
 
         cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
         cur_pc_downsampled.header.seq = cloud->header.seq;
@@ -651,12 +480,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_ERROR("empty pointcloud!");
     }
 
-    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() - time_diff;
+    ROS_INFO_STREAM("After tracking step: " + std::to_string(time_diff) + " ms");
 
     // pc_pub.publish(output);
 
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
     ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
+
+    // ros::shutdown();
         
     return tracking_img_msg;
 }
@@ -665,10 +497,28 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
 
+    // load parameters
+    nh.getParam("/trackdlo/beta", beta); 
+    nh.getParam("/trackdlo/lambda", lambda); 
+    nh.getParam("/trackdlo/alpha", alpha); 
+    nh.getParam("/trackdlo/lle_weight", lle_weight); 
+    nh.getParam("/trackdlo/mu", mu); 
+    nh.getParam("/trackdlo/max_iter", max_iter); 
+    nh.getParam("/trackdlo/tol", tol);
+    nh.getParam("/trackdlo/k_vis", k_vis);
+    nh.getParam("/trackdlo/include_lle", include_lle); 
+    nh.getParam("/trackdlo/use_geodesic", use_geodesic); 
+    nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
+    nh.getParam("/trackdlo/kernel", kernel); 
+
+    nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
+    nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
+    nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
+
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 100, update_opencv_mask);
-    image_transport::Publisher mask_pub = it.advertise("/mask", 100);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 100);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
+    image_transport::Publisher mask_pub = it.advertise("/mask", 10);
+    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", 1);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
@@ -677,9 +527,9 @@ int main(int argc, char **argv) {
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", 1);
 
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 100);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 100);
-    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 100);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
+    message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, 10);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
                                              const sensor_msgs::PointCloud2ConstPtr&,
@@ -701,8 +551,6 @@ int main(int argc, char **argv) {
             const boost::shared_ptr<const message_filters::NullType> var6,
             const boost::shared_ptr<const message_filters::NullType> var7)
         {
-            // sensor_msgs::ImagePtr test_image = imageCallback(msg, _);
-            // mask_pub.publish(test_image);
             sensor_msgs::ImagePtr tracking_img = Callback(img_msg, pc_msg);
             tracking_img_pub.publish(tracking_img);
         }

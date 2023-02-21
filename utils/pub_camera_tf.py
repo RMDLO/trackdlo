@@ -27,8 +27,8 @@ if __name__=='__main__':
     static_transformStamped_5.child_frame_id = "camera_color_optical_frame"
 
     # current camera pos
-    trans_5 = [0.39571294977748606, 0.029380709444140524, 0.6267427288143163]
-    quat_5 = [-0.7065995183555387, 0.7075479083521102, -0.009247187369593136, 0.0027509220319289975]
+    trans_5 = [0.5308947503950723, 0.030109485611943067, 0.6311476272663069]
+    quat_5 = [-0.7065771296991245, 0.7075322875283535, 0.0004147019946593735, 0.012109909714664245]
 
     static_transformStamped_5.transform.translation.x = trans_5[0]
     static_transformStamped_5.transform.translation.y = trans_5[1]
