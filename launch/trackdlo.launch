@@ -17,5 +17,8 @@
 
         <param name="use_eval_rope" value="true" />
         <param name="num_of_nodes" value="35" />
+
+        <!-- for testing only. set to true when running with_gripper_perpendicular.bag -->
+        <param name="extra_outlier_filtering" value="true" />
     </node>
 </launch>

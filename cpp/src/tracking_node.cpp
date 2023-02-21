@@ -25,6 +25,7 @@ double total_len = 0;
 bool visualize_dist = false;
 
 bool use_eval_rope;
+bool extra_outlier_filtering;
 int num_of_nodes;
 double beta;
 double lambda;
@@ -156,11 +157,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
                 // should not pick up points from the gripper
-                // if (cloud_xyz(j, i).z < 0.58 || cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.02 && cloud_xyz(j, i).y < 0.0)) {
-                //     continue;
-                // }
-                if (cloud_xyz(j, i).z < 0.58) {
-                    continue;
+                if (extra_outlier_filtering) {
+                    if (cloud_xyz(j, i).z < 0.58 || cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.02 && cloud_xyz(j, i).y < 0.0)) {
+                        continue;
+                    }
+                }
+                else {
+                    if (cloud_xyz(j, i).z < 0.58) {
+                        continue;
+                    }
                 }
 
 
@@ -512,6 +517,7 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
+    nh.getParam("/trackdlo/extra_outlier_filtering", extra_outlier_filtering);
     nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
