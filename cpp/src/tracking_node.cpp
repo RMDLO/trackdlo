@@ -27,18 +27,30 @@ double total_len = 0;
 bool visualize_dist = false;
 
 // trackdlo params
-double beta = 0.5;
-double lambda = 80000;
-double alpha = 0.5;
-double lle_weight = 10.0;
-double mu = 0.05;
-int max_iter = 50;
-double tol = 0.00001;
-double k_vis = 0.5;
-bool include_lle = false;
-bool use_geodesic = true;
-bool use_prev_sigma2 = true;
-std::string kernel = "2rd order";
+// double beta = 0.5;
+// double lambda = 80000;
+// double alpha = 0.5;
+// double lle_weight = 10.0;
+// double mu = 0.05;
+// int max_iter = 50;
+// double tol = 0.00001;
+// double k_vis = 0.5;
+// bool include_lle = false;
+// bool use_geodesic = true;
+// bool use_prev_sigma2 = true;
+// std::string kernel = "2rd order";
+double beta;
+double lambda;
+double alpha;
+double lle_weight;
+double mu;
+int max_iter;
+double tol;
+double k_vis;
+bool include_lle;
+bool use_geodesic;
+bool use_prev_sigma2;
+std::string kernel;
 
 trackdlo tracker;
 
@@ -496,6 +508,20 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 int main(int argc, char **argv) {
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
+
+    // load parameters
+    nh.getParam("/trackdlo/beta", beta); 
+    nh.getParam("/trackdlo/lambda", lambda); 
+    nh.getParam("/trackdlo/alpha", alpha); 
+    nh.getParam("/trackdlo/lle_weight", lle_weight); 
+    nh.getParam("/trackdlo/mu", mu); 
+    nh.getParam("/trackdlo/max_iter", max_iter); 
+    nh.getParam("/trackdlo/tol", tol);
+    nh.getParam("/trackdlo/k_vis", k_vis);
+    nh.getParam("/trackdlo/include_lle", include_lle); 
+    nh.getParam("/trackdlo/use_geodesic", use_geodesic); 
+    nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
+    nh.getParam("/trackdlo/kernel", kernel); 
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
