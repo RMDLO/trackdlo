@@ -42,14 +42,14 @@ def callback (rgb, pc):
     # lower = (98, 100, 100)
     # upper = (130, 255, 255)
     # --- rope blue ---
-    # lower = (90, 60, 40)
-    # upper = (130, 255, 255)
+    lower = (90, 90, 90)
+    upper = (130, 255, 255)
     # --- background green ---
     # lower = (0, 0, 0)
     # upper = (220, 255, 210)
     # --- tape yellow ---
-    lower = (15, 100, 80)
-    upper = (40, 255, 255)
+    # lower = (15, 100, 80)
+    # upper = (40, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
 
     # --- wire green ---
@@ -59,10 +59,10 @@ def callback (rgb, pc):
     # lower = (40, 110, 60)
     # upper = (85, 255, 255)
     # --- tape red ---
-    lower = (130, 60, 40)
+    lower = (130, 60, 65)
     upper = (255, 255, 255)
     mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
-    lower = (0, 60, 40)
+    lower = (0, 60, 65)
     upper = (10, 255, 255)
     mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
     mask_red = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy())

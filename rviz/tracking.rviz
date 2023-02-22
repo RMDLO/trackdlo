@@ -84,7 +84,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.0020000000949949026
+      Size (m): 0.007000000216066837
       Style: Spheres
       Topic: /pts
       Unreliable: false
@@ -129,6 +129,7 @@ Visualization Manager:
         line_results36: true
         line_results37: true
         line_results38: true
+        line_results39: true
         line_results4: true
         line_results5: true
         line_results6: true
@@ -170,6 +171,7 @@ Visualization Manager:
         node_results38: true
         node_results39: true
         node_results4: true
+        node_results40: true
         node_results5: true
         node_results6: true
         node_results7: true
@@ -243,7 +245,7 @@ Visualization Manager:
       Value: false
   Enabled: true
   Global Options:
-    Background Color: 136; 138; 133
+    Background Color: 85; 87; 83
     Default Light: true
     Fixed Frame: base_link
     Frame Rate: 30
@@ -269,7 +271,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.729062020778656
+      Distance: 0.914535403251648
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -285,9 +287,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6547946333885193
+      Pitch: 1.4247939586639404
       Target Frame: <Fixed Frame>
-      Yaw: 3.260396957397461
+      Yaw: 3.1253950595855713
     Saved: ~
 Window Geometry:
   Displays:
