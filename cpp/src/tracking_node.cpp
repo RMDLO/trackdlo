@@ -25,7 +25,7 @@ double total_len = 0;
 bool visualize_dist = false;
 
 bool use_eval_rope;
-bool extra_outlier_filtering;
+int bag_file;
 int num_of_nodes;
 double beta;
 double lambda;
@@ -157,7 +157,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
                 // should not pick up points from the gripper
-                if (extra_outlier_filtering) {
+                if (bag_file == 2) {
+                    if (cloud_xyz(j, i).x < -0.15 || cloud_xyz(j, i).y < -0.15 || cloud_xyz(j, i).z < 0.58) {
+                        continue;
+                    }
+                }
+                else if (bag_file == 1) {
                     if ((cloud_xyz(j, i).x < 0.0 && cloud_xyz(j, i).y < 0.05) || cloud_xyz(j, i).z < 0.58 || 
                          cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.1 && cloud_xyz(j, i).y < -0.05)) {
                         continue;
@@ -470,7 +475,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         
         pcl::toPCLPointCloud2(trackdlo_pc, result_pc_pclpoincloud2);
         pcl_conversions::moveFromPCL(result_pc_pclpoincloud2, result_pc);
+
         result_pc.header = pc_msg->header;
+        // ros::Time t = pc_msg->header.stamp;
+        // t.Time() += 3e7;
+        // result_pc.header.stamp = t;
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
@@ -518,21 +527,23 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
-    nh.getParam("/trackdlo/extra_outlier_filtering", extra_outlier_filtering);
+    nh.getParam("/trackdlo/bag_file", bag_file);
     nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
+    int pub_queue_size = 30;
+
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
-    image_transport::Publisher mask_pub = it.advertise("/mask", 10);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", 10);
-    pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", 1);
-    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", 1);
-    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", 1);
-    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", 1);
+    image_transport::Publisher mask_pub = it.advertise("/mask", pub_queue_size);
+    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", pub_queue_size);
+    pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", pub_queue_size);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", pub_queue_size);
+    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", pub_queue_size);
+    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", pub_queue_size);
 
     // trackdlo point cloud topic
-    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", 1);
+    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", pub_queue_size);
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
