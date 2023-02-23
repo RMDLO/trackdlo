@@ -53,10 +53,8 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
 
     // compute error
-    double E1 = tracking_evaluator.get_piecewise_error(Y_track, Y_true);
-    double E2 = tracking_evaluator.get_piecewise_error(Y_true, Y_track);
-
-    std::cout << "error = " << (E1 + E2)/2 << std::endl;
+    double cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+    std::cout << "error = " << cur_error << std::endl;
 }   
 
 int main(int argc, char **argv) {

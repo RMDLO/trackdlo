@@ -2,7 +2,9 @@
     <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
     <arg name="bag_file" default="0" />
     <arg name="alg" default="trackdlo" />
-    <arg name="bag_dir" default="/home/jingyixiang/cdcpd2_ws/with_gripper_perpendicular.bag" />
+    <arg name="bag_dir" default="/home/jingyixiang/cdcpd2_ws/stationary.bag" if="$(eval arg('bag_file') == 0)"/>
+    <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/with_gripper_perpendicular.bag" if="$(eval arg('bag_file') == 1)"/>
+    <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/with_gripper_parallel.bag" if="$(eval arg('bag_file') == 2)"/>
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />

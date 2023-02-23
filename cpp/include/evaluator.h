@@ -18,6 +18,7 @@ class evaluator
         MatrixXf sort_pts (MatrixXf Y_0, MatrixXf head);
         double calc_min_distance (MatrixXf A, MatrixXf B, MatrixXf E, MatrixXf& closest_pt_on_AB_to_E);
         double get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true);
+        double compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true);
     private:
         int length_;
         int trial_;

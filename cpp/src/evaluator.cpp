@@ -2,6 +2,9 @@
 #include "../include/trackdlo.h"
 #include "../include/evaluator.h"
 
+#include <iostream>
+#include <fstream>
+
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
 using Eigen::RowVectorXf;
@@ -166,10 +169,12 @@ MatrixXf evaluator::get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::Po
             }
         }
         else {
-            if (keypoint_pc.z > 0.58) {
-                cur_nodes_xyz.push_back(keypoint_pc);
+            if (keypoint_pc.z < 0.58) {
+                continue;
             }
         }
+
+        cur_nodes_xyz.push_back(keypoint_pc);
     }
 
     // the node set returned is not sorted
@@ -225,4 +230,19 @@ double evaluator::get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true) {
     double error_frame = total_distances_to_curve / Y_track.rows();
 
     return error_frame;
+}
+
+double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
+    // compute error
+    double E1 = get_piecewise_error(Y_track, Y_true);
+    double E2 = get_piecewise_error(Y_true, Y_track);
+
+    double cur_frame_error = (E1 + E2) / 2;
+    errors_.push_back(cur_frame_error);
+
+    std::ofstream error_list ("/home/jingyixiang/catkin_ws/src/trackdlo/data/errors.txt", std::fstream::app);
+    error_list << std::to_string(cur_frame_error) + "\n";
+    error_list.close();
+
+    return cur_frame_error;
 }
