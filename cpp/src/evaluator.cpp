@@ -8,14 +8,13 @@ using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
-int bag_file = 2;
-
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg) {
+evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file) {
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
     alg_ = alg;
+    bag_file_ = bag_file;
 }
 
 MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
@@ -155,14 +154,21 @@ MatrixXf evaluator::get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::Po
     for (cv::KeyPoint key_point : keypoints_markers) {
         auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
         
-        if (bag_file == 2) {
+        if (bag_file_ == 2) {
             if (keypoint_pc.x < -0.15 || keypoint_pc.y < -0.15 || keypoint_pc.z < 0.58) {
                 continue;
             }
         }
-
-        if (keypoint_pc.z > 0.58) {
-            cur_nodes_xyz.push_back(keypoint_pc);
+        else if (bag_file_ == 1) {
+            if ((keypoint_pc.x < 0.0 && keypoint_pc.y < 0.05) || keypoint_pc.z < 0.58 || 
+                 keypoint_pc.x < -0.2 || (keypoint_pc.x < 0.1 && keypoint_pc.y < -0.05)) {
+                continue;
+            }
+        }
+        else {
+            if (keypoint_pc.z > 0.58) {
+                cur_nodes_xyz.push_back(keypoint_pc);
+            }
         }
     }
 

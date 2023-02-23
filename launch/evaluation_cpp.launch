@@ -1,0 +1,13 @@
+<launch>
+    <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
+    <arg name="bag_file" default="0" />
+    <arg name="alg" default="trackdlo" />
+    <arg name="bag_dir" default="/home/jingyixiang/cdcpd2_ws/with_gripper_perpendicular.bag" />
+
+    <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
+        <param name="bag_file" value="$(arg bag_file)" />
+        <param name="alg" value="$(arg alg)" />
+        <param name="bag_dir" value="$(arg bag_dir)" />
+    </node>
+
+</launch>
