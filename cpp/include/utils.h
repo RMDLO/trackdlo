@@ -28,4 +28,7 @@ std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point
 visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
 visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
 
+MatrixXf cross_product (MatrixXf vec1, MatrixXf vec2);
+double dot_product (MatrixXf vec1, MatrixXf vec2);
+
 #endif
