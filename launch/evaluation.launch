@@ -4,19 +4,22 @@
     <arg name="trial" default="0" />
     <arg name="alg" default="trackdlo" />
 
-    <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)"/>
-    <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)"/>
-    <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)"/>
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)" />
     <arg name="save_location" default="$(find trackdlo)/data/dlo_tracking_eval/"/>
 
     <!-- pct_occlusion takes value from 0 to 1 -->
     <arg name="pct_occlusion" default="25"/>
 
     <!-- determines how many seconds to wait before injecting occlusion -->
-    <arg name="start_occlusion_at" default="8.0" />
+    <arg name="start_record_at" value="8.0" if="$(eval arg('bag_file') == 0)" />
 
     <!-- determines when to end evalution (in seconds, with respect to start_time) -->
-    <arg name="exit_at" default="28.0" />
+    <arg name="exit_at" value="33.0" if="$(eval arg('bag_file') == 0)"/>
+
+    <!-- determines how much data to record before injecting occlusion -->
+    <arg name="wait_before_occlusion" value="5.0" if="$(eval arg('bag_file') == 0)" />
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
@@ -25,8 +28,9 @@
         <param name="bag_dir" value="$(arg bag_dir)" />
         <param name="save_location" value="$(arg save_location)" />
         <param name="pct_occlusion" value="$(arg pct_occlusion)" />
-        <param name="start_occlusion_at" value="$(arg start_occlusion_at)" />
+        <param name="start_record_at" value="$(arg start_record_at)" />
         <param name="exit_at" value="$(arg exit_at)" />
+        <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
     </node>
 
     <!-- start the simulate occlusion script -->
