@@ -13,15 +13,16 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_occlusion_at, double exit_at) {
+evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_record_at, double exit_at, double wait_before_occlusion) {
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
     alg_ = alg;
     bag_file_ = bag_file;
     save_location_ = save_location;
-    start_occlusion_at_ = start_occlusion_at;
+    start_record_at_ = start_record_at;
     exit_at_ = exit_at;
+    wait_before_occlusion_ = wait_before_occlusion;
     cleared_file_ = false;
 }
 
@@ -266,13 +267,13 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
 
     if (cleared_file_ = false) {
         std::ofstream error_list (dir);
-        error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
+        error_list << std::to_string(time_diff - start_record_at_) + " " + std::to_string(cur_frame_error) + "\n";
         error_list.close();
         cleared_file_ = true;
     }
     else {
         std::ofstream error_list (dir, std::fstream::app);
-        error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
+        error_list << std::to_string(time_diff - start_record_at_) + " " + std::to_string(cur_frame_error) + "\n";
         error_list.close();
     }
 
@@ -291,8 +292,8 @@ double evaluator::pct_occlusion () {
     return pct_occlusion_;
 }
 
-double evaluator::occlusion_start_time () {
-    return start_occlusion_at_;
+double evaluator::recording_start_time () {
+    return start_record_at_;
 }
 
 double evaluator::exit_time () {
@@ -301,4 +302,8 @@ double evaluator::exit_time () {
 
 int evaluator::length () {
     return length_;
+}
+
+double evaluator::wait_before_occlusion () {
+    return wait_before_occlusion_;
 }
