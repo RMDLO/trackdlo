@@ -37,6 +37,7 @@ class evaluator
         std::chrono::steady_clock::time_point start_time_;
         double start_occlusion_at_;
         double exit_at_;
+        bool cleared_file_;
 };
 
 #endif

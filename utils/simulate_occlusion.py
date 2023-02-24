@@ -66,7 +66,7 @@ class OcclusionSimulation:
             self.mouse_mask[self.rect[1]:self.rect[3], self.rect[0]:self.rect[2], :] = 0
             cv2.imshow('frame', frame)
         else:
-            #drawing rectangle
+            # drawing rectangle
             if self.startPoint == True and self.endPoint != True:
                 cv2.rectangle(frame, (self.rect[0], self.rect[1]), (self.rect[2], self.rect[3]), (0, 0, 255), 2)
             
@@ -75,6 +75,7 @@ class OcclusionSimulation:
                 self.mouse_mask[self.rect[1]:self.rect[3], self.rect[0]:self.rect[2], :] = 0
 
             cv2.imshow('frame', frame)
+            print(self.rect)
 
         # publish mask
         occlusion_mask = (self.mouse_mask*255).astype('uint8')
