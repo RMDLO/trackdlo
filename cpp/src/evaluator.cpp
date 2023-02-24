@@ -13,13 +13,15 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file, std::string save_location) {
+evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_occlusion_at, double exit_at) {
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
     alg_ = alg;
     bag_file_ = bag_file;
     save_location_ = save_location;
+    start_occlusion_at_ = start_occlusion_at;
+    exit_at_ = exit_at;
 }
 
 MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
@@ -91,7 +93,7 @@ MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
         counter += 1;
     }
 
-    if (pt2pt_dis(Y_0_sorted_vec[0], head) > 0.05) {
+    if (pt2pt_dis(Y_0_sorted_vec[0], head) > 0.08) {
         std::reverse(Y_0_sorted_vec.begin(), Y_0_sorted_vec.end());
     }
 
@@ -259,10 +261,10 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
 
     double time_diff;
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_).count();
-    time_diff = time_diff * 0.9 / 1000;  // bag files played at 0.9x speed
+    time_diff = time_diff / 1000.0;
 
     std::ofstream error_list (dir, std::fstream::app);
-    error_list << std::to_string(time_diff) + " " + std::to_string(cur_frame_error) + "\n";
+    error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
     error_list.close();
 
     return cur_frame_error;
@@ -278,4 +280,16 @@ std::chrono::steady_clock::time_point evaluator::start_time () {
 
 double evaluator::pct_occlusion () {
     return pct_occlusion_;
+}
+
+double evaluator::occlusion_start_time () {
+    return start_occlusion_at_;
+}
+
+double evaluator::exit_time () {
+    return exit_at_;
+}
+
+int evaluator::length () {
+    return length_;
 }

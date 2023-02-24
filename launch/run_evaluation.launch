@@ -2,12 +2,19 @@
     <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
     <arg name="bag_file" default="0" />
     <arg name="alg" default="trackdlo" />
-    <arg name="bag_dir" default="/home/jingyixiang/cdcpd2_ws/stationary.bag" if="$(eval arg('bag_file') == 0)"/>
+    <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/stationary.bag" if="$(eval arg('bag_file') == 0)"/>
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)"/>
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/parallel_motion.bag" if="$(eval arg('bag_file') == 2)"/>
     <arg name="save_location" default="/home/jingyixiang/dlo_tracking_eval/"/>
+
     <!-- pct_occlusion takes value from 0 to 1 -->
-    <arg name="pct_occlusion" default="0.5"/>
+    <arg name="pct_occlusion" default="0.4"/>
+
+    <!-- determines how many seconds to wait before injecting occlusion -->
+    <arg name="start_occlusion_at" default="8.0" />
+
+    <!-- determines when to end evalution (in seconds, with respect to start_time) -->
+    <arg name="exit_at" default="28.0" />
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
@@ -15,6 +22,8 @@
         <param name="bag_dir" value="$(arg bag_dir)" />
         <param name="save_location" value="$(arg save_location)" />
         <param name="pct_occlusion" value="$(arg pct_occlusion)" />
+        <param name="start_occlusion_at" value="$(arg start_occlusion_at)" />
+        <param name="exit_at" value="$(arg exit_at)" />
     </node>
 
     <!-- start the simulate occlusion script -->

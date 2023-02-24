@@ -18,6 +18,8 @@ std::string alg;
 std::string bag_dir;
 std::string save_location;
 double pct_occlusion;
+double start_occlusion_at;
+double exit_at;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -25,8 +27,32 @@ MatrixXf head_node = MatrixXf::Zero(1, 3);
 
 MatrixXf proj_matrix(3, 4);
 ros::Publisher corners_arr_pub;
+bool initialized = false;
 
 void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg, const sensor_msgs::PointCloud2ConstPtr& result_msg) {
+    if (!initialized) {
+        tracking_evaluator.set_start_time (std::chrono::steady_clock::now());
+        initialized = true;
+    }
+    
+    double time_from_start;
+    time_from_start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - tracking_evaluator.start_time()).count();
+    time_from_start = time_from_start / 1000.0;
+    std::cout << time_from_start << "; " << tracking_evaluator.exit_time() << std::endl;
+    
+    if (tracking_evaluator.exit_time() == -1) {
+        if (callback_count >= tracking_evaluator.length() - 3) {
+            std::cout << "Shutting down evaluator..." << std::endl;
+            ros::shutdown();
+        }
+    }
+    else {
+        if (time_from_start > tracking_evaluator.exit_time()) {
+            std::cout << "Shutting down evaluator..." << std::endl;
+            ros::shutdown();
+        }
+    }
+    
     callback_count += 1;
     std::cout << "callback: " << callback_count << std::endl;
 
@@ -49,8 +75,13 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     MatrixXf Y_true = gt_nodes.replicate(1, 1);
     // if not initialized
     if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
-        head_node = Y_track.row(0).replicate(1, 1);
-        tracking_evaluator.set_start_time (std::chrono::steady_clock::now());
+        // the one with greater x. this holds true for all 3 bag files
+        if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
+            head_node = Y_track.row(0).replicate(1, 1);
+        }
+        else {
+            head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
+        }
     }
     Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
 
@@ -61,13 +92,9 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
 
     // simulate occlusion: occlude the first n nodes
     // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-    double time_from_start;
-    time_from_start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - tracking_evaluator.start_time()).count();
-    time_from_start = time_from_start / 1000.0; 
-
     int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion());
 
-    if (num_of_occluded_nodes != 0 && time_from_start > 1.0) {
+    if (num_of_occluded_nodes != 0 && time_from_start > tracking_evaluator.occlusion_start_time()) {
 
         double min_x = Y_true(0, 0);
         double min_y = Y_true(0, 1);
@@ -182,11 +209,11 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
         std_msgs::Int32MultiArray corners_arr;
         corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
         corners_arr_pub.publish(corners_arr);
-    }
 
-    // compute error
-    double cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
-    std::cout << "error = " << cur_error << std::endl;
+        // compute error
+        double cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        std::cout << "error = " << cur_error << std::endl;
+    }
 }   
 
 int main(int argc, char **argv) {
@@ -203,6 +230,8 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/bag_dir", bag_dir);
     nh.getParam("/evaluation/save_location", save_location);
     nh.getParam("/evaluation/pct_occlusion", pct_occlusion);
+    nh.getParam("/evaluation/start_occlusion_at", start_occlusion_at);
+    nh.getParam("/evaluation/exit_at", exit_at);
 
     // get bag file length
     std::vector<std::string> topics;
@@ -236,7 +265,7 @@ int main(int argc, char **argv) {
     std::cout << "num of point cloud messages: " << pc_count << std::endl;
 
     // initialize evaluator
-    tracking_evaluator = evaluator(0, 0, pct_occlusion, alg, bag_file, save_location);
+    tracking_evaluator = evaluator(rgb_count, 0, pct_occlusion, alg, bag_file, save_location, start_occlusion_at, exit_at);
 
     image_transport::ImageTransport it(nh);
     corners_arr_pub = nh.advertise<std_msgs::Int32MultiArray>("/corners", 10);
