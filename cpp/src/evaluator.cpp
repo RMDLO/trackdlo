@@ -98,10 +98,8 @@ MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
     }
 
     // copy to Y_0_sorted
-    std::cout << "===== " << head << " =====" << std::endl;
     for (int i = 0; i < N; i ++) {
         Y_0_sorted.row(i) = Y_0_sorted_vec[i];
-        std::cout << Y_0_sorted_vec[i] << std::endl;
     }
 
     return Y_0_sorted;
