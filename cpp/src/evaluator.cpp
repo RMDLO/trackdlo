@@ -271,3 +271,11 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
 void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
     start_time_ = cur_time;
 }
+
+std::chrono::steady_clock::time_point evaluator::start_time () {
+    return start_time_;
+}
+
+double evaluator::pct_occlusion () {
+    return pct_occlusion_;
+}

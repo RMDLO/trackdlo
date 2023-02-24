@@ -20,6 +20,8 @@ class evaluator
         double get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true);
         double compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true);
         void set_start_time (std::chrono::steady_clock::time_point cur_time);
+        double pct_occlusion ();
+        std::chrono::steady_clock::time_point start_time ();
     private:
         int length_;
         int trial_;

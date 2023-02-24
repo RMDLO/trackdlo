@@ -6,12 +6,14 @@
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)"/>
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/parallel_motion.bag" if="$(eval arg('bag_file') == 2)"/>
     <arg name="save_location" default="/home/jingyixiang/dlo_tracking_eval/"/>
+    <arg name="pct_occlusion" default="0.25"/>
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
         <param name="alg" value="$(arg alg)" />
         <param name="bag_dir" value="$(arg bag_dir)" />
         <param name="save_location" value="$(arg save_location)" />
+        <param name="pct_occlusion" value="$(arg pct_occlusion)" />
     </node>
 
 </launch>

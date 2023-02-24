@@ -42,11 +42,45 @@ double downsample_leaf_size;
 
 trackdlo tracker;
 
+std::string type2str(int type) {
+  std::string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
+}
+
 void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
-    occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "bgr8")->image;
+    occlusion_mask = cv_bridge::toCvShare(opencv_mask_msg, "mono8")->image;
     if (!occlusion_mask.empty()) {
         updated_opencv_mask = true;
+        occlusion_mask *= 255;
     }
+
+    // cv::imshow("bmask transformed", occlusion_mask);
+    // cv::waitKey(3);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // cv::imshow("bmask transformed", occlusion_mask);
+    // cv::waitKey(3);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::string ty =  type2str( occlusion_mask.type() );
+    printf("Matrix: %s %dx%d \n", ty.c_str(), occlusion_mask.cols, occlusion_mask.rows );
 }
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
@@ -107,28 +141,44 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     // update cur image for visualization
     Mat cur_image;
-    Mat occlusion_mask_gray;
+    // Mat occlusion_mask_gray;
+    Mat occlusion_mask_rgb;
+
+    std::cout << "before updating occlusion mask" << std::endl;
     if (updated_opencv_mask) {
-        cv::cvtColor(occlusion_mask, occlusion_mask_gray, cv::COLOR_BGR2GRAY);
-        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask_gray, mask);
-        cv::bitwise_and(cur_image_orig, occlusion_mask, cur_image);
+        std::cout << "during updating occlusion mask" << std::endl;
+        cv::cvtColor(occlusion_mask, occlusion_mask_rgb, cv::COLOR_GRAY2BGR);
+        cv::bitwise_and(mask_without_occlusion_block, occlusion_mask, mask);
+        cv::bitwise_and(cur_image_orig, occlusion_mask_rgb, cur_image);
     }
     else {
+        std::cout << "haven't received occlusion mask message" << std::endl;
         mask_without_occlusion_block.copyTo(mask);
         cur_image_orig.copyTo(cur_image);
     }
+    std::cout << "after updating occlusion mask" << std::endl;
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
+
+    cv::imshow("mask", mask);
+    cv::waitKey(3);
+    // cv::imshow("cur_image", cur_image);
+    // cv::waitKey(3);
 
     // distance transform
     Mat bmask_transformed;
     cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
     double mat_min, mat_max;
     cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
-    // std::cout << mat_min << ", " << mat_max << std::endl;
+    std::cout << mat_min << ", " << mat_max << std::endl;
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
     double mask_dist_threshold = 10;
+
+    // cv::imshow("bmask transformed", bmask_transformed_normalized);
+    // cv::waitKey(3);
+
+    std::cout << "after distance transform" << std::endl;
 
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
     ROS_INFO_STREAM("Before pcl operations: " + std::to_string(time_diff) + " ms");
