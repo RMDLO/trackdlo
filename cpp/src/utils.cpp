@@ -423,3 +423,17 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, s
 
     return results;
 }
+
+MatrixXf cross_product (MatrixXf vec1, MatrixXf vec2) {
+    MatrixXf ret = MatrixXf::Zero(1, 3);
+    
+    ret(0, 0) = vec1(0, 1)*vec2(0, 2) - vec1(0, 2)*vec2(0, 1);
+    ret(0, 1) = -(vec1(0, 0)*vec2(0, 2) - vec1(0, 2)*vec2(0, 0));
+    ret(0, 2) = vec1(0, 0)*vec2(0, 1) - vec1(0, 1)*vec2(0, 0);
+
+    return ret;
+}
+
+double dot_product (MatrixXf vec1, MatrixXf vec2) {
+    return vec1(0, 0)*vec2(0, 0) + vec1(0, 1)*vec2(0, 1) + vec1(0, 2)*vec2(0, 2);
+}

@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Image1
       Splitter Ratio: 0.5
     Tree Height: 268
   - Class: rviz/Selection
@@ -129,7 +130,6 @@ Visualization Manager:
         line_results36: true
         line_results37: true
         line_results38: true
-        line_results39: true
         line_results4: true
         line_results5: true
         line_results6: true
@@ -171,7 +171,6 @@ Visualization Manager:
         node_results38: true
         node_results39: true
         node_results4: true
-        node_results40: true
         node_results5: true
         node_results6: true
         node_results7: true
@@ -279,9 +278,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.4501248300075531
-        Y: -0.12447553873062134
-        Z: -0.011135928332805634
+        X: 0.49177086353302
+        Y: -0.018738387152552605
+        Z: -0.0052645024843513966
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

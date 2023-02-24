@@ -5,8 +5,6 @@ using cv::Mat;
 
 ros::Publisher pc_pub;
 ros::Publisher results_pub;
-ros::Publisher guide_nodes_pub;
-ros::Publisher error_pub;
 ros::Publisher result_pc_pub;
 
 using Eigen::MatrixXd;
@@ -29,16 +27,12 @@ int bag_file;
 int num_of_nodes;
 double beta;
 double lambda;
-double alpha;
 double lle_weight;
 double mu;
 int max_iter;
 double tol;
-double k_vis;
 bool include_lle;
-bool use_geodesic;
 bool use_prev_sigma2;
-int kernel;
 double downsample_leaf_size;
 
 trackdlo tracker;
@@ -196,7 +190,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // log time
         cur_time = std::chrono::steady_clock::now();
 
-        MatrixXf guide_nodes;
         std::vector<MatrixXf> priors;
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
@@ -233,7 +226,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
                 
-                tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+                tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, 0, lle_weight, 0, mu, max_iter, tol, include_lle, false, use_prev_sigma2, 3);
 
                 sigma2 = 0.0001;
 
@@ -274,7 +267,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     converted_node_coord.push_back(cur_sum);
                 }
 
-                tracker = trackdlo(num_of_nodes, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+                tracker = trackdlo(Y.rows(), beta, lambda, 0, lle_weight, 0, mu, max_iter, tol, include_lle, false, use_prev_sigma2, 3);
                 tracker.initialize_nodes(Y);
                 tracker.initialize_geodesic_coord(converted_node_coord);
             }
@@ -283,18 +276,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
-            tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+            double cur_sigma2 = tracker.get_sigma2();
+            tracker.ecpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, false, use_prev_sigma2);
+            tracker.initialize_nodes(Y);
         }
-
-        Y = tracker.get_tracking_result();
-        guide_nodes = tracker.get_guide_nodes();
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
         ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
 
         // projection and pub image
         MatrixXf nodes_h = Y.replicate(1, 1);
-        // MatrixXf nodes_h = guide_nodes.replicate(1, 1);
 
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
@@ -459,8 +450,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // publish the results as a marker array
         visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
-        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
-
         // convert to pointcloud2 for eval
         pcl::PointCloud<pcl::PointXYZ> trackdlo_pc;
         for (int i = 0; i < Y.rows(); i++) {
@@ -482,14 +471,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // result_pc.header.stamp = t;
 
         results_pub.publish(results);
-        guide_nodes_pub.publish(guide_nodes_results);
         pc_pub.publish(output);
         result_pc_pub.publish(result_pc);
-
-        // reset all guide nodes
-        for (int i = 0; i < guide_nodes_results.markers.size(); i ++) {
-            guide_nodes_results.markers[i].action = visualization_msgs::Marker::DELETEALL;
-        }
     }
     else {
         ROS_ERROR("empty pointcloud!");
@@ -499,6 +482,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     ROS_INFO_STREAM("After tracking step: " + std::to_string(time_diff) + " ms");
 
     // pc_pub.publish(output);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
     ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
@@ -509,22 +493,18 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 }
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "image_listener");
+    ros::init(argc, argv, "gltp");
     ros::NodeHandle nh;
 
     // load parameters
     nh.getParam("/trackdlo/beta", beta); 
     nh.getParam("/trackdlo/lambda", lambda); 
-    nh.getParam("/trackdlo/alpha", alpha); 
     nh.getParam("/trackdlo/lle_weight", lle_weight); 
     nh.getParam("/trackdlo/mu", mu); 
     nh.getParam("/trackdlo/max_iter", max_iter); 
     nh.getParam("/trackdlo/tol", tol);
-    nh.getParam("/trackdlo/k_vis", k_vis);
     nh.getParam("/trackdlo/include_lle", include_lle); 
-    nh.getParam("/trackdlo/use_geodesic", use_geodesic); 
     nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
-    nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
     nh.getParam("/trackdlo/bag_file", bag_file);
@@ -539,11 +519,9 @@ int main(int argc, char **argv) {
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", pub_queue_size);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", pub_queue_size);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", pub_queue_size);
-    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", pub_queue_size);
-    error_pub = nh.advertise<std_msgs::Float64>("/trackdlo/error", pub_queue_size);
 
     // trackdlo point cloud topic
-    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", pub_queue_size);
+    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/gltp_results_pc", pub_queue_size);
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);

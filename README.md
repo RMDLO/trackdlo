@@ -27,7 +27,7 @@ Instructions for running the C++ implementation of TrackDLO are below.
 ### Important:
 1. Run ```catkin build``` to create the executable file. Do this every time after modifying any of the .cpp files.
 2. Set the parameter ```use_eval_rope``` in ```trackdlo.launch``` to switch between regular rope and marker rope.
-3. Run ```rosrun trackdlo opencv_interactive.py``` alongside with the camera node and the tracking node to user interactive OpenCV visualization to manually synthetically create occlusions.
+3. Run ```rosrun trackdlo simulate_occlusion.py``` alongside with the camera node and the tracking node to user interactive OpenCV visualization to manually synthetically create occlusions.
 
 
 ## Python:
