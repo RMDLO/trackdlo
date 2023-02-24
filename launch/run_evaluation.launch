@@ -6,7 +6,8 @@
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)"/>
     <arg name="bag_dir" value="/home/jingyixiang/cdcpd2_ws/parallel_motion.bag" if="$(eval arg('bag_file') == 2)"/>
     <arg name="save_location" default="/home/jingyixiang/dlo_tracking_eval/"/>
-    <arg name="pct_occlusion" default="0.25"/>
+    <!-- pct_occlusion takes value from 0 to 1 -->
+    <arg name="pct_occlusion" default="0.5"/>
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
@@ -15,5 +16,8 @@
         <param name="save_location" value="$(arg save_location)" />
         <param name="pct_occlusion" value="$(arg pct_occlusion)" />
     </node>
+
+    <!-- start the simulate occlusion script -->
+    <node pkg="trackdlo" name="simulate_occlusion" type="simulate_occlusion_eval.py" output="screen" />
 
 </launch>
