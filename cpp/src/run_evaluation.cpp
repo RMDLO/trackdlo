@@ -14,10 +14,11 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 int bag_file;
+int trial;
 std::string alg;
 std::string bag_dir;
 std::string save_location;
-double pct_occlusion;
+int pct_occlusion;
 double start_occlusion_at;
 double exit_at;
 
@@ -95,7 +96,7 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
 
         // simulate occlusion: occlude the first n nodes
         // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-        int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion());
+        int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * (tracking_evaluator.pct_occlusion()/100));
 
         if (num_of_occluded_nodes != 0) {
 
@@ -230,6 +231,7 @@ int main(int argc, char **argv) {
 
     // load params
     nh.getParam("/evaluation/bag_file", bag_file);
+    nh.getParam("/evaluation/trial", trial);
     nh.getParam("/evaluation/alg", alg);
     nh.getParam("/evaluation/bag_dir", bag_dir);
     nh.getParam("/evaluation/save_location", save_location);
@@ -269,7 +271,7 @@ int main(int argc, char **argv) {
     std::cout << "num of point cloud messages: " << pc_count << std::endl;
 
     // initialize evaluator
-    tracking_evaluator = evaluator(rgb_count, 0, pct_occlusion, alg, bag_file, save_location, start_occlusion_at, exit_at);
+    tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_occlusion_at, exit_at);
 
     image_transport::ImageTransport it(nh);
     corners_arr_pub = nh.advertise<std_msgs::Int32MultiArray>("/corners", 10);

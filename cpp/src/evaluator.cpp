@@ -13,7 +13,7 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_occlusion_at, double exit_at) {
+evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_occlusion_at, double exit_at) {
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
@@ -98,10 +98,8 @@ MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
     }
 
     // copy to Y_0_sorted
-    std::cout << "===== " << head << " =====" << std::endl;
     for (int i = 0; i < N; i ++) {
         Y_0_sorted.row(i) = Y_0_sorted_vec[i];
-        std::cout << Y_0_sorted_vec[i] << std::endl;
     }
 
     return Y_0_sorted;
@@ -249,13 +247,13 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     std::string dir;
     // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
     if (bag_file_ == 0) {
-        dir = save_location_ + alg_ + "_stationary_error.txt";
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_stationary_error.txt";
     }
     else if (bag_file_ == 1) {
-        dir = save_location_ + alg_ + "_perpendicular_motion_error.txt";
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_perpendicular_motion_error.txt";
     }
     else if (bag_file_ == 2) {
-        dir = save_location_ + alg_ + "_parallel_motion_error.txt";
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_parallel_motion_error.txt";
     }
     else {
         throw std::invalid_argument("Invalid bag file ID!");
