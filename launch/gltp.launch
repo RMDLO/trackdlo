@@ -1,0 +1,23 @@
+<launch>
+    <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
+    <arg name="bag_file" default="0" />
+
+    <node name="trackdlo" pkg="trackdlo" type="gltp" output="screen">
+        <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
+        <param name="bag_file" value="$(arg bag_file)" />
+
+        <param name="beta" value="2" />
+        <param name="lambda" value="1" />
+        <param name="lle_weight" value="1" />
+        <param name="mu" value="0.05" />
+        <param name="max_iter" value="50" />
+        <param name="tol" value="0.00001" />
+        <param name="include_lle" value="false" />
+        <param name="use_prev_sigma2" value="true" />
+        <!-- 0: Laplacian; 1: 1st order; 2: 2nd order; 3: Gaussian -->
+        <param name="downsample_leaf_size" value="0.005" />
+        <param name="use_eval_rope" value="true" />
+        <param name="num_of_nodes" value="35" />
+    </node>
+
+</launch>
