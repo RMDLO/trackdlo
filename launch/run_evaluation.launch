@@ -8,7 +8,7 @@
     <arg name="save_location" default="/home/jingyixiang/dlo_tracking_eval/"/>
 
     <!-- pct_occlusion takes value from 0 to 1 -->
-    <arg name="pct_occlusion" default="0.4"/>
+    <arg name="pct_occlusion" default="0"/>
 
     <!-- determines how many seconds to wait before injecting occlusion -->
     <arg name="start_occlusion_at" default="8.0" />

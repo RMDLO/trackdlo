@@ -22,6 +22,7 @@ evaluator::evaluator (int length, int trial, double pct_occlusion, std::string a
     save_location_ = save_location;
     start_occlusion_at_ = start_occlusion_at;
     exit_at_ = exit_at;
+    cleared_file_ = false;
 }
 
 MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
@@ -98,10 +99,8 @@ MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
     }
 
     // copy to Y_0_sorted
-    std::cout << "===== " << head << " =====" << std::endl;
     for (int i = 0; i < N; i ++) {
         Y_0_sorted.row(i) = Y_0_sorted_vec[i];
-        std::cout << Y_0_sorted_vec[i] << std::endl;
     }
 
     return Y_0_sorted;
@@ -265,9 +264,17 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_).count();
     time_diff = time_diff / 1000.0;
 
-    std::ofstream error_list (dir, std::fstream::app);
-    error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
-    error_list.close();
+    if (cleared_file_ = false) {
+        std::ofstream error_list (dir);
+        error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
+        error_list.close();
+        cleared_file_ = true;
+    }
+    else {
+        std::ofstream error_list (dir, std::fstream::app);
+        error_list << std::to_string(time_diff - start_occlusion_at_) + " " + std::to_string(cur_frame_error) + "\n";
+        error_list.close();
+    }
 
     return cur_frame_error;
 }
