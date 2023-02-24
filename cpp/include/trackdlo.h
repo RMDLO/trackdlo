@@ -26,6 +26,7 @@
 #include <ctime>
 #include <chrono>
 #include <thread>
+#include <algorithm> 
 
 #include <unistd.h>
 #include <cstdlib>
