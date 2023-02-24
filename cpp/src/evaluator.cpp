@@ -303,3 +303,7 @@ double evaluator::exit_time () {
 int evaluator::length () {
     return length_;
 }
+
+double evaluator::wait_before_occlusion () {
+    return wait_before_occlusion_;
+}

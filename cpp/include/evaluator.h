@@ -25,6 +25,7 @@ class evaluator
         double recording_start_time ();
         double exit_time ();
         int length ();
+        double wait_before_occlusion ();
 
     private:
         int length_;

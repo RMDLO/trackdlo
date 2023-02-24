@@ -14,12 +14,15 @@
 
     <!-- determines how many seconds to wait before injecting occlusion -->
     <arg name="start_record_at" value="8.0" if="$(eval arg('bag_file') == 0)" />
+    <arg name="start_record_at" value="5.0" if="$(eval arg('bag_file') == 1)" />
 
     <!-- determines when to end evalution (in seconds, with respect to start_time) -->
     <arg name="exit_at" value="33.0" if="$(eval arg('bag_file') == 0)"/>
+    <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 1)"/>
 
     <!-- determines how much data to record before injecting occlusion -->
     <arg name="wait_before_occlusion" value="5.0" if="$(eval arg('bag_file') == 0)" />
+    <arg name="wait_before_occlusion" value="3.0" if="$(eval arg('bag_file') == 1)" />
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
@@ -36,6 +39,6 @@
     <!-- start the simulate occlusion script -->
     <node pkg="trackdlo" name="simulate_occlusion" type="simulate_occlusion_eval.py" output="screen" />
 
-    <node pkg="rosbag" type="play" name="rosbag" args="$(arg bag_dir)"/>
+    <node pkg="rosbag" type="play" name="rosbag" args="$(arg bag_dir)" output="screen" />
 
 </launch>
