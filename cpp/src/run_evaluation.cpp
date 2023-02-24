@@ -80,17 +80,6 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
         if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
             head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
         }
-
-        Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
-
-        // update head node
-        head_node = Y_true.row(0).replicate(1, 1);
-
-        std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
-
-        // simulate occlusion: occlude the first n nodes
-        // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-        int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * (tracking_evaluator.pct_occlusion()/100));
         else {
             head_node = Y_track.row(0).replicate(1, 1);
         }
