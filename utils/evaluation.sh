@@ -3,77 +3,22 @@
 
 # make directories
 
-for bag in stationary.bag moving_parallel.bag moving_perpendicular.bag
+for bag in 0 1 2
 do
     for pct in 0 25 50 75
     do
-        for trial in 1 2 3 4 5 6 7 8 9 10
+        for trial in 0 1 2 3 4 5 6 7 8 9
         do
             for alg in trackdlo
             do
-                echo "starting roscore"
-                terminator -e 'roscore -p 1234' &
+                terminator -e 'cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo trackdlo.launch' &
                 first_teminal=$!
-                echo "starting nodes for $alg evaluation" &
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo trackdlo" &
+                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo evaluation.launch bag_file:=$bag trial:=$trial pct_occlusion:=$pct --wait" &
                 second_teminal=$!
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg $bag" &
-                third_teminal=$!
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/src/trackdlo/data/bags && rosbag play -r 0.04 $bag" &
-                fourth_teminal=$!
-                sleep 610
+                sleep 36
                 rosnode kill -a
                 killall -9 rosmaster
-                kill $first_terminal
-                kill $second_terminal
-                kill $third_terminal
-                kill $fourth_terminal
-            done
-            for alg in gltp
-            do
-                echo "starting roscore"
-                terminator -e 'roscore -p 1234' &
-                first_teminal=$!
-                echo "starting nodes for $alg evaluation" &
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo trackdlo.py $alg" &
-                second_teminal=$!
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg $bag" &
-                third_teminal=$!
-                terminator -e "source ~/.bashrc && sleep 2; cd rmdlo_tracking/src/trackdlo/data/bags && rosbag play -r 0.04 $bag" &
-                fourth_teminal=$!
-                sleep 610
-                rosnode kill -a
-                killall -9 rosmaster
-                kill $first_terminal
-                kill $second_terminal
-                kill $third_terminal
-                kill $fourth_terminal
-            done
-            for alg in cdcpd
-            do
-                echo "starting roscore"
-                terminator -e 'roscore -p 1234' &
-                first_teminal=$!
-                echo "starting nodes for $alg evaluation" &
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && python src/cdcpd/ros_nodes/simple_cdcpd_node.py" &
-                second_teminal=$!
-                terminator -e "source ~/.bashrc && cd rmdlo_tracking/ && source devel/setup.bash && rosrun trackdlo evaluation.py $trial $pct $alg $bag" &
-                third_teminal=$!
-                terminator -e "source ~/.bashrc && sleep 2; cd rmdlo_tracking/src/trackdlo/data/bags && rosbag play -r 0.04 $bag" &
-                fourth_teminal=$!
-                sleep 610
-                rosnode kill -a
-                killall -9 rosmaster
-                kill $first_terminal
-                kill $second_terminal
-                kill $third_terminal
-                kill $fourth_terminal
             done
         done
     done
 done
-
-terminator -e "python rmdlo_tracking/src/trackdlo/utils/plot.py" 
-last_teminal=$!
-sleep 2
-kill $last_terminal
