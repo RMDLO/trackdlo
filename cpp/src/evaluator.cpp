@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXf;
@@ -12,12 +13,13 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file) {
+evaluator::evaluator (int length, int trial, double pct_occlusion, std::string alg, int bag_file, std::string save_location) {
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
     alg_ = alg;
     bag_file_ = bag_file;
+    save_location_ = save_location;
 }
 
 MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
@@ -240,9 +242,32 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     double cur_frame_error = (E1 + E2) / 2;
     errors_.push_back(cur_frame_error);
 
-    std::ofstream error_list ("/home/jingyixiang/catkin_ws/src/trackdlo/data/errors.txt", std::fstream::app);
-    error_list << std::to_string(cur_frame_error) + "\n";
+    std::string dir;
+    // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
+    if (bag_file_ == 0) {
+        dir = save_location_ + alg_ + "_stationary_error.txt";
+    }
+    else if (bag_file_ == 1) {
+        dir = save_location_ + alg_ + "_perpendicular_motion_error.txt";
+    }
+    else if (bag_file_ == 2) {
+        dir = save_location_ + alg_ + "_parallel_motion_error.txt";
+    }
+    else {
+        throw std::invalid_argument("Invalid bag file ID!");
+    }
+
+    double time_diff;
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_).count();
+    time_diff = time_diff * 0.9 / 1000;  // bag files played at 0.9x speed
+
+    std::ofstream error_list (dir, std::fstream::app);
+    error_list << std::to_string(time_diff) + " " + std::to_string(cur_frame_error) + "\n";
     error_list.close();
 
     return cur_frame_error;
+}
+
+void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
+    start_time_ = cur_time;
 }

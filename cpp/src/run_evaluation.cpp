@@ -15,6 +15,7 @@ using cv::Mat;
 int bag_file;
 std::string alg;
 std::string bag_dir;
+std::string save_location;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -44,6 +45,7 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     // if not initialized
     if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
         head_node = Y_track.row(0).replicate(1, 1);
+        tracking_evaluator.set_start_time (std::chrono::steady_clock::now());
     }
     Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
 
@@ -65,6 +67,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/bag_file", bag_file);
     nh.getParam("/evaluation/alg", alg);
     nh.getParam("/evaluation/bag_dir", bag_dir);
+    nh.getParam("/evaluation/save_location", save_location);
 
     // get bag file length
     std::vector<std::string> topics;
@@ -98,7 +101,7 @@ int main(int argc, char **argv) {
     std::cout << "num of point cloud messages: " << pc_count << std::endl;
 
     // initialize evaluator
-    tracking_evaluator = evaluator(0, 0, 0, alg, bag_file);
+    tracking_evaluator = evaluator(0, 0, 0, alg, bag_file, save_location);
 
     image_transport::ImageTransport it(nh);
 
