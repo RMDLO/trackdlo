@@ -22,6 +22,7 @@ int pct_occlusion;
 double start_record_at;
 double exit_at;
 double wait_before_occlusion;
+double bag_rate;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -39,7 +40,7 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     
     double time_from_start;
     time_from_start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - tracking_evaluator.start_time()).count();
-    time_from_start = time_from_start / 1000.0;
+    time_from_start = time_from_start / 1000.0 * tracking_evaluator.rate();
     std::cout << time_from_start << "; " << tracking_evaluator.exit_time() << std::endl;
     
     if (tracking_evaluator.exit_time() == -1) {
@@ -249,6 +250,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/start_record_at", start_record_at);
     nh.getParam("/evaluation/exit_at", exit_at);
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
+    nh.getParam("/evaluation/bag_rate", bag_rate);
 
     // get bag file length
     std::vector<std::string> topics;
@@ -282,7 +284,7 @@ int main(int argc, char **argv) {
     std::cout << "num of point cloud messages: " << pc_count << std::endl;
 
     // initialize evaluator
-    tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_record_at, exit_at, wait_before_occlusion);
+    tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_record_at, exit_at, wait_before_occlusion, bag_rate);
 
     image_transport::ImageTransport it(nh);
     corners_arr_pub = nh.advertise<std_msgs::Int32MultiArray>("/corners", 10);
