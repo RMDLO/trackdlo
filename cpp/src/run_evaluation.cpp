@@ -74,32 +74,32 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     pcl::fromPCLPointCloud2(*result_cloud, result_cloud_xyz);
     MatrixXf Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose();
 
-    MatrixXf gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
-    MatrixXf Y_true = gt_nodes.replicate(1, 1);
-    // if not initialized
-    if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
-        // the one with greater x. this holds true for all 3 bag files
-        if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
-            head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
-        }
-        else {
-            head_node = Y_track.row(0).replicate(1, 1);
-        }
-    }
-    Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
-
-    // update head node
-    head_node = Y_true.row(0).replicate(1, 1);
-
-    std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
-
     if (time_from_start > tracking_evaluator.recording_start_time()) {
+
+        MatrixXf gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
+        MatrixXf Y_true = gt_nodes.replicate(1, 1);
+        // if not initialized
+        if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
+            // the one with greater x. this holds true for all 3 bag files
+            if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
+                head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
+            }
+            else {
+                head_node = Y_track.row(0).replicate(1, 1);
+            }
+        }
+        Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
+
+        // update head node
+        head_node = Y_true.row(0).replicate(1, 1);
+
+        std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
 
         if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
             if (bag_file == 0) {
                 // simulate occlusion: occlude the first n nodes
                 // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-                int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * (tracking_evaluator.pct_occlusion()/100));
+                int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion() / 100.0);
 
                 if (num_of_occluded_nodes != 0) {
 
@@ -223,6 +223,16 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
                 std_msgs::Int32MultiArray corners_arr;
                 corners_arr.data = {840, 408, 1191, 678};
                 corners_arr_pub.publish(corners_arr);
+            }
+
+            else if (bag_file == 2) {
+                std_msgs::Int32MultiArray corners_arr;
+                corners_arr.data = {681, 12, 1012, 320};
+                corners_arr_pub.publish(corners_arr);
+            }
+
+            else {
+                throw std::invalid_argument("Invalid bag file ID!");
             }
         }
 
