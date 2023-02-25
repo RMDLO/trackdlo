@@ -13,7 +13,9 @@ using Eigen::RowVectorXd;
 using cv::Mat;
 
 evaluator::evaluator () {}
-evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_record_at, double exit_at, double wait_before_occlusion) {
+evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, 
+                      double start_record_at, double exit_at, double wait_before_occlusion, double bag_rate) 
+{
     length_ = length;
     trial_ = trial;
     pct_occlusion_ = pct_occlusion;
@@ -24,6 +26,39 @@ evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg,
     exit_at_ = exit_at;
     wait_before_occlusion_ = wait_before_occlusion;
     cleared_file_ = false;
+    bag_rate_ = bag_rate;
+}
+
+void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
+    start_time_ = cur_time;
+}
+
+std::chrono::steady_clock::time_point evaluator::start_time () {
+    return start_time_;
+}
+
+double evaluator::pct_occlusion () {
+    return pct_occlusion_;
+}
+
+double evaluator::recording_start_time () {
+    return start_record_at_;
+}
+
+double evaluator::exit_time () {
+    return exit_at_;
+}
+
+int evaluator::length () {
+    return length_;
+}
+
+double evaluator::wait_before_occlusion () {
+    return wait_before_occlusion_;
+}
+
+double evaluator::rate () {
+    return bag_rate_;
 }
 
 MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
@@ -278,32 +313,4 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     }
 
     return cur_frame_error;
-}
-
-void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
-    start_time_ = cur_time;
-}
-
-std::chrono::steady_clock::time_point evaluator::start_time () {
-    return start_time_;
-}
-
-double evaluator::pct_occlusion () {
-    return pct_occlusion_;
-}
-
-double evaluator::recording_start_time () {
-    return start_record_at_;
-}
-
-double evaluator::exit_time () {
-    return exit_at_;
-}
-
-int evaluator::length () {
-    return length_;
-}
-
-double evaluator::wait_before_occlusion () {
-    return wait_before_occlusion_;
 }

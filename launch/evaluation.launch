@@ -3,6 +3,7 @@
     <arg name="bag_file" default="0" />
     <arg name="trial" default="0" />
     <arg name="alg" default="trackdlo" />
+    <arg name="bag_rate" default="1" />
 
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
@@ -34,11 +35,12 @@
         <param name="start_record_at" value="$(arg start_record_at)" />
         <param name="exit_at" value="$(arg exit_at)" />
         <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
+        <param name="bag_rate" value="$(arg bag_rate)" />
     </node>
 
     <!-- start the simulate occlusion script -->
     <node pkg="trackdlo" name="simulate_occlusion" type="simulate_occlusion_eval.py" output="screen" />
 
-    <node pkg="rosbag" type="play" name="rosbag" args="$(arg bag_dir)"/>
+    <node pkg="rosbag" type="play" name="rosbag" args="-r $(arg bag_rate) $(arg bag_dir)"/>
 
 </launch>
