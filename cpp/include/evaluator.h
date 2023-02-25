@@ -13,7 +13,8 @@ class evaluator
 {
     public:
         evaluator ();
-        evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, double start_record_at, double exit_at, double wait_before_occlusion);
+        evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, 
+                   double start_record_at, double exit_at, double wait_before_occlusion, double bag_rate);
         MatrixXf get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz);
         MatrixXf sort_pts (MatrixXf Y_0, MatrixXf head);
         double calc_min_distance (MatrixXf A, MatrixXf B, MatrixXf E, MatrixXf& closest_pt_on_AB_to_E);
@@ -26,6 +27,7 @@ class evaluator
         double exit_time ();
         int length ();
         double wait_before_occlusion ();
+        double rate ();
 
     private:
         int length_;
@@ -40,6 +42,7 @@ class evaluator
         double exit_at_;
         double wait_before_occlusion_;
         bool cleared_file_;
+        double bag_rate_;
 };
 
 #endif
