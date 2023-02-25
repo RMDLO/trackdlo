@@ -21,7 +21,7 @@ def callback (arr_msg):
 
 
 if __name__=='__main__':
-    rospy.init_node('test', anonymous=True)
+    rospy.init_node('simulate_occlusion_eval', anonymous=True)
 
     arr_sub = rospy.Subscriber('/corners', Int32MultiArray, callback)
     occlusion_mask_img_pub = rospy.Publisher('/mask_with_occlusion', Image, queue_size=10)

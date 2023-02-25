@@ -224,6 +224,16 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
                 corners_arr.data = {840, 408, 1191, 678};
                 corners_arr_pub.publish(corners_arr);
             }
+
+            else if (bag_file == 2) {
+                std_msgs::Int32MultiArray corners_arr;
+                corners_arr.data = {681, 12, 1012, 320};
+                corners_arr_pub.publish(corners_arr);
+            }
+
+            else {
+                throw std::invalid_argument("Invalid bag file ID!");
+            }
         }
 
         // compute error
