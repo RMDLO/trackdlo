@@ -98,7 +98,7 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
             if (bag_file == 0) {
                 // simulate occlusion: occlude the first n nodes
                 // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-                int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion());
+                int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * (tracking_evaluator.pct_occlusion()/100));
 
                 if (num_of_occluded_nodes != 0) {
 
