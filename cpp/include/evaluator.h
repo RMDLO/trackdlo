@@ -29,6 +29,8 @@ class evaluator
         double wait_before_occlusion ();
         double rate ();
         double compute_error (MatrixXf Y_track, MatrixXf Y_true);
+        void increment_image_counter ();
+        int image_counter ();
 
     private:
         int length_;
@@ -44,6 +46,7 @@ class evaluator
         double wait_before_occlusion_;
         bool cleared_file_;
         double bag_rate_;
+        int image_counter_;
 };
 
 #endif

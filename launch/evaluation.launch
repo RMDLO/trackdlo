@@ -5,6 +5,9 @@
     <arg name="alg" default="trackdlo" />
     <arg name="bag_rate" default="0.5" />
 
+    <!-- save one image every second -->
+    <arg name="save_image" default="false" />
+
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)" />
@@ -39,6 +42,7 @@
         <param name="exit_at" value="$(arg exit_at)" />
         <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
         <param name="bag_rate" value="$(arg bag_rate)" />
+        <param name="save_image" value="$(arg save_image)" />
     </node>
 
     <!-- start the simulate occlusion script -->

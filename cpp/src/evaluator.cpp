@@ -27,6 +27,15 @@ evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg,
     wait_before_occlusion_ = wait_before_occlusion;
     cleared_file_ = false;
     bag_rate_ = bag_rate;
+    image_counter_ = 0;
+}
+
+int evaluator::image_counter () {
+    return image_counter_;
+}
+
+void evaluator::increment_image_counter () {
+    image_counter_ += 1;
 }
 
 void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {

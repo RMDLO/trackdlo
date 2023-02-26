@@ -23,6 +23,7 @@ double start_record_at;
 double exit_at;
 double wait_before_occlusion;
 double bag_rate;
+bool save_image;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -308,9 +309,28 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cv::circle(eval_img, cv::Point(row, col), 5, point_color, -1);
 
         if (cur_error != -1) {
-            double scale = 0.01;
-            std::string err = "Avg error per node: " + std::to_string(static_cast<int>(cur_error*1000 / scale) * scale);
+            std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
             cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
+        }
+    }
+
+    // save image
+    if (save_image) {
+        double diff = time_from_start - tracking_evaluator.recording_start_time();
+        if ((int)(diff/1) == tracking_evaluator.image_counter() && fabs(diff-(tracking_evaluator.image_counter()*1)) <= 0.1) {
+            std::string dir;
+            // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
+            if (bag_file == 0) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 1) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 2) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            cv::imwrite(dir, eval_img);
+            tracking_evaluator.increment_image_counter();
         }
     }
 
@@ -337,6 +357,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/exit_at", exit_at);
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
     nh.getParam("/evaluation/bag_rate", bag_rate);
+    nh.getParam("/evaluation/save_image", save_image);
 
     // get bag file length
     std::vector<std::string> topics;
