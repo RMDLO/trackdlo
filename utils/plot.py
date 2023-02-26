@@ -8,6 +8,7 @@ algorithms = ['trackdlo', 'cdcpd','cdcpd2', 'gltp']
 bags = ['stationary','perpendicular_motion', 'parallel_motion']
 duration_frames = [375, 197, 240]
 duration_times = [34.1-8, 18.4-5, 22.7-6.5]
+pcts = [0, 25, 50]
 
 # bags = ['stationary','perpendicular_motion']
 algorithms_plot = {'trackdlo': 'TrackDLO',
@@ -16,18 +17,20 @@ algorithms_plot = {'trackdlo': 'TrackDLO',
                     'cdcpd2': 'CDCPD2'}
 colors = ['cyan','blue','magenta','red']
 markers = ['o','^','*','s']
+
+###################### PLOT TIME VS. FRAME ERROR ######################
 window_size = 10
 ROOT_DIR = os.path.abspath(os.curdir)
 dir = f'{ROOT_DIR}/src/trackdlo/data'
 
 for n, bag in enumerate(bags):
     if bag=='stationary':
-        for pct in [0, 25, 50]:
+        for pct in pcts:
             ax = plt.gca()
             for i, algorithm in enumerate(algorithms):
                 data = []
                 for trial in range(0,10):
-                    with open(f'{dir}/dlo_tracking/{algorithm}_{trial}_{pct}_{bag}_error.txt', 'r') as file:
+                    with open(f'{dir}/archive_2/{algorithm}_{trial}_{pct}_{bag}_error.txt', 'r') as file:
                         content = file.readlines()
                         error = []
                         for line in content:
@@ -52,18 +55,18 @@ for n, bag in enumerate(bags):
             labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
-            plt.ylim(0, 60)
+            plt.ylim(0, 50)
             plt.tight_layout()
-            plt.savefig(f'{dir}/frame_error_eval_{bag}_{pct}.png')
+            plt.savefig(f'{dir}/frame_error_{bag}_{pct}.png')
             plt.close()
 
     else:
-        for pct in [0]:
+        for pct in pcts[:1]:
             ax = plt.gca()
             for i, algorithm in enumerate(algorithms):
                 data = []
                 for trial in range(0,10):
-                    with open(f'{dir}/dlo_tracking/{algorithm}_{trial}_{pct}_{bag}_error.txt', 'r') as file:
+                    with open(f'{dir}/archive_2/{algorithm}_{trial}_{pct}_{bag}_error.txt', 'r') as file:
                         content = file.readlines()
                         error = []
                         for line in content:
@@ -88,7 +91,51 @@ for n, bag in enumerate(bags):
             labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
-            plt.ylim(0, 60)
+            plt.ylim(0, 50)
             plt.tight_layout()
-            plt.savefig(f'{dir}/frame_error_eval_{bag}_{pct}.png')
+            plt.savefig(f'{dir}/frame_error_{bag}.png')
             plt.close()
+
+###################### PLOT PCT OCCLUSION VS. FINAL FRAME ERROR ######################
+
+for n, bag in enumerate(bags):
+    if bag=='stationary':
+        ax = plt.gca()
+        for i, algorithm in enumerate(algorithms):
+            avg = []
+            std = []
+            for pct in pcts:
+                data = []
+                for trial in range(0,10):
+                    with open(f'{dir}/archive_2/{algorithm}_{trial}_{pct}_{bag}_error.txt', 'r') as file:
+                        content = file.readlines()
+                        error = []
+                        for line in content:
+                            row = line.split()
+                            error.append(float(row[1])*1000)
+
+                    data.append(error[duration_frames[n-1]])
+            
+                data = np.asarray(data, dtype=object)
+                average_error = data.mean()
+                std_error = data.std()
+
+                minus_one_std = average_error - std_error
+                if minus_one_std < 0:
+                    minus_one_std = 0 # set negative std to 0 so that frame error is always positive
+                plus_one_std = average_error + std_error
+
+                avg.append(average_error)
+                std.append(std_error)
+            print(avg, std, pcts)
+            ax.plot(pcts, avg, label=f'{algorithms_plot[algorithm]}', linewidth=4, alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
+            # ax.errorbar(pcts, avg, yerr=std, linewidth=10, color=colors[i])
+
+        # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
+        plt.xlabel('Percentage of Occluded Nodes (%)')
+        plt.ylabel('Final Frame Error (mm)')
+        plt.ylim(0, 50)
+        plt.tight_layout()
+        plt.legend()
+        plt.savefig(f'{dir}/pct_error_{bag}.png')
+        plt.close()
