@@ -1058,14 +1058,6 @@ void trackdlo::tracking_step (MatrixXf X_orig,
         correspondence_priors_ = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 2, alignment_node_idx);
     }
 
-    // ----- quick test -----
-
-    // test 1st order
-    // ecpd_lle (X_orig, Y, sigma2, 10, 1, 1, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 2, "1st order", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
-
-    // test 2nd order
+    // include_lle == false because we have no space to discuss it in the paper
     ecpd_lle (X_orig, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, include_lle_, use_geodesic_, use_prev_sigma2_, true, correspondence_priors_, alpha_, kernel_, occluded_nodes, k_vis_, bmask_transformed_normalized, mat_max);
-
-    // test Gaussian
-    // ecpd_lle (X_orig, Y, sigma2, 1, 1000, 10, 0.05, 50, 0.00001, false, true, true, true, priors_vec, 1, "Gaussian", occluded_nodes, 0.05, bmask_transformed_normalized, mat_max);
 }
