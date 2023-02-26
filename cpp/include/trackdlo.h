@@ -6,6 +6,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/features2d.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/cvstd.hpp>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
