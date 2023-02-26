@@ -14,7 +14,7 @@ using cv::Mat;
 
 evaluator::evaluator () {}
 evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg, int bag_file, std::string save_location, 
-                      double start_record_at, double exit_at, double wait_before_occlusion, double bag_rate) 
+                      double start_record_at, double exit_at, double wait_before_occlusion, double bag_rate, int num_of_nodes) 
 {
     length_ = length;
     trial_ = trial;
@@ -27,6 +27,7 @@ evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg,
     wait_before_occlusion_ = wait_before_occlusion;
     cleared_file_ = false;
     bag_rate_ = bag_rate;
+    num_of_nodes_ = num_of_nodes;
 }
 
 void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
@@ -268,7 +269,7 @@ double evaluator::get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true) {
         closest_pts_on_Y_true.push_back(closest_pt);
     }
 
-    double error_frame = total_distances_to_curve / Y_track.rows();
+    double error_frame = total_distances_to_curve / num_of_nodes_;
 
     return error_frame;
 }
