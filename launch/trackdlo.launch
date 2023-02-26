@@ -21,7 +21,7 @@
         <param name="kernel" value="1" />
         <param name="downsample_leaf_size" value="0.005" />
         <param name="use_eval_rope" value="true" />
-        <param name="num_of_nodes" value="35" />
+        <param name="num_of_nodes" value="40" />
     </node>
 
 </launch>
