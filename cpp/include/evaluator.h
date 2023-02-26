@@ -28,6 +28,7 @@ class evaluator
         int length ();
         double wait_before_occlusion ();
         double rate ();
+        double compute_error (MatrixXf Y_track, MatrixXf Y_true);
 
     private:
         int length_;

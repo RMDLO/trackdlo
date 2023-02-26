@@ -298,7 +298,7 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
 
     double time_diff;
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_).count();
-    time_diff = time_diff / 1000.0;
+    time_diff = time_diff / 1000.0 * bag_rate_;
 
     if (cleared_file_ = false) {
         std::ofstream error_list (dir);
@@ -312,5 +312,15 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
         error_list.close();
     }
 
+    return cur_frame_error;
+}
+
+double evaluator::compute_error (MatrixXf Y_track, MatrixXf Y_true) {
+    // compute error
+    double E1 = get_piecewise_error(Y_track, Y_true);
+    double E2 = get_piecewise_error(Y_true, Y_track);
+
+    double cur_frame_error = (E1 + E2) / 2;
+    
     return cur_frame_error;
 }
