@@ -24,6 +24,7 @@ double exit_at;
 double wait_before_occlusion;
 double bag_rate;
 int num_of_nodes;
+bool save_image;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -33,7 +34,9 @@ MatrixXf proj_matrix(3, 4);
 ros::Publisher corners_arr_pub;
 bool initialized = false;
 
-void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg, const sensor_msgs::PointCloud2ConstPtr& result_msg) {
+sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg, const sensor_msgs::PointCloud2ConstPtr& result_msg) {
+    sensor_msgs::ImagePtr eval_img_msg = nullptr;
+    
     if (!initialized) {
         tracking_evaluator.set_start_time (std::chrono::steady_clock::now());
         initialized = true;
@@ -62,6 +65,10 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
 
     Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
+    // for visualizing results
+    Mat eval_img;
+    cur_image_orig.copyTo(eval_img);
+
     // process original pc
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
     pcl_conversions::toPCL(*pc_msg, *cloud);
@@ -75,6 +82,12 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
     pcl::fromPCLPointCloud2(*result_cloud, result_cloud_xyz);
     MatrixXf Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose();
 
+    int top_left_x = -1;
+    int top_left_y = -1;
+    int bottom_right_x = -1;
+    int bottom_right_y = -1;
+
+    double cur_error = -1;
     if (time_from_start > tracking_evaluator.recording_start_time()) {
 
         MatrixXf gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
@@ -93,7 +106,6 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
 
         // update head node
         head_node = Y_true.row(0).replicate(1, 1);
-
         std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
 
         if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
@@ -155,7 +167,6 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
                     int pix_coord_2_y = static_cast<int>(image_coords(1, 1)/image_coords(1, 2));
                 
                     int extra_border = 30;
-                    int top_left_x, top_left_y, bottom_right_x, bottom_right_y;
 
                     // best scenarios: min_corner and max_corner are the top left and bottom right corners
                     if (pix_coord_1_x <= pix_coord_2_x && pix_coord_1_y <= pix_coord_2_y) {
@@ -221,14 +232,24 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
             }
 
             else if (bag_file == 1) {
+                top_left_x = 840;
+                top_left_y = 408;
+                bottom_right_x = 1191;
+                bottom_right_y = 678;
+
                 std_msgs::Int32MultiArray corners_arr;
-                corners_arr.data = {840, 408, 1191, 678};
+                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
                 corners_arr_pub.publish(corners_arr);
             }
 
             else if (bag_file == 2) {
+                top_left_x = 750;
+                top_left_y = 50;
+                bottom_right_x = 1012;
+                bottom_right_y = 320;
+
                 std_msgs::Int32MultiArray corners_arr;
-                corners_arr.data = {681, 12, 1012, 320};
+                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
                 corners_arr_pub.publish(corners_arr);
             }
 
@@ -238,9 +259,84 @@ void Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::Po
         }
 
         // compute error
-        double cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
         std::cout << "error = " << cur_error << std::endl;
+
+        // optional pub and save result image
+        if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
+            cv::Point p1(top_left_x, top_left_y);
+            cv::Point p2(bottom_right_x, bottom_right_y);
+            cv::rectangle(eval_img, p1, p2, cv::Scalar(0, 0, 0), -1);
+            eval_img = 0.5*eval_img + 0.5*cur_image_orig;
+            cv::putText(eval_img, "occlusion", cv::Point(top_left_x, top_left_y-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+        }
+        else {
+            cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
+        }
     }
+
+    // project tracking results onto the image
+    MatrixXf Y_track_h = Y_track.replicate(1, 1);
+    Y_track_h.conservativeResize(Y_track_h.rows(), Y_track_h.cols()+1);
+    Y_track_h.col(Y_track_h.cols()-1) = MatrixXf::Ones(Y_track_h.rows(), 1);
+
+    // project and pub image
+    MatrixXf image_coords_Y = (proj_matrix * Y_track_h.transpose()).transpose();
+    // draw points
+    for (int i = 0; i < image_coords_Y.rows(); i ++) {
+
+        int row = static_cast<int>(image_coords_Y(i, 0)/image_coords_Y(i, 2));
+        int col = static_cast<int>(image_coords_Y(i, 1)/image_coords_Y(i, 2));
+
+        cv::Scalar point_color;
+        cv::Scalar line_color;
+
+        if (row <= bottom_right_x && row >= top_left_x && col <= bottom_right_y && col >= top_left_y) {
+            point_color = cv::Scalar(0, 0, 255);
+            line_color = cv::Scalar(0, 0, 255);
+        }
+        else {
+            point_color = cv::Scalar(0, 150, 255);
+            line_color = cv::Scalar(0, 255, 0);
+        }
+
+        if (i != image_coords_Y.rows()-1) {
+            cv::line(eval_img, cv::Point(row, col),
+                cv::Point(static_cast<int>(image_coords_Y(i+1, 0)/image_coords_Y(i+1, 2)), 
+                static_cast<int>(image_coords_Y(i+1, 1)/image_coords_Y(i+1, 2))),
+                line_color, 2);
+        }
+
+        cv::circle(eval_img, cv::Point(row, col), 5, point_color, -1);
+
+        if (cur_error != -1) {
+            std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
+            cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
+        }
+    }
+
+    // save image
+    if (save_image) {
+        double diff = time_from_start - tracking_evaluator.recording_start_time();
+        if ((int)(diff/1) == tracking_evaluator.image_counter() && fabs(diff-(tracking_evaluator.image_counter()*1)) <= 0.1) {
+            std::string dir;
+            // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
+            if (bag_file == 0) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 1) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 2) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            cv::imwrite(dir, eval_img);
+            tracking_evaluator.increment_image_counter();
+        }
+    }
+
+    eval_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", eval_img).toImageMsg();
+    return eval_img_msg;
 }   
 
 int main(int argc, char **argv) {
@@ -263,6 +359,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
     nh.getParam("/evaluation/bag_rate", bag_rate);
     nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
+    nh.getParam("/evaluation/save_image", save_image);
 
     // get bag file length
     std::vector<std::string> topics;
@@ -299,6 +396,7 @@ int main(int argc, char **argv) {
     tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_record_at, exit_at, wait_before_occlusion, bag_rate, num_of_nodes);
 
     image_transport::ImageTransport it(nh);
+    image_transport::Publisher eval_img_pub = it.advertise("/eval_img", 10);
     corners_arr_pub = nh.advertise<std_msgs::Int32MultiArray>("/corners", 10);
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
@@ -326,7 +424,8 @@ int main(int argc, char **argv) {
             const boost::shared_ptr<const message_filters::NullType> var5,
             const boost::shared_ptr<const message_filters::NullType> var6)
         {
-            Callback(img_msg, pc_msg, result_msg);
+            sensor_msgs::ImagePtr eval_img = Callback(img_msg, pc_msg, result_msg);
+            eval_img_pub.publish(eval_img);
         }
     );
     

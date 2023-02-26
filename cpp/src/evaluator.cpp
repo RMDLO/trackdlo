@@ -28,6 +28,15 @@ evaluator::evaluator (int length, int trial, int pct_occlusion, std::string alg,
     cleared_file_ = false;
     bag_rate_ = bag_rate;
     num_of_nodes_ = num_of_nodes;
+    image_counter_ = 0;
+}
+
+int evaluator::image_counter () {
+    return image_counter_;
+}
+
+void evaluator::increment_image_counter () {
+    image_counter_ += 1;
 }
 
 void evaluator::set_start_time (std::chrono::steady_clock::time_point cur_time) {
@@ -299,7 +308,7 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
 
     double time_diff;
     time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time_).count();
-    time_diff = time_diff / 1000.0;
+    time_diff = time_diff / 1000.0 * bag_rate_;
 
     if (cleared_file_ = false) {
         std::ofstream error_list (dir);
@@ -313,5 +322,15 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
         error_list.close();
     }
 
+    return cur_frame_error;
+}
+
+double evaluator::compute_error (MatrixXf Y_track, MatrixXf Y_true) {
+    // compute error
+    double E1 = get_piecewise_error(Y_track, Y_true);
+    double E2 = get_piecewise_error(Y_true, Y_track);
+
+    double cur_frame_error = (E1 + E2) / 2;
+    
     return cur_frame_error;
 }
