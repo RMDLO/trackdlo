@@ -3,12 +3,12 @@
     <arg name="bag_file" default="0" />
     <arg name="trial" default="0" />
     <arg name="alg" default="trackdlo" />
-    <arg name="bag_rate" default="1" />
+    <arg name="bag_rate" default="0.5" />
 
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)" />
-    <arg name="save_location" default="$(find trackdlo)/data/dlo_tracking_eval/"/>
+    <arg name="save_location" default="$(find trackdlo)/data/dlo_tracking/"/>
 
     <!-- pct_occlusion takes value from 0 to 1 -->
     <arg name="pct_occlusion" default="25"/>
