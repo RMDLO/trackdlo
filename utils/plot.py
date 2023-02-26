@@ -6,6 +6,7 @@ from labellines import labelLines
 
 algorithms = ['trackdlo', 'cdcpd','cdcpd2', 'gltp']
 bags = ['stationary','perpendicular_motion', 'parallel_motion']
+titles = ['Stationary', 'Perpendicular Motion', 'Parallel Motion']
 duration_frames = [375, 197, 240]
 duration_times = [34.1-8, 18.4-5, 22.7-6.5]
 pcts = [0, 25, 50]
@@ -53,11 +54,12 @@ for n, bag in enumerate(bags):
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
             labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
+            plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
             plt.ylim(0, 50)
             plt.tight_layout()
-            plt.savefig(f'{dir}/frame_error_{bag}_{pct}.png')
+            plt.savefig(f'{dir}/eval_frame_error_{bag}_{pct}.png')
             plt.close()
 
     else:
@@ -89,11 +91,12 @@ for n, bag in enumerate(bags):
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
             labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
+            plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
             plt.ylim(0, 50)
             plt.tight_layout()
-            plt.savefig(f'{dir}/frame_error_{bag}.png')
+            plt.savefig(f'{dir}/eval_frame_error_{bag}.png')
             plt.close()
 
 ###################### PLOT PCT OCCLUSION VS. FINAL FRAME ERROR ######################
@@ -131,11 +134,11 @@ for n, bag in enumerate(bags):
             ax.plot(pcts, avg, label=f'{algorithms_plot[algorithm]}', linewidth=4, alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
             # ax.errorbar(pcts, avg, yerr=std, linewidth=10, color=colors[i])
 
-        # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
         plt.xlabel('Percentage of Occluded Nodes (%)')
+        plt.title(titles[n])
         plt.ylabel('Final Frame Error (mm)')
         plt.ylim(0, 50)
         plt.tight_layout()
         plt.legend()
-        plt.savefig(f'{dir}/pct_error_{bag}.png')
+        plt.savefig(f'{dir}/eval_pct_error_{bag}.png')
         plt.close()
