@@ -136,7 +136,7 @@ class OcclusionSimulation:
             self.resting = True
 
 if __name__=='__main__':
-    rospy.init_node("test")
+    rospy.init_node("simulated_occlusion")
     t = OcclusionSimulation()
     try:
         rospy.spin()

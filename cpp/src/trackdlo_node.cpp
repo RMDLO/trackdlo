@@ -49,6 +49,42 @@ void update_opencv_mask (const sensor_msgs::ImageConstPtr& opencv_mask_msg) {
     }
 }
 
+std::vector<double> rgb2hsv (int r_orig, int g_orig, int b_orig) {
+    double r = r_orig / 255.0;
+    double g = g_orig / 255.0;
+    double b = b_orig / 255.0;
+    double cmax = std::max(r, std::max(g, b)); 
+    double cmin = std::min(r, std::min(g, b)); 
+    double diff = cmax - cmin; 
+    double h = -1, s = -1;
+
+    if (cmax == cmin) {
+        h = 0;
+    }
+    else if (cmax == r) {
+        h = fmod(60 * ((g - b) / diff) + 360, 360);
+    }
+    else if (cmax == g) {
+        h = fmod(60 * ((b - r) / diff) + 120, 360);
+    }
+    else if (cmax == b) {
+        h = fmod(60 * ((r - g) / diff) + 240, 360);
+    }
+    h = h / 360 * 255;
+        
+    if (cmax == 0) {
+        s = 0;
+    }
+    else {
+        s = (diff / cmax) * 255;
+    }
+
+    double v = cmax * 255;
+
+    std::vector<double> hsv = {h, s, v};
+    return hsv;
+}
+
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
     // log time
@@ -141,6 +177,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     pcl_conversions::toPCL(*pc_msg, *cloud);   // cloud is 720*1280 (height*width) now, however is a ros pointcloud2 message. 
                                                // see message definition here: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointCloud2.html
 
+    bool simulated_occlusion = false;
+    int occlusion_corner_i = -1;
+    int occlusion_corner_j = -1;
     if (cloud->width != 0 && cloud->height != 0) {
         // convert to xyz point
         pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz;
@@ -177,17 +216,37 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 if (mask.at<uchar>(i, j) != 0) {
                     cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
                 }
+
+                // for text label
+                if (updated_opencv_mask && !simulated_occlusion && occlusion_mask_gray.at<uchar>(i, j) == 0) {
+                    occlusion_corner_i = i;
+                    occlusion_corner_j = j;
+                    simulated_occlusion = true;
+                }
             }
         }
 
         // Perform downsampling
         pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cur_pc_xyz.makeShared());
+        // pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloudPtr(cloud_xyz.makeShared());
         pcl::PCLPointCloud2 cur_pc_downsampled;
         pcl::VoxelGrid<pcl::PointXYZRGB> sor;
         sor.setInputCloud (cloudPtr);
         sor.setLeafSize (downsample_leaf_size, downsample_leaf_size, downsample_leaf_size);
         sor.filter (downsampled_xyz);
         pcl::toPCLPointCloud2(downsampled_xyz, cur_pc_downsampled);
+
+        // for (auto point : downsampled_xyz) {
+        //     std::vector<double> hsv = rgb2hsv(point.r, point.g, point.b);
+            
+        //     // hsv color thresholding
+        //     if (((hsv[0] > lower_red_1[0] && hsv[0] < upper_red_1[0] && hsv[1] > lower_red_1[1] && hsv[1] < upper_red_1[1] && hsv[2] > lower_red_1[2] && hsv[2] < upper_red_1[2]) || 
+        //          (hsv[0] > lower_red_2[0] && hsv[0] < upper_red_2[0] && hsv[1] > lower_red_2[1] && hsv[1] < upper_red_2[1] && hsv[2] > lower_red_2[2] && hsv[2] < upper_red_2[2])) &&
+        //         (hsv[0] > lower_blue[0] && hsv[0] < upper_blue[0] && hsv[1] > lower_blue[1] && hsv[1] < upper_blue[1] && hsv[2] > lower_blue[2] && hsv[2] < upper_blue[2]) &&
+        //         (hsv[0] > lower_yellow[0] && hsv[0] < upper_yellow[0] && hsv[1] > lower_yellow[1] && hsv[1] < upper_yellow[1] && hsv[2] > lower_yellow[2] && hsv[2] < upper_yellow[2])) {
+        //         downsampled_filtered_xyz.push_back(point);
+        //     }
+        // }
 
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
@@ -439,14 +498,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
             }
         }
+        // add text
+        if (updated_opencv_mask && simulated_occlusion) {
+            cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+        }
 
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
-
-        // // fill in header
-        // cur_pc->header.frame_id = "camera_color_optical_frame";
-        // cur_pc->header.seq = cloud->header.seq;
-        // cur_pc->fields = cloud->fields;
 
         cur_pc_downsampled.header.frame_id = "camera_color_optical_frame";
         cur_pc_downsampled.header.seq = cloud->header.seq;
@@ -476,9 +534,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(result_pc_pclpoincloud2, result_pc);
 
         result_pc.header = pc_msg->header;
-        // ros::Time t = pc_msg->header.stamp;
-        // t.Time() += 3e7;
-        // result_pc.header.stamp = t;
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
