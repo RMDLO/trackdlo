@@ -42,6 +42,7 @@
         <param name="exit_at" value="$(arg exit_at)" />
         <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
         <param name="bag_rate" value="$(arg bag_rate)" />
+        <param name="num_of_nodes" value="40" />
         <param name="save_image" value="$(arg save_image)" />
     </node>
 

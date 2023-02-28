@@ -23,6 +23,7 @@ double start_record_at;
 double exit_at;
 double wait_before_occlusion;
 double bag_rate;
+int num_of_nodes;
 bool save_image;
 
 int callback_count = 0;
@@ -357,6 +358,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/exit_at", exit_at);
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
     nh.getParam("/evaluation/bag_rate", bag_rate);
+    nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
     nh.getParam("/evaluation/save_image", save_image);
 
     // get bag file length
@@ -391,7 +393,7 @@ int main(int argc, char **argv) {
     std::cout << "num of point cloud messages: " << pc_count << std::endl;
 
     // initialize evaluator
-    tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_record_at, exit_at, wait_before_occlusion, bag_rate);
+    tracking_evaluator = evaluator(rgb_count, trial, pct_occlusion, alg, bag_file, save_location, start_record_at, exit_at, wait_before_occlusion, bag_rate, num_of_nodes);
 
     image_transport::ImageTransport it(nh);
     image_transport::Publisher eval_img_pub = it.advertise("/eval_img", 10);
