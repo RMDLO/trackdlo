@@ -9,7 +9,7 @@ do
         do
             for alg in gltp
             do
-                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo gltp.launch" &
+                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo gltp.launch bag_file:=$bag" &
                 first_terminal=$!
                 terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo evaluation.launch alg:=$alg bag_file:=$bag trial:=$trial pct_occlusion:=$pct --wait" &
                 second_teminal=$!
@@ -31,7 +31,7 @@ do
         do
             for alg in gltp
             do
-                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo gltp.launch" &
+                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo gltp.launch bag_file:=$bag" &
                 first_terminal=$!
                 terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo evaluation.launch alg:=$alg bag_file:=$bag trial:=$trial pct_occlusion:=$pct --wait" &
                 second_teminal=$!

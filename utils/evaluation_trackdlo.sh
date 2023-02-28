@@ -9,7 +9,7 @@ do
         do
             for alg in trackdlo
             do
-                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo trackdlo.launch" &
+                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo trackdlo.launch bag_file:=$bag" &
                 first_teminal=$!
                 terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo evaluation.launch alg:=$alg bag_file:=$bag trial:=$trial pct_occlusion:=$pct --wait" &
                 second_teminal=$!
@@ -29,7 +29,7 @@ do
         do
             for alg in trackdlo
             do
-                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo trackdlo.launch" &
+                terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo trackdlo.launch bag_file:=$bag" &
                 first_teminal=$!
                 terminator -e "cd rmdlo_tracking && source devel/setup.bash && roslaunch trackdlo evaluation.launch alg:=$alg bag_file:=$bag trial:=$trial pct_occlusion:=$pct --wait" &
                 second_teminal=$!
