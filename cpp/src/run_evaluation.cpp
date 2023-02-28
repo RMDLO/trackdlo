@@ -25,6 +25,7 @@ double wait_before_occlusion;
 double bag_rate;
 int num_of_nodes;
 bool save_image;
+bool save_errors;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -259,7 +260,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         // compute error
-        cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        if (save_errors) {
+            cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        }
+        else {
+            cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
+        }
         std::cout << "error = " << cur_error << std::endl;
 
         // optional pub and save result image
@@ -360,6 +366,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/bag_rate", bag_rate);
     nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
     nh.getParam("/evaluation/save_image", save_image);
+    nh.getParam("/evaluation/save_errors", save_errors);
 
     // get bag file length
     std::vector<std::string> topics;
