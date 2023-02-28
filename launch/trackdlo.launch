@@ -7,7 +7,7 @@
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
         <param name="bag_file" value="$(arg bag_file)" />
 
-        <param name="beta" value="4" if="$(eval arg('kernel') == 0)"/>
+        <param name="beta" value="3" if="$(eval arg('kernel') == 0)"/>
         <param name="lambda" value="100000" if="$(eval arg('kernel') == 0)"/>
 
         <param name="beta" value="0.5" if="$(eval arg('kernel') == 1)"/>
