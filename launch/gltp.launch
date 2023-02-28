@@ -6,7 +6,7 @@
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
         <param name="bag_file" value="$(arg bag_file)" />
 
-        <param name="beta" value="2" />
+        <param name="beta" value="1" />
         <param name="lambda" value="1" />
         <param name="lle_weight" value="1" />
         <param name="mu" value="0.05" />
