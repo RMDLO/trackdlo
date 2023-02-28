@@ -314,11 +314,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         cv::circle(eval_img, cv::Point(row, col), 5, point_color, -1);
+    }
 
-        // if (cur_error != -1) {
-        //     std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
-        //     cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
-        // }
+    if (cur_error != -1) {
+        std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
+        cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
     }
 
     // save image
