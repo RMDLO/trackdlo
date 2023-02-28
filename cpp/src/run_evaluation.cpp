@@ -25,6 +25,7 @@ double wait_before_occlusion;
 double bag_rate;
 int num_of_nodes;
 bool save_image;
+bool save_errors;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
@@ -244,7 +245,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
             else if (bag_file == 2) {
                 top_left_x = 750;
-                top_left_y = 50;
+                top_left_y = 70;
                 bottom_right_x = 1012;
                 bottom_right_y = 320;
 
@@ -259,7 +260,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         // compute error
-        cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        if (save_errors) {
+            cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
+        }
+        else {
+            cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
+        }
         std::cout << "error = " << cur_error << std::endl;
 
         // optional pub and save result image
@@ -308,11 +314,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         cv::circle(eval_img, cv::Point(row, col), 5, point_color, -1);
+    }
 
-        if (cur_error != -1) {
-            std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
-            cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
-        }
+    if (cur_error != -1) {
+        std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
+        cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
     }
 
     // save image
@@ -322,13 +328,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             std::string dir;
             // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
             if (bag_file == 0) {
-                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             else if (bag_file == 1) {
-                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             else if (bag_file == 2) {
-                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             cv::imwrite(dir, eval_img);
             tracking_evaluator.increment_image_counter();
@@ -360,6 +366,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/bag_rate", bag_rate);
     nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
     nh.getParam("/evaluation/save_image", save_image);
+    nh.getParam("/evaluation/save_errors", save_errors);
 
     // get bag file length
     std::vector<std::string> topics;

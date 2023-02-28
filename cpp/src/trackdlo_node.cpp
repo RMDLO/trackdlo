@@ -194,6 +194,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // filter point cloud from mask
         for (int i = 0; i < cloud->height; i ++) {
             for (int j = 0; j < cloud->width; j ++) {
+                // for text label
+                if (updated_opencv_mask && !simulated_occlusion && occlusion_mask_gray.at<uchar>(i, j) == 0) {
+                    occlusion_corner_i = i;
+                    occlusion_corner_j = j;
+                    simulated_occlusion = true;
+                }
+
                 // should not pick up points from the gripper
                 if (bag_file == 2) {
                     if (cloud_xyz(j, i).x < -0.15 || cloud_xyz(j, i).y < -0.15 || cloud_xyz(j, i).z < 0.58) {
@@ -215,13 +222,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
                 if (mask.at<uchar>(i, j) != 0) {
                     cur_pc_xyz.push_back(cloud_xyz(j, i));   // note: this is (j, i) not (i, j)
-                }
-
-                // for text label
-                if (updated_opencv_mask && !simulated_occlusion && occlusion_mask_gray.at<uchar>(i, j) == 0) {
-                    occlusion_corner_i = i;
-                    occlusion_corner_j = j;
-                    simulated_occlusion = true;
                 }
             }
         }
