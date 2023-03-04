@@ -1,11 +1,11 @@
 #!/bin/bash
 # Loop
 
-for kernel in 0 3
+for kernel in 3
 do
-    for bag in 0 1
+    for bag in 0
     do
-        for trial in 0 1 2 3 4 5 6 7 8 9
+        for trial in 9
         do
             terminator -e "cd ~/catkin_ws && source devel/setup.bash && roslaunch trackdlo trackdlo.launch bag_file:=$bag kernel:=$kernel" &
             first_teminal=$!
