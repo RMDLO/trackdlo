@@ -156,9 +156,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
+    // log time
+    cur_time = std::chrono::steady_clock::now();
+
     // distance transform
-    Mat bmask_transformed;
-    cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
+    Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
+    cv::distanceTransform((255-mask), bmask_transformed, cv::noArray(), cv::DIST_L2, 5);
+
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
+    ROS_INFO_STREAM("Distance transform only: " + std::to_string(time_diff) + " ms");
+
     double mat_min, mat_max;
     cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
     // std::cout << mat_min << ", " << mat_max << std::endl;
