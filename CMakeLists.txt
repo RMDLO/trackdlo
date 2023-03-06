@@ -151,19 +151,19 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(
-  trackdlo cpp/src/trackdlo_node.cpp cpp/src/trackdlo.cpp cpp/src/utils.cpp
+  trackdlo trackdlo/src/trackdlo_node.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp
 )
 
 add_executable(
-  gltp cpp/src/gltp_node.cpp cpp/src/trackdlo.cpp cpp/src/utils.cpp
+  gltp trackdlo/src/gltp_node.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp
 )
 
 add_executable(
-  evaluation cpp/src/run_evaluation.cpp cpp/src/trackdlo.cpp cpp/src/utils.cpp cpp/src/evaluator.cpp
+  evaluation trackdlo/src/run_evaluation.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp trackdlo/src/evaluator.cpp
 )
 
 # add_executable(
-#   test_node cpp/src/test_node.cpp cpp/src/trackdlo.cpp
+#   test_node trackdlo/src/test_node.cpp trackdlo/src/trackdlo.cpp
 # )
 
 ## Rename C++ executable without prefix
