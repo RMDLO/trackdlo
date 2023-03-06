@@ -22,7 +22,6 @@ markers = ['o','^','s']
 
 ###################### PLOT TIME VS. FRAME ERROR ######################
 window_size = 10
-ROOT_DIR = abspath(os.curdir)
 dir = join(dirname(dirname(abspath(__file__))), "data")
 
 for n, bag in enumerate(bags):
@@ -31,7 +30,7 @@ for n, bag in enumerate(bags):
         ax = plt.gca()
         data = []
         for trial in range(0,10):
-            file_path = f'{dir}/dlo_tracking/kernel_analysis/{kernel}/trackdlo_{trial}_40_{bag}_error.txt'
+            file_path = f'{dir}/dlo_tracking/kernel_comparison/{kernel}/trackdlo_{trial}_40_{bag}_error.txt'
             with open(file_path, 'r') as file:
                 content = file.readlines()
                 error = []

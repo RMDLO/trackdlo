@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from os.path import dirname, abspath, join
 import numpy as np
 from labellines import labelLines
 
-algorithms = ['trackdlo', 'cdcpd2', 'cdcpd','gltp']
+algorithms = ['trackdlo', 'cdcpd2', 'cdcpd','gltp', 'cdcpd2_no_gripper']
 bags = ['stationary','perpendicular_motion', 'parallel_motion']
 titles = ['Stationary', 'Perpendicular Motion', 'Parallel Motion']
 duration_frames = [375, 197, 240]
@@ -15,14 +16,14 @@ pcts = [0, 10, 20, 30, 40, 50]
 algorithms_plot = {'trackdlo': 'TrackDLO',
                     'gltp': 'GLTP',
                     'cdcpd': 'CDCPD',
-                    'cdcpd2': 'CDCPD2'}
-colors = ['cyan','blue','magenta','red']
-markers = ['o','^','*','s']
+                    'cdcpd2': 'CDCPD2',
+                    'cdcpd2_no_gripper': 'CDCPD2 w/o gripper'}
+colors = ['red', 'orange', 'midnightblue', 'deepskyblue', 'b']
+markers = ['o','^','X','s', 'v']
 
 ###################### PLOT TIME VS. FRAME ERROR ######################
 window_size = 10
-ROOT_DIR = os.path.abspath(os.curdir)
-dir = f'{ROOT_DIR}/src/trackdlo/data'
+dir = join(dirname(dirname(abspath(__file__))), "data")
 
 
 for n, bag in enumerate(bags):
@@ -32,7 +33,7 @@ for n, bag in enumerate(bags):
             for i, algorithm in enumerate(algorithms):
                 data = []
                 for trial in range(0,10):
-                    file_path = f'{dir}/dlo_tracking/{algorithm}_{trial}_{pct}_{bag}_error.txt'
+                    file_path = f'{dir}/dlo_tracking/algo_comparison/{algorithm}/{bag}/{algorithm}_{trial}_{pct}_{bag}_error.txt'
                     with open(file_path, 'r') as file:
                         content = file.readlines()
                         error = []
@@ -46,7 +47,7 @@ for n, bag in enumerate(bags):
 
                 average_smoothed_error = pd.Series(list(mean_data_array)).rolling(window_size).mean()
                 std_smoothed_error = pd.Series(list(mean_data_array)).rolling(window_size).std()
-                time = np.asarray(average_smoothed_error.index/duration_frames[n]) * duration_times[n]
+                time = np.asarray(average_smoothed_error.index/duration_frames[n]) * duration_times[n] - 0.5
 
                 minus_one_std = average_smoothed_error - std_smoothed_error
                 minus_one_std[minus_one_std<0] = 0 # set negative std to 0 so that frame error is always positive
@@ -55,12 +56,14 @@ for n, bag in enumerate(bags):
                 ax.plot(time, average_smoothed_error.values, label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markevery=30, markersize=12)
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
-            labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
+            # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
             # plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
             plt.ylim(0, 50)
             plt.tight_layout()
+            # plt.grid()
+            plt.legend()
             plt.savefig(f'{dir}/eval_frame_error_{bag}_{pct}.png')
             plt.close()
 
@@ -70,7 +73,7 @@ for n, bag in enumerate(bags):
             for i, algorithm in enumerate(algorithms):
                 data = []
                 for trial in range(0,10):
-                    file_path = f'{dir}/dlo_tracking/{algorithm}_{trial}_{pct}_{bag}_error.txt'
+                    file_path = f'{dir}/dlo_tracking/algo_comparison/{algorithm}/{bag}/{algorithm}_{trial}_{pct}_{bag}_error.txt'
                     with open(file_path, 'r') as file:
                         content = file.readlines()
                         error = []
@@ -83,7 +86,7 @@ for n, bag in enumerate(bags):
 
                 average_smoothed_error = pd.Series(list(mean_data_array)).rolling(window_size).mean()
                 std_smoothed_error = pd.Series(list(mean_data_array)).rolling(window_size).std()
-                time = np.asarray(average_smoothed_error.index/duration_frames[n]) * duration_times[n]
+                time = np.asarray(average_smoothed_error.index/duration_frames[n]) * duration_times[n] - 0.5
 
                 minus_one_std = average_smoothed_error - std_smoothed_error
                 minus_one_std[minus_one_std<0] = 0 # set negative std to 0 so that frame error is always positive
@@ -92,12 +95,14 @@ for n, bag in enumerate(bags):
                 ax.plot(time,average_smoothed_error.values, label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markevery=30, markersize=12)
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
-            labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
+            # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
             # plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
             plt.ylim(0, 50)
             plt.tight_layout()
+            # plt.grid()
+            plt.legend()
             plt.savefig(f'{dir}/eval_frame_error_{bag}.png')
             plt.close()
 
@@ -112,7 +117,7 @@ for n, bag in enumerate(bags):
             for pct in pcts:
                 data = []
                 for trial in range(0,10):
-                    file_path = f'{dir}/dlo_tracking/{algorithm}_{trial}_{pct}_{bag}_error.txt'
+                    file_path = f'{dir}/dlo_tracking/algo_comparison/{algorithm}/{bag}/{algorithm}_{trial}_{pct}_{bag}_error.txt'
                     with open(file_path, 'r') as file:
                         content = file.readlines()
                         error = []
@@ -132,7 +137,7 @@ for n, bag in enumerate(bags):
 
                 avg.append(average_error)
                 std.append(std_error)
-            ax.plot(pcts, avg, label=f'{algorithms_plot[algorithm]}', linewidth=4, alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
+            ax.plot(pcts, avg, label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
             ax.errorbar(pcts, avg, yerr=std, linewidth=2, color=colors[i])
 
         plt.xlabel('Percentage of Occluded Nodes (%)')
@@ -140,6 +145,7 @@ for n, bag in enumerate(bags):
         plt.ylabel('Final Frame Error (mm)')
         plt.ylim(0, 50)
         plt.tight_layout()
+        # plt.grid()
         plt.legend()
         plt.savefig(f'{dir}/eval_pct_error_{bag}.png')
         plt.close()
