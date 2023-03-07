@@ -279,6 +279,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             double cur_sigma2 = tracker.get_sigma2();
             tracker.ecpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, false, use_prev_sigma2);
             tracker.initialize_nodes(Y);
+            tracker.set_sigma2(cur_sigma2);
         }
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
