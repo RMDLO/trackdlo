@@ -4,8 +4,7 @@ project(trackdlo)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-O3 )   # -std=c++11
+add_compile_options(-O3 )   # -std=c++11
 
 # set(CMAKE_CXX_STANDARD 14)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,7 +55,7 @@ target_link_libraries(trackdlo
   # ${OpenCV_LIBS}
   Eigen3::Eigen
 )
-target_compile_options(trackdlo PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
+# target_compile_options(trackdlo PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
 
 add_executable(
   gltp trackdlo/src/gltp_node.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp
@@ -67,7 +66,7 @@ target_link_libraries(gltp
   # ${OpenCV_LIBS}
   Eigen3::Eigen
 )
-target_compile_options(gltp PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
+# target_compile_options(gltp PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
 
 add_executable(
   evaluation trackdlo/src/run_evaluation.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp trackdlo/src/evaluator.cpp
@@ -78,4 +77,4 @@ target_link_libraries(evaluation
   # ${OpenCV_LIBS}
   Eigen3::Eigen
 )
-target_compile_options(evaluation PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
+# target_compile_options(evaluation PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
