@@ -220,6 +220,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                         continue;
                     }
                 }
+                else if (bag_file == 3) {
+                    if (cloud_xyz(j, i).y < -0.1 || cloud_xyz(j, i).z < 0.58) {
+                        continue;
+                    }
+                }
                 else {
                     if (cloud_xyz(j, i).z < 0.58) {
                         continue;

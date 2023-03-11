@@ -9,7 +9,7 @@
 
         <param name="beta" value="1" />
         <param name="lambda" value="1" />
-        <param name="lle_weight" value="1" />
+        <param name="lle_weight" value="10" />
         <param name="mu" value="0.05" />
         <param name="max_iter" value="50" />
         <param name="tol" value="0.00001" />

@@ -429,7 +429,7 @@ def cpd_lle (X, Y_0, beta, alpha, gamma, mu, max_iter=50, tol=0.00001, include_l
 
 initialized = False
 use_eval_rope = True
-pub_tracking_img = False
+pub_tracking_img = True
 init_nodes = []
 nodes = []
 guide_nodes_Y_0 = []
@@ -574,7 +574,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        nodes, sigma2 = cpd_lle(filtered_pc, nodes, 0.7, 5, 1, 0.05, 50, 0.00001, True, True, True, sigma2)
+        nodes, sigma2 = cpd_lle(filtered_pc, nodes, 0.7, 5, 1, 0.05, 50, 0.00001, True, False, True, sigma2)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()
@@ -616,7 +616,7 @@ def callback (rgb, pc):
 
 if __name__=='__main__':
 
-    rospy.init_node('track_dlo', anonymous=True)
+    rospy.init_node('tracking_test', anonymous=True)
 
     rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
     pc_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)

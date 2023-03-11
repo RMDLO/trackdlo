@@ -18,7 +18,7 @@ algorithms_plot = {'trackdlo': 'TrackDLO',
                     'cdcpd': 'CDCPD',
                     'cdcpd2': 'CDCPD2',
                     'cdcpd2_no_gripper': 'CDCPD2 w/o gripper'}
-colors = ['red', 'orange', 'midnightblue', 'deepskyblue', 'b']
+colors = ['red', 'midnightblue', 'deepskyblue', 'b', 'orange']
 markers = ['o','^','X','s', 'v']
 
 ###################### PLOT TIME VS. FRAME ERROR ######################
@@ -29,6 +29,7 @@ dir = join(dirname(dirname(abspath(__file__))), "data")
 for n, bag in enumerate(bags):
     if bag=='stationary':
         for pct in pcts:
+            plt.figure(figsize=(8, 5))
             ax = plt.gca()
             for i, algorithm in enumerate(algorithms):
                 data = []
@@ -60,6 +61,10 @@ for n, bag in enumerate(bags):
             # plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
+
+            plt.xlim(0, 26)
+            plt.axvspan(5, 26, facecolor='gray', alpha=0.3)
+
             plt.ylim(0, 50)
             plt.tight_layout()
             # plt.grid()
@@ -69,6 +74,7 @@ for n, bag in enumerate(bags):
 
     else:
         for pct in pcts[:1]:
+            plt.figure(figsize=(8, 5))
             ax = plt.gca()
             for i, algorithm in enumerate(algorithms):
                 data = []
@@ -99,6 +105,16 @@ for n, bag in enumerate(bags):
             # plt.title(titles[n])
             plt.xlabel('Time (s)')
             plt.ylabel('Frame Error (mm)')
+
+            if bag == "perpendicular_motion":
+                plt.xlim(0, 13)
+                plt.axvspan(2.55, 14, facecolor='gray', alpha=0.3)
+
+            if bag == "parallel_motion":
+                plt.xlim(0, 16)
+                plt.axvspan(3.5, 10, facecolor='gray', alpha=0.3)
+                plt.axvspan(10, 16, facecolor='green', alpha=0.1)
+
             plt.ylim(0, 50)
             plt.tight_layout()
             # plt.grid()
@@ -110,6 +126,7 @@ for n, bag in enumerate(bags):
 
 for n, bag in enumerate(bags):
     if bag=='stationary':
+        plt.figure(figsize=(8, 5))
         ax = plt.gca()
         for i, algorithm in enumerate(algorithms):
             avg = []
