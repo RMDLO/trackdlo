@@ -187,6 +187,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     bool simulated_occlusion = false;
     int occlusion_corner_i = -1;
     int occlusion_corner_j = -1;
+    int occlusion_corner_i_2 = -1;
+    int occlusion_corner_j_2 = -1;
     if (cloud->width != 0 && cloud->height != 0) {
         // convert to xyz point
         pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz;
@@ -206,6 +208,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     occlusion_corner_i = i;
                     occlusion_corner_j = j;
                     simulated_occlusion = true;
+                }
+
+                // update the other corner of occlusion mask
+                if (updated_opencv_mask && occlusion_mask_gray.at<uchar>(i, j) == 0) {
+                    occlusion_corner_i_2 = i;
+                    occlusion_corner_j_2 = j;
                 }
 
                 // should not pick up points from the gripper
@@ -276,7 +284,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             if (use_eval_rope) {
                 // simple blob detector
                 std::vector<cv::KeyPoint> keypoints_markers;
-                // std::vector<cv::KeyPoint> keypoints_blue;
+                std::vector<cv::KeyPoint> keypoints_blue;
                 cv::SimpleBlobDetector::Params blob_params;
                 blob_params.filterByColor = false;
                 blob_params.filterByArea = true;
@@ -287,7 +295,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
                 // detect
                 detector->detect(mask_markers, keypoints_markers);
-                // detector->detect(mask_blue, keypoints_blue);
 
                 for (cv::KeyPoint key_point : keypoints_markers) {
                     auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
@@ -295,9 +302,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                         cur_nodes_xyz.push_back(keypoint_pc);
                     }
                 }
-                // for (cv::KeyPoint key_point : keypoints_blue) {
-                //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-                // }
+
+                // if using shorter rope
+                if (bag_file == 4) {
+                    detector->detect(mask_blue, keypoints_blue);
+
+                    for (cv::KeyPoint key_point : keypoints_blue) {
+                        cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                    }
+                }
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
@@ -305,7 +318,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 
                 tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
 
-                sigma2 = 0.0001;
+                sigma2 = 0.001;
 
                 // record geodesic coord
                 double cur_sum = 0;
@@ -512,7 +525,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
         // add text
         if (updated_opencv_mask && simulated_occlusion) {
-            cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            if (bag_file == 4) {
+                cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j-190, occlusion_corner_i_2-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
+            else {
+                cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
         }
 
         // publish image

@@ -168,7 +168,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     }
                 }
                 else {
-                    if (cloud_xyz(j, i).z < 0.58) {
+                    if (cloud_xyz(j, i).z < 0.55) {
                         continue;
                     }
                 }

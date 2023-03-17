@@ -4,7 +4,7 @@ project(trackdlo)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-O3 )   # -std=c++11
+add_compile_options(-O2)   # -std=c++11
 
 # set(CMAKE_CXX_STANDARD 14)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -391,7 +391,7 @@ def cpd_lle (X, Y_0, beta, alpha, gamma, mu, max_iter=50, tol=0.00001, include_l
         Np = np.sum(P1)
         PX = np.matmul(P, X)
 
-        print(Pt1)
+        # print(Pt1)
     
         # ----- M step: solve for new weights and variance -----
         if include_lle:
@@ -574,7 +574,7 @@ def callback (rgb, pc):
 
         # log time
         cur_time = time.time()
-        nodes, sigma2 = cpd_lle(filtered_pc, nodes, 0.7, 5, 1, 0.05, 50, 0.00001, True, False, True, sigma2)
+        nodes, sigma2 = cpd_lle(filtered_pc, nodes, 0.7, 5, 1, 0.05, 50, 0.00001, True, False, False, sigma2)
         rospy.logwarn('tracking_step total: ' + str((time.time() - cur_time)*1000) + ' ms')
 
         init_nodes = nodes.copy()

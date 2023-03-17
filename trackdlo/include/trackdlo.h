@@ -79,6 +79,19 @@ class trackdlo
         void initialize_nodes (MatrixXf Y_init);
         void set_sigma2 (double sigma2);
 
+        void cpd_lle (MatrixXf X,
+                        MatrixXf& Y,
+                        double& sigma2,
+                        double beta,
+                        double lambda,
+                        double gamma,
+                        double mu,
+                        int max_iter = 30,
+                        double tol = 0.00001,
+                        bool include_lle = true,
+                        bool use_geodesic = false,
+                        bool use_prev_sigma2 = false);
+
         bool ecpd_lle (MatrixXf X_orig,
                         MatrixXf& Y,
                         double& sigma2,
