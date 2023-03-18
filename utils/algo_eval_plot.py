@@ -5,9 +5,11 @@ from os.path import dirname, abspath, join
 import numpy as np
 from labellines import labelLines
 
-algorithms = ['trackdlo', 'cdcpd2', 'cdcpd','gltp', 'cdcpd2_no_gripper']
+plt.rcParams.update({'font.size': 12})
+
+algorithms = ['trackdlo', 'cdcpd2', 'cdcpd2_no_gripper','cdcpd', 'gltp']
 bags = ['stationary','perpendicular_motion', 'parallel_motion']
-titles = ['Stationary', 'Perpendicular Motion', 'Parallel Motion']
+titles = ['Avg. Error Over 30s vs. $\%$ Occlusion, Stationary DLO', 'Tracking Error vs. Time for Perpendicular Motion', 'Tracking Error vs. Time for Parallel Motion']
 duration_frames = [375, 197, 240]
 duration_times = [34.1-8, 18.4-5, 22.7-6.5]
 pcts = [0, 10, 20, 30, 40, 50]
@@ -18,7 +20,7 @@ algorithms_plot = {'trackdlo': 'TrackDLO',
                     'cdcpd': 'CDCPD',
                     'cdcpd2': 'CDCPD2',
                     'cdcpd2_no_gripper': 'CDCPD2 w/o gripper'}
-colors = ['red', 'midnightblue', 'deepskyblue', 'b', 'orange']
+colors = ['red', 'orange', 'deepskyblue', 'b', 'midnightblue']
 markers = ['o','^','X','s', 'v']
 
 ###################### PLOT TIME VS. FRAME ERROR ######################
@@ -28,6 +30,8 @@ dir = join(dirname(dirname(abspath(__file__))), "data")
 
 for n, bag in enumerate(bags):
     if bag=='stationary':
+        continue
+
         for pct in pcts:
             plt.figure(figsize=(8, 5))
             ax = plt.gca()
@@ -58,9 +62,9 @@ for n, bag in enumerate(bags):
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
             # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
-            # plt.title(titles[n])
-            plt.xlabel('Time (s)')
-            plt.ylabel('Frame Error (mm)')
+            plt.title('Tracking Error vs. Time for Stationary DLO', fontsize=18)
+            plt.xlabel('Time (s)', fontsize=15)
+            plt.ylabel('Frame Error (mm)', fontsize=15)
 
             plt.xlim(0, 26)
             plt.axvspan(5, 26, facecolor='gray', alpha=0.3)
@@ -102,18 +106,18 @@ for n, bag in enumerate(bags):
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
             # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
-            # plt.title(titles[n])
-            plt.xlabel('Time (s)')
-            plt.ylabel('Frame Error (mm)')
+            plt.title(titles[n], fontsize=18)
+            plt.xlabel('Time (s)', fontsize=15)
+            plt.ylabel('Frame Error (mm)', fontsize=15)
 
             if bag == "perpendicular_motion":
                 plt.xlim(0, 13)
-                plt.axvspan(2.55, 14, facecolor='gray', alpha=0.3)
+                plt.axvspan(2.55, 14, facecolor='slategray', alpha=0.2)
 
             if bag == "parallel_motion":
                 plt.xlim(0, 16)
-                plt.axvspan(3.5, 10, facecolor='gray', alpha=0.3)
-                plt.axvspan(10, 16, facecolor='green', alpha=0.1)
+                plt.axvspan(3.5, 10, facecolor='darkslateblue', alpha=0.2)
+                plt.axvspan(10, 16, facecolor='slategray', alpha=0.2)
 
             plt.ylim(0, 50)
             plt.tight_layout()
@@ -154,12 +158,12 @@ for n, bag in enumerate(bags):
 
                 avg.append(average_error)
                 std.append(std_error)
-            ax.plot(pcts, avg, label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
-            ax.errorbar(pcts, avg, yerr=std, linewidth=2, color=colors[i])
+            ax.plot(pcts, avg, linestyle='--', label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
+            # ax.errorbar(pcts, avg, yerr=std, linewidth=2, color=colors[i], linestyle='dotted')
 
-        plt.xlabel('Percentage of Occluded Nodes (%)')
-        # plt.title(titles[n])
-        plt.ylabel('Final Frame Error (mm)')
+        plt.title(titles[n], fontsize=18)
+        plt.xlabel('Percentage of Occluded Nodes (%)', fontsize=15)
+        plt.ylabel('Final Frame Error (mm)', fontsize=15)
         plt.ylim(0, 50)
         plt.tight_layout()
         # plt.grid()
