@@ -163,6 +163,110 @@ MatrixXf trackdlo::calc_LLE_weights (int k, MatrixXf X) {
     return W;
 }
 
+void trackdlo::cpd_lle (MatrixXf X,
+                    MatrixXf& Y,
+                    double& sigma2,
+                    double beta,
+                    double lambda,
+                    double gamma,
+                    double mu,
+                    int max_iter,
+                    double tol,
+                    bool include_lle,
+                    bool use_geodesic,
+                    bool use_prev_sigma2)
+{
+    int M = Y.rows();
+    int N = X.rows();
+    int D = 3;
+
+    // initialization
+    // compute differences for G matrix computation
+    MatrixXf diff_yy = MatrixXf::Zero(M, M);
+    MatrixXf diff_yy_sqrt = MatrixXf::Zero(M, M);
+    for (int i = 0; i < M; i ++) {
+        for (int j = 0; j < M; j ++) {
+            diff_yy(i, j) = (Y.row(i) - Y.row(j)).squaredNorm();
+            diff_yy_sqrt(i, j) = (Y.row(i) - Y.row(j)).norm();
+        }
+    }
+
+    MatrixXf G = (-diff_yy / (2 * beta * beta)).array().exp();
+    MatrixXf Y_0 = Y.replicate(1, 1);
+
+    // diff_xy should be a (M * N) matrix
+    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    for (int i = 0; i < M; i ++) {
+        for (int j = 0; j < N; j ++) {
+            diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
+        }
+    }
+
+    // initialize sigma2
+    if (!use_prev_sigma2 || sigma2 == 0) {
+        sigma2 = diff_xy.sum() / static_cast<double>(D * M * N);
+    }
+
+    for (int it = 0; it < max_iter; it ++) {
+        // ----- E step: compute posteriori probability matrix P -----
+
+        // update diff_xy
+        diff_xy = MatrixXf::Zero(M, N);
+        for (int i = 0; i < M; i ++) {
+            for (int j = 0; j < N; j ++) {
+                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+            }
+        }
+
+        float c = std::pow(2 * M_PI * sigma2, static_cast<double>(D) / 2);
+        float w = 0.1;
+        c *= w / (1 - w);
+        c *= static_cast<double>(M) / N;
+
+        MatrixXf P = (-diff_xy / (2 * sigma2)).array().exp().matrix();
+        // P.array().colwise() *= Y_emit_prior.array();
+
+        RowVectorXf den = P.colwise().sum();
+        den.array() += c;
+
+        P = P.array().rowwise() / den.array();
+
+        MatrixXf Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
+        MatrixXf P1 = P.rowwise().sum();
+        double Np = P1.sum();
+        MatrixXf PX = P * X;
+
+        // M step
+        MatrixXf A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M);
+        MatrixXf B_matrix = PX - P1.asDiagonal() * Y_0;
+
+        // MatrixXf W = A_matrix.householderQr().solve(B_matrix);
+        // MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+
+        MatrixXf T = Y_0 + G * W;
+        double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
+        double trPXtT = (PX.transpose() * T).trace();
+        double trTtdP1T = (T.transpose() * P1.asDiagonal() * T).trace();
+
+        sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D);
+
+        if (pt2pt_dis_sq(Y, Y_0 + G*W) < tol) {
+            Y = Y_0 + G*W;
+            ROS_INFO_STREAM("Iteration until convergence: " + std::to_string(it+1));
+            break;
+        }
+        else {
+            Y = Y_0 + G*W;
+        }
+
+        if (it == max_iter - 1) {
+            ROS_ERROR("optimization did not converge!");
+            break;
+        }
+    }
+}
+
 bool trackdlo::ecpd_lle (MatrixXf X_orig,
                         MatrixXf& Y,
                         double& sigma2,
@@ -458,7 +562,11 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
         }
 
         // MatrixXf W = A_matrix.householderQr().solve(B_matrix);
-        MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        // MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        // MatrixXf W = A_matrix.fullPivLu().solve(B_matrix);
+        // MatrixXf W = A_matrix.partialPivLu().solve(B_matrix);
+        // MatrixXf W = A_matrix.colPivHouseholderQr().solve(B_matrix);
+        MatrixXf W = A_matrix.fullPivHouseholderQr().solve(B_matrix);
 
         MatrixXf T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
@@ -994,7 +1102,7 @@ void trackdlo::tracking_step (MatrixXf X_orig,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    ecpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, 4, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0.0, 1);
+    ecpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, 1, 1, 10, 0.1, 50, 0.00001, true, true, true, false);
 
     if (occluded_nodes.size() == 0) {
         ROS_INFO("All nodes visible");

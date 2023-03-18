@@ -156,9 +156,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
+    // log time
+    cur_time = std::chrono::steady_clock::now();
+
     // distance transform
-    Mat bmask_transformed;
-    cv::distanceTransform((255 - mask), bmask_transformed, cv::DIST_L2, 3);
+    Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
+    cv::distanceTransform((255-mask), bmask_transformed, cv::noArray(), cv::DIST_L2, 5);
+
+    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
+    ROS_INFO_STREAM("Distance transform only: " + std::to_string(time_diff) + " ms");
+
     double mat_min, mat_max;
     cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
     // std::cout << mat_min << ", " << mat_max << std::endl;
@@ -180,6 +187,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     bool simulated_occlusion = false;
     int occlusion_corner_i = -1;
     int occlusion_corner_j = -1;
+    int occlusion_corner_i_2 = -1;
+    int occlusion_corner_j_2 = -1;
     if (cloud->width != 0 && cloud->height != 0) {
         // convert to xyz point
         pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz;
@@ -201,6 +210,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     simulated_occlusion = true;
                 }
 
+                // update the other corner of occlusion mask
+                if (updated_opencv_mask && occlusion_mask_gray.at<uchar>(i, j) == 0) {
+                    occlusion_corner_i_2 = i;
+                    occlusion_corner_j_2 = j;
+                }
+
                 // should not pick up points from the gripper
                 if (bag_file == 2) {
                     if (cloud_xyz(j, i).x < -0.15 || cloud_xyz(j, i).y < -0.15 || cloud_xyz(j, i).z < 0.58) {
@@ -210,6 +225,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 else if (bag_file == 1) {
                     if ((cloud_xyz(j, i).x < 0.0 && cloud_xyz(j, i).y < 0.05) || cloud_xyz(j, i).z < 0.58 || 
                          cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.1 && cloud_xyz(j, i).y < -0.05)) {
+                        continue;
+                    }
+                }
+                else if (bag_file == 3) {
+                    if (cloud_xyz(j, i).y < -0.1 || cloud_xyz(j, i).z < 0.58) {
                         continue;
                     }
                 }
@@ -264,7 +284,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             if (use_eval_rope) {
                 // simple blob detector
                 std::vector<cv::KeyPoint> keypoints_markers;
-                // std::vector<cv::KeyPoint> keypoints_blue;
+                std::vector<cv::KeyPoint> keypoints_blue;
                 cv::SimpleBlobDetector::Params blob_params;
                 blob_params.filterByColor = false;
                 blob_params.filterByArea = true;
@@ -275,7 +295,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
                 // detect
                 detector->detect(mask_markers, keypoints_markers);
-                // detector->detect(mask_blue, keypoints_blue);
 
                 for (cv::KeyPoint key_point : keypoints_markers) {
                     auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
@@ -283,9 +302,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                         cur_nodes_xyz.push_back(keypoint_pc);
                     }
                 }
-                // for (cv::KeyPoint key_point : keypoints_blue) {
-                //     cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-                // }
+
+                // if using shorter rope
+                if (bag_file == 4) {
+                    detector->detect(mask_blue, keypoints_blue);
+
+                    for (cv::KeyPoint key_point : keypoints_blue) {
+                        cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
+                    }
+                }
 
                 MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
                 MatrixXf Y_0_sorted = sort_pts(Y_0);
@@ -293,7 +318,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 
                 tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
 
-                sigma2 = 0.0001;
+                sigma2 = 0.001;
 
                 // record geodesic coord
                 double cur_sum = 0;
@@ -500,7 +525,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
         // add text
         if (updated_opencv_mask && simulated_occlusion) {
-            cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            if (bag_file == 4) {
+                cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j-190, occlusion_corner_i_2-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
+            else {
+                cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
         }
 
         // publish image

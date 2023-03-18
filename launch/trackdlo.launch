@@ -1,38 +1,39 @@
 <launch>
     <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
+    <!-- 3 -> self_intersection.bag; 4 -> folding -->
     <arg name="bag_file" default="0" />
     <arg name="kernel" default="1" />
+    <arg name="use_eval_rope" default="true" />
 
     <node name="trackdlo" pkg="trackdlo" type="trackdlo" output="screen">
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
         <param name="bag_file" value="$(arg bag_file)" />
 
         <param name="beta" value="3" if="$(eval arg('kernel') == 0)"/>
-        <param name="lambda" value="100000" if="$(eval arg('kernel') == 0)"/>
+        <param name="lambda" value="50000" if="$(eval arg('kernel') == 0)"/>
 
         <param name="beta" value="0.5" if="$(eval arg('kernel') == 1)"/>
-        <param name="lambda" value="90000" if="$(eval arg('kernel') == 1)"/>
+        <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
 
         <!-- NOT TUNED!!! -->
         <param name="beta" value="0.3" if="$(eval arg('kernel') == 2)"/>
-        <param name="lambda" value="90000" if="$(eval arg('kernel') == 2)"/>
+        <param name="lambda" value="50000" if="$(eval arg('kernel') == 2)"/>
 
-        <param name="beta" value="0.2" if="$(eval arg('kernel') == 3)"/>
-        <param name="lambda" value="90000" if="$(eval arg('kernel') == 3)"/>
+        <param name="beta" value="0.17" if="$(eval arg('kernel') == 3)"/>
+        <param name="lambda" value="50000" if="$(eval arg('kernel') == 3)"/>
 
-        <param name="alpha" value="2.0" />
+        <param name="alpha" value="3" />
         <param name="lle_weight" value="10.0" />
         <param name="mu" value="0.05" />
         <param name="max_iter" value="50" />
         <param name="tol" value="0.00001" />
-        <param name="k_vis" value="0.05" />
+        <param name="k_vis" value="0.1" />
         <param name="include_lle" value="false" />
         <param name="use_geodesic" value="true" />
         <param name="use_prev_sigma2" value="true" />
-        <!-- 0: Laplacian; 1: 1st order; 2: 2nd order; 3: Gaussian -->
         <param name="kernel" value="$(arg kernel)" />
         <param name="downsample_leaf_size" value="0.005" />
-        <param name="use_eval_rope" value="true" />
+        <param name="use_eval_rope" value="$(arg use_eval_rope)" />
         <param name="num_of_nodes" value="40" />
     </node>
 

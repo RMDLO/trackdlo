@@ -82,7 +82,7 @@ def callback (pc):
         # draw circle
         uv = (us[i], vs[i])
         if vis[i] < mask_dis_threshold:
-            cv2.circle(tracking_img, uv, 5, (0, 255, 0), -1)
+            cv2.circle(tracking_img, uv, 5, (255, 150, 0), -1)
         else:
             cv2.circle(tracking_img, uv, 5, (255, 0, 0), -1)
 
@@ -101,7 +101,7 @@ if __name__=='__main__':
 
     rospy.Subscriber('/mask', Image, update_mask)
     rospy.Subscriber('/camera/color/image_raw', Image, update_rgb)
-    rospy.Subscriber('/cdcpd/output', PointCloud2, callback)
-    tracking_img_pub = rospy.Publisher ('/cdcpd/tracking_img', Image, queue_size=10)
+    rospy.Subscriber('/cdcpd2_no_gripper_results_pc', PointCloud2, callback)
+    tracking_img_pub = rospy.Publisher ('/tracking_img', Image, queue_size=10)
 
     rospy.spin()

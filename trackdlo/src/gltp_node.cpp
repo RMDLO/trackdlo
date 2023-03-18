@@ -162,8 +162,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                         continue;
                     }
                 }
+                else if (bag_file == 3) {
+                    if (cloud_xyz(j, i).y < -0.1 || cloud_xyz(j, i).z < 0.58) {
+                        continue;
+                    }
+                }
                 else {
-                    if (cloud_xyz(j, i).z < 0.58) {
+                    if (cloud_xyz(j, i).z < 0.55) {
                         continue;
                     }
                 }
@@ -279,6 +284,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             double cur_sigma2 = tracker.get_sigma2();
             tracker.ecpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, false, use_prev_sigma2);
             tracker.initialize_nodes(Y);
+            tracker.set_sigma2(cur_sigma2);
         }
 
         time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
