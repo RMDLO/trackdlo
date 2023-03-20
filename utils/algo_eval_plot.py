@@ -5,11 +5,14 @@ from os.path import dirname, abspath, join
 import numpy as np
 from labellines import labelLines
 
-plt.rcParams.update({'font.size': 12})
+plt.rcParams.update({'font.size': 15})
+titleSize = 22
+labelSize = 18
 
 algorithms = ['trackdlo', 'cdcpd2', 'cdcpd2_no_gripper','cdcpd', 'gltp']
 bags = ['stationary','perpendicular_motion', 'parallel_motion']
-titles = ['Avg. Error Over 30s vs. $\%$ Occlusion, Stationary DLO', 'Tracking Error vs. Time for Perpendicular Motion', 'Tracking Error vs. Time for Parallel Motion']
+# titles = ['Avg. Error Over 30s vs. $\%$ Occlusion, Stationary DLO', 'Tracking Error vs. Time for Perpendicular Motion', 'Tracking Error vs. Time for Parallel Motion']
+titles = ['Stationary', 'Perpendicular Motion', 'Parallel Motion']
 duration_frames = [375, 197, 240]
 duration_times = [34.1-8, 18.4-5, 22.7-6.5]
 pcts = [0, 10, 20, 30, 40, 50]
@@ -19,7 +22,7 @@ algorithms_plot = {'trackdlo': 'TrackDLO',
                     'gltp': 'GLTP',
                     'cdcpd': 'CDCPD',
                     'cdcpd2': 'CDCPD2',
-                    'cdcpd2_no_gripper': 'CDCPD2 w/o gripper'}
+                    'cdcpd2_no_gripper': 'CDCPD2\nw/o gripper'}
 colors = ['red', 'orange', 'deepskyblue', 'b', 'midnightblue']
 markers = ['o','^','X','s', 'v']
 
@@ -106,9 +109,9 @@ for n, bag in enumerate(bags):
                 ax.fill_between(time, minus_one_std.values, plus_one_std.values, alpha=0.2, color=colors[i])
 
             # labelLines(ax.get_lines(), align=False, zorder=2.5, fontsize=20)
-            plt.title(titles[n], fontsize=18)
-            plt.xlabel('Time (s)', fontsize=15)
-            plt.ylabel('Frame Error (mm)', fontsize=15)
+            plt.title(titles[n], fontsize=titleSize)
+            plt.xlabel('Time (s)', fontsize=labelSize)
+            plt.ylabel('Frame Error (mm)', fontsize=labelSize)
 
             if bag == "perpendicular_motion":
                 plt.xlim(0, 13)
@@ -161,9 +164,9 @@ for n, bag in enumerate(bags):
             ax.plot(pcts, avg, linestyle='--', label=f'{algorithms_plot[algorithm]}', alpha=1.0, color=colors[i], marker=markers[i], markersize=12)
             # ax.errorbar(pcts, avg, yerr=std, linewidth=2, color=colors[i], linestyle='dotted')
 
-        plt.title(titles[n], fontsize=18)
-        plt.xlabel('Percentage of Occluded Nodes (%)', fontsize=15)
-        plt.ylabel('Final Frame Error (mm)', fontsize=15)
+        plt.title(titles[n], fontsize=titleSize)
+        plt.xlabel('Percentage of Occluded Nodes (%)', fontsize=labelSize)
+        plt.ylabel('Final Frame Error (mm)', fontsize=labelSize)
         plt.ylim(0, 50)
         plt.tight_layout()
         # plt.grid()
