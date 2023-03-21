@@ -325,7 +325,7 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
             G = (-diff_yy_sqrt / (2 * beta * beta)).array().exp();
         }
         else if (kernel == 1) {
-            G = 1/(2*beta * 2*beta) * (-sqrt(2)*diff_yy_sqrt/beta).array().exp() * (sqrt(2)*diff_yy_sqrt.array() + beta);
+            G = 1/(2*beta * 2*beta) * (-sqrt(2)*diff_yy_sqrt/beta).array().exp() * (2*diff_yy_sqrt.array() + sqrt(2)*beta);
         }
         else if (kernel == 2) {
             G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*diff_yy_sqrt/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*diff_yy_sqrt.array() + sqrt(3)*diff_yy.array());

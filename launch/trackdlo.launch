@@ -9,17 +9,17 @@
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
         <param name="bag_file" value="$(arg bag_file)" />
 
-        <param name="beta" value="3" if="$(eval arg('kernel') == 0)"/>
+        <param name="beta" value="1" if="$(eval arg('kernel') == 0)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 0)"/>
 
         <param name="beta" value="0.5" if="$(eval arg('kernel') == 1)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
 
         <!-- NOT TUNED!!! -->
-        <param name="beta" value="0.3" if="$(eval arg('kernel') == 2)"/>
+        <param name="beta" value="0.5" if="$(eval arg('kernel') == 2)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 2)"/>
 
-        <param name="beta" value="0.17" if="$(eval arg('kernel') == 3)"/>
+        <param name="beta" value="0.2" if="$(eval arg('kernel') == 3)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 3)"/>
 
         <param name="alpha" value="3" />
