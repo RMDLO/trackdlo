@@ -304,7 +304,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
 
                 // if using shorter rope
-                if (bag_file == 4) {
+                if (bag_file == 4 || bag_file == 5) {
                     detector->detect(mask_blue, keypoints_blue);
 
                     for (cv::KeyPoint key_point : keypoints_blue) {
