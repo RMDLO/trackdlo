@@ -14,6 +14,9 @@
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/short_rope_folding.bag" if="$(eval arg('bag_file') == 4)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/short_rope_stationary.bag" if="$(eval arg('bag_file') == 5)" />
+
     <arg name="save_location" default="$(find trackdlo)/data/dlo_tracking/"/>
 
     <!-- pct_occlusion takes value from 0 to 1 -->
@@ -23,16 +26,22 @@
     <arg name="start_record_at" value="8.0" if="$(eval arg('bag_file') == 0)" />
     <arg name="start_record_at" value="5.0" if="$(eval arg('bag_file') == 1)" />
     <arg name="start_record_at" value="6.0" if="$(eval arg('bag_file') == 2)" />
+    <arg name="start_record_at" value="1.0" if="$(eval arg('bag_file') == 4)" />
+    <arg name="start_record_at" value="1.0" if="$(eval arg('bag_file') == 5)" />
 
     <!-- determines when to end evalution (in seconds, with respect to start_time) -->
     <arg name="exit_at" value="33.0" if="$(eval arg('bag_file') == 0)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 1)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 2)"/>
+    <arg name="exit_at" value="30.0" if="$(eval arg('bag_file') == 4)"/>
+    <arg name="exit_at" value="12.5" if="$(eval arg('bag_file') == 5)"/>
 
     <!-- determines how much data to record before injecting occlusion -->
     <arg name="wait_before_occlusion" value="5.0" if="$(eval arg('bag_file') == 0)" />
     <arg name="wait_before_occlusion" value="3.0" if="$(eval arg('bag_file') == 1)" />
     <arg name="wait_before_occlusion" value="3.0" if="$(eval arg('bag_file') == 2)" />
+    <arg name="wait_before_occlusion" value="0.0" if="$(eval arg('bag_file') == 4)" />
+    <arg name="wait_before_occlusion" value="0.0" if="$(eval arg('bag_file') == 5)" />
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />

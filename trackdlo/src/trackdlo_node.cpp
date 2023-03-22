@@ -369,6 +369,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
+        ROS_INFO_STREAM("Number of nodes: " + std::to_string(Y.rows()));
+
         Y = tracker.get_tracking_result();
         guide_nodes = tracker.get_guide_nodes();
 

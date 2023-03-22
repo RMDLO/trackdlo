@@ -16,7 +16,7 @@
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
 
         <!-- NOT TUNED!!! -->
-        <param name="beta" value="0.5" if="$(eval arg('kernel') == 2)"/>
+        <param name="beta" value="0.35" if="$(eval arg('kernel') == 2)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 2)"/>
 
         <param name="beta" value="0.2" if="$(eval arg('kernel') == 3)"/>
@@ -27,7 +27,7 @@
         <param name="mu" value="0.05" />
         <param name="max_iter" value="50" />
         <param name="tol" value="0.00001" />
-        <param name="k_vis" value="0.1" />
+        <param name="k_vis" value="0.2" />
         <param name="include_lle" value="false" />
         <param name="use_geodesic" value="true" />
         <param name="use_prev_sigma2" value="true" />

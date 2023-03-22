@@ -254,6 +254,28 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 corners_arr_pub.publish(corners_arr);
             }
 
+            else if (bag_file == 4) {
+                top_left_x = 543;
+                top_left_y = 276;
+                bottom_right_x = 738;
+                bottom_right_y = 383;
+
+                std_msgs::Int32MultiArray corners_arr;
+                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                corners_arr_pub.publish(corners_arr);
+            }
+
+            else if (bag_file == 5) {
+                top_left_x = 300;
+                top_left_y = 317;
+                bottom_right_x = 698;
+                bottom_right_y = 440;
+
+                std_msgs::Int32MultiArray corners_arr;
+                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                corners_arr_pub.publish(corners_arr);
+            }
+
             else {
                 throw std::invalid_argument("Invalid bag file ID!");
             }

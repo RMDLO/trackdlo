@@ -47,6 +47,8 @@ class OcclusionSimulation:
 
         key = cv2.waitKey(10)
 
+        print(np.array(self.rect)*1.5)
+
         if key == 114: # r
             # reset everyhting
             frame = cv2.resize(cur_image, (new_w, new_h))
