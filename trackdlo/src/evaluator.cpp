@@ -278,7 +278,8 @@ double evaluator::get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true) {
         closest_pts_on_Y_true.push_back(closest_pt);
     }
 
-    double error_frame = total_distances_to_curve / num_of_nodes_;
+    // double error_frame = total_distances_to_curve / num_of_nodes_;
+    double error_frame = total_distances_to_curve / Y_track.rows();
 
     return error_frame;
 }
@@ -301,6 +302,12 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     }
     else if (bag_file_ == 2) {
         dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_parallel_motion_error.txt";
+    }
+    else if (bag_file_ == 4) {
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_short_rope_folding_error.txt";
+    }
+    else if (bag_file_ == 5) {
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_short_rope_stationary_error.txt";
     }
     else {
         throw std::invalid_argument("Invalid bag file ID!");

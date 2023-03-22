@@ -6,7 +6,7 @@
     <arg name="bag_rate" default="0.5" />
 
     <!-- save one image every second -->
-    <arg name="save_image" default="false" />
+    <arg name="save_images" default="false" />
 
     <!-- save error values to text file -->
     <arg name="save_errors" default="true" />
@@ -33,8 +33,8 @@
     <arg name="exit_at" value="33.0" if="$(eval arg('bag_file') == 0)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 1)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 2)"/>
-    <arg name="exit_at" value="30.0" if="$(eval arg('bag_file') == 4)"/>
-    <arg name="exit_at" value="12.5" if="$(eval arg('bag_file') == 5)"/>
+    <arg name="exit_at" value="14.5" if="$(eval arg('bag_file') == 4)"/>
+    <arg name="exit_at" value="31.0" if="$(eval arg('bag_file') == 5)"/>
 
     <!-- determines how much data to record before injecting occlusion -->
     <arg name="wait_before_occlusion" value="5.0" if="$(eval arg('bag_file') == 0)" />
@@ -55,7 +55,7 @@
         <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
         <param name="bag_rate" value="$(arg bag_rate)" />
         <param name="num_of_nodes" value="40" />
-        <param name="save_image" value="$(arg save_image)" />
+        <param name="save_images" value="$(arg save_images)" />
         <param name="save_errors" value="$(arg save_errors)" />
     </node>
 

@@ -24,7 +24,7 @@ double exit_at;
 double wait_before_occlusion;
 double bag_rate;
 int num_of_nodes;
-bool save_image;
+bool save_images;
 bool save_errors;
 
 int callback_count = 0;
@@ -296,7 +296,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::Point p2(bottom_right_x, bottom_right_y);
             cv::rectangle(eval_img, p1, p2, cv::Scalar(0, 0, 0), -1);
             eval_img = 0.5*eval_img + 0.5*cur_image_orig;
-            cv::putText(eval_img, "occlusion", cv::Point(top_left_x, top_left_y-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+
+            if (bag_file == 4) {
+                // cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j-190, occlusion_corner_i_2-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                cv::putText(eval_img, "occlusion", cv::Point(top_left_x-190, bottom_right_y-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
+            else {
+                cv::putText(eval_img, "occlusion", cv::Point(top_left_x, top_left_y-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+            }
         }
         else {
             cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
@@ -344,7 +351,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     }
 
     // save image
-    if (save_image) {
+    if (save_images) {
         double diff = time_from_start - tracking_evaluator.recording_start_time();
         if ((int)(diff/1) == tracking_evaluator.image_counter() && fabs(diff-(tracking_evaluator.image_counter()*1)) <= 0.1) {
             std::string dir;
@@ -357,6 +364,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
             else if (bag_file == 2) {
                 dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 4) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_short_rope_folding_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 5) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_short_rope_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             cv::imwrite(dir, eval_img);
             tracking_evaluator.increment_image_counter();
@@ -387,7 +400,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
     nh.getParam("/evaluation/bag_rate", bag_rate);
     nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
-    nh.getParam("/evaluation/save_image", save_image);
+    nh.getParam("/evaluation/save_images", save_images);
     nh.getParam("/evaluation/save_errors", save_errors);
 
     // get bag file length
