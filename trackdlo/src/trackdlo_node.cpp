@@ -85,12 +85,17 @@ std::vector<double> rgb2hsv (int r_orig, int g_orig, int b_orig) {
     return hsv;
 }
 
+double pre_proc_total = 0;
+double algo_total = 0;
+double pub_data_total = 0;
+int frames = 0;
+
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg) {
     
     // log time
-    std::chrono::steady_clock::time_point cur_time_cb = std::chrono::steady_clock::now();
+    std::chrono::high_resolution_clock::time_point cur_time_cb = std::chrono::high_resolution_clock::now();
     double time_diff;
-    std::chrono::steady_clock::time_point cur_time;
+    std::chrono::high_resolution_clock::time_point cur_time;
 
     sensor_msgs::ImagePtr tracking_img_msg = nullptr;
 
@@ -156,15 +161,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
-    // log time
-    cur_time = std::chrono::steady_clock::now();
-
     // distance transform
     Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
     cv::distanceTransform((255-mask), bmask_transformed, cv::noArray(), cv::DIST_L2, 5);
-
-    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
-    ROS_INFO_STREAM("Distance transform only: " + std::to_string(time_diff) + " ms");
 
     double mat_min, mat_max;
     cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
@@ -172,9 +171,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
     bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
     double mask_dist_threshold = 10;
-
-    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
-    ROS_INFO_STREAM("Before pcl operations: " + std::to_string(time_diff) + " ms");
 
     sensor_msgs::PointCloud2 output;
     sensor_msgs::PointCloud2 result_pc;
@@ -271,14 +267,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
-        // log time
-        cur_time = std::chrono::steady_clock::now();
-
         MatrixXf guide_nodes;
         std::vector<MatrixXf> priors;
 
-        time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
+        // log time
+        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time_cb).count() / 1000.0;
         ROS_INFO_STREAM("Before tracking step: " + std::to_string(time_diff) + " ms");
+        pre_proc_total += time_diff;
+        cur_time = std::chrono::high_resolution_clock::now();
 
         if (!initialized) {
             if (use_eval_rope) {
@@ -369,13 +365,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
         }
 
-        ROS_INFO_STREAM("Number of nodes: " + std::to_string(Y.rows()));
-
         Y = tracker.get_tracking_result();
         guide_nodes = tracker.get_guide_nodes();
 
-        time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count();
-        ROS_INFO_STREAM("Tracking step time difference: " + std::to_string(time_diff) + " ms");
+        // log time
+        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time).count() / 1000.0;
+        ROS_INFO_STREAM("Tracking step: " + std::to_string(time_diff) + " ms");
+        algo_total += time_diff;
+        cur_time = std::chrono::high_resolution_clock::now();
 
         // projection and pub image
         MatrixXf nodes_h = Y.replicate(1, 1);
@@ -581,15 +578,19 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         ROS_ERROR("empty pointcloud!");
     }
 
-    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time).count() - time_diff;
-    ROS_INFO_STREAM("After tracking step: " + std::to_string(time_diff) + " ms");
-
     // pc_pub.publish(output);
 
-    time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - cur_time_cb).count();
-    ROS_INFO_STREAM("Total callback time difference: " + std::to_string(time_diff) + " ms");
+    // log time
+    time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time).count() / 1000.0;
+    ROS_INFO_STREAM("Pub data: " + std::to_string(time_diff) + " ms");
+    pub_data_total += time_diff;
 
-    // ros::shutdown();
+    frames += 1;
+
+    ROS_INFO_STREAM("Avg before tracking step: " + std::to_string(pre_proc_total / frames) + " ms");
+    ROS_INFO_STREAM("Avg tracking step: " + std::to_string(algo_total / frames) + " ms");
+    ROS_INFO_STREAM("Avg pub data: " + std::to_string(pub_data_total / frames) + " ms");
+    ROS_INFO_STREAM("Avg total: " + std::to_string((pre_proc_total + algo_total + pub_data_total) / frames) + " ms");
         
     return tracking_img_msg;
 }

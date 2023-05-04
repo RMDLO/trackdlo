@@ -15,14 +15,13 @@
         <param name="beta" value="0.5" if="$(eval arg('kernel') == 1)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
 
-        <!-- NOT TUNED!!! -->
         <param name="beta" value="0.35" if="$(eval arg('kernel') == 2)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 2)"/>
 
         <param name="beta" value="0.2" if="$(eval arg('kernel') == 3)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 3)"/>
 
-        <param name="alpha" value="3" />
+        <param name="alpha" value="2" />
         <param name="lle_weight" value="10.0" />
         <param name="mu" value="0.05" />
         <param name="max_iter" value="50" />
