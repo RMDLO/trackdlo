@@ -9,11 +9,9 @@ ros::Publisher guide_nodes_pub;
 ros::Publisher result_pc_pub;
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 
-MatrixXf Y;
+MatrixXd Y;
 double sigma2;
 bool initialized = false;
 std::vector<double> converted_node_coord = {0.0};
@@ -264,11 +262,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         //     }
         // }
 
-        MatrixXf X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose();
+        MatrixXd X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
-        MatrixXf guide_nodes;
-        std::vector<MatrixXf> priors;
+        MatrixXd guide_nodes;
+        std::vector<MatrixXd> priors;
 
         // log time
         time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time_cb).count() / 1000.0;
@@ -308,8 +306,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     }
                 }
 
-                MatrixXf Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
-                MatrixXf Y_0_sorted = sort_pts(Y_0);
+                MatrixXd Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
+                MatrixXd Y_0_sorted = sort_pts(Y_0);
                 Y = Y_0_sorted.replicate(1, 1);
                 
                 tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
@@ -325,7 +323,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
                 // use ecpd to help initialize
                 for (int i = 0; i < Y_0_sorted.rows(); i ++) {
-                    MatrixXf temp = MatrixXf::Zero(1, 4);
+                    MatrixXd temp = MatrixXd::Zero(1, 4);
                     temp(0, 0) = i;
                     temp(0, 1) = Y_0_sorted(i, 0);
                     temp(0, 2) = Y_0_sorted(i, 1);
@@ -375,18 +373,18 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cur_time = std::chrono::high_resolution_clock::now();
 
         // projection and pub image
-        MatrixXf nodes_h = Y.replicate(1, 1);
-        // MatrixXf nodes_h = guide_nodes.replicate(1, 1);
+        MatrixXd nodes_h = Y.replicate(1, 1);
+        // MatrixXd nodes_h = guide_nodes.replicate(1, 1);
 
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-        nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
+        nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
 
         // project and pub image
-        MatrixXf proj_matrix(3, 4);
+        MatrixXd proj_matrix(3, 4);
         proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                        0.0, 916.265869140625, 354.02392578125, 0.0,
                        0.0, 0.0, 1.0, 0.0;
-        MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+        MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
         Mat tracking_img;
         tracking_img = 0.5*cur_image_orig + 0.5*cur_image;
@@ -424,15 +422,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
         else {
             // priors contain visible nodes
-            MatrixXf visible_nodes = MatrixXf::Zero(priors.size(), 3);
-            MatrixXf occluded_nodes = MatrixXf::Zero(Y.rows() - priors.size(), 3);
+            MatrixXd visible_nodes = MatrixXd::Zero(priors.size(), 3);
+            MatrixXd occluded_nodes = MatrixXd::Zero(Y.rows() - priors.size(), 3);
             std::vector<int> visibility(Y.rows(), 0);
 
             // record geodesic coord
             bool use_geodesic = true;
 
             double cur_sum = 0;
-            MatrixXf Y_geodesic = MatrixXf::Zero(Y.rows(), 3);
+            MatrixXd Y_geodesic = MatrixXd::Zero(Y.rows(), 3);
             if (use_geodesic) {
                 Y_geodesic(0, 0) = 0.0;
                 Y_geodesic(0, 1) = 0.0;
@@ -468,7 +466,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     counter += 1;
                 }
             }
-            MatrixXf diff_visible_occluded = MatrixXf::Zero(visible_nodes.rows(), occluded_nodes.rows());
+            MatrixXd diff_visible_occluded = MatrixXd::Zero(visible_nodes.rows(), occluded_nodes.rows());
             
             for (int i = 0; i < visible_nodes.rows(); i ++) {
                 for (int j = 0; j < occluded_nodes.rows(); j ++) {
@@ -544,8 +542,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_downsampled, output);
 
         // publish the results as a marker array
-        visualization_msgs::MarkerArray results = MatrixXf2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
-        visualization_msgs::MarkerArray guide_nodes_results = MatrixXf2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
+        visualization_msgs::MarkerArray results = MatrixXd2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 0.75}, {0.0, 1.0, 0.0, 0.75});
+        visualization_msgs::MarkerArray guide_nodes_results = MatrixXd2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
 
         // convert to pointcloud2 for eval
         pcl::PointCloud<pcl::PointXYZ> trackdlo_pc;

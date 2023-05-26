@@ -8,8 +8,6 @@
 #include <std_msgs/Int32MultiArray.h>
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
@@ -29,9 +27,9 @@ bool save_errors;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
-MatrixXf head_node = MatrixXf::Zero(1, 3);
+MatrixXd head_node = MatrixXd::Zero(1, 3);
 
-MatrixXf proj_matrix(3, 4);
+MatrixXd proj_matrix(3, 4);
 ros::Publisher corners_arr_pub;
 bool initialized = false;
 
@@ -82,7 +80,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     pcl_conversions::toPCL(*result_msg, *result_cloud);
     pcl::PointCloud<pcl::PointXYZ> result_cloud_xyz;
     pcl::fromPCLPointCloud2(*result_cloud, result_cloud_xyz);
-    MatrixXf Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose();
+    MatrixXd Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
 
     int top_left_x = -1;
     int top_left_y = -1;
@@ -93,8 +91,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     if (time_from_start > tracking_evaluator.recording_start_time()) {
         
         if (bag_file != 3) {
-            MatrixXf gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
-            MatrixXf Y_true = gt_nodes.replicate(1, 1);
+            MatrixXd gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
+            MatrixXd Y_true = gt_nodes.replicate(1, 1);
             // if not initialized
             if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
                 // the one with greater x. this holds true for all 3 bag files
@@ -149,20 +147,20 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                             }
                         }
 
-                        MatrixXf min_corner(1, 3);
+                        MatrixXd min_corner(1, 3);
                         min_corner << min_x, min_y, min_z;
-                        MatrixXf max_corner(1, 3);
+                        MatrixXd max_corner(1, 3);
                         max_corner << max_x, max_y, max_z;
 
-                        MatrixXf corners = MatrixXf::Zero(2, 3);
+                        MatrixXd corners = MatrixXd::Zero(2, 3);
                         corners.row(0) = min_corner.replicate(1, 1);
                         corners.row(1) = max_corner.replicate(1, 1);
 
                         // project to find occlusion block coorindate
-                        MatrixXf nodes_h = corners.replicate(1, 1);
+                        MatrixXd nodes_h = corners.replicate(1, 1);
                         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-                        nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-                        MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+                        nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
+                        MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
                         int pix_coord_1_x = static_cast<int>(image_coords(0, 0)/image_coords(0, 2));
                         int pix_coord_1_y = static_cast<int>(image_coords(0, 1)/image_coords(0, 2));
@@ -314,12 +312,12 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     }
 
     // project tracking results onto the image
-    MatrixXf Y_track_h = Y_track.replicate(1, 1);
+    MatrixXd Y_track_h = Y_track.replicate(1, 1);
     Y_track_h.conservativeResize(Y_track_h.rows(), Y_track_h.cols()+1);
-    Y_track_h.col(Y_track_h.cols()-1) = MatrixXf::Ones(Y_track_h.rows(), 1);
+    Y_track_h.col(Y_track_h.cols()-1) = MatrixXd::Ones(Y_track_h.rows(), 1);
 
     // project and pub image
-    MatrixXf image_coords_Y = (proj_matrix * Y_track_h.transpose()).transpose();
+    MatrixXd image_coords_Y = (proj_matrix * Y_track_h.transpose()).transpose();
     // draw points
     for (int i = 0; i < image_coords_Y.rows(); i ++) {
 

@@ -2,8 +2,6 @@
 #include "../include/utils.h"
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
@@ -13,25 +11,25 @@ void signal_callback_handler(int signum) {
 }
 
 template <typename T>
-void print_1d_vector (std::vector<T> vec) {
-    for (int i = 0; i < vec.size(); i ++) {
-        std::cout << vec[i] << " ";
+void print_1d_vector (const std::vector<T>& vec) {
+    for (auto item : vec) {
+        std::cout << item << " ";
     }
     std::cout << std::endl;
 }
 
-double pt2pt_dis_sq (MatrixXf pt1, MatrixXf pt2) {
+double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2) {
     return (pt1 - pt2).rowwise().squaredNorm().sum();
 }
 
-double pt2pt_dis (MatrixXf pt1, MatrixXf pt2) {
+double pt2pt_dis (MatrixXd pt1, MatrixXd pt2) {
     return (pt1 - pt2).rowwise().norm().sum();
 }
 
-void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu, int max_iter) {
+void reg (MatrixXd pts, MatrixXd& Y, double& sigma2, int M, double mu, int max_iter) {
     // initial guess
-    MatrixXf X = pts.replicate(1, 1);
-    Y = MatrixXf::Zero(M, 3);
+    MatrixXd X = pts.replicate(1, 1);
+    Y = MatrixXd::Zero(M, 3);
     for (int i = 0; i < M; i ++) {
         Y(i, 1) = 0.1 / static_cast<double>(M) * static_cast<double>(i);
         Y(i, 0) = 0;
@@ -42,7 +40,7 @@ void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu, int max_i
     int D = 3;
 
     // diff_xy should be a (M * N) matrix
-    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    MatrixXd diff_xy = MatrixXd::Zero(M, N);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < N; j ++) {
             diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
@@ -60,17 +58,17 @@ void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu, int max_i
             }
         }
 
-        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
-        MatrixXf P_stored = P.replicate(1, 1);
+        MatrixXd P = (-0.5 * diff_xy / sigma2).array().exp();
+        MatrixXd P_stored = P.replicate(1, 1);
         double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
         P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
-        MatrixXf Pt1 = P.colwise().sum(); 
-        MatrixXf P1 = P.rowwise().sum();
+        MatrixXd Pt1 = P.colwise().sum(); 
+        MatrixXd P1 = P.rowwise().sum();
         double Np = P1.sum();
-        MatrixXf PX = P * X;
+        MatrixXd PX = P * X;
 
-        MatrixXf P1_expanded = MatrixXf::Zero(M, D);
+        MatrixXd P1_expanded = MatrixXd::Zero(M, D);
         P1_expanded.col(0) = P1;
         P1_expanded.col(1) = P1;
         P1_expanded.col(2) = P1;
@@ -92,7 +90,7 @@ void reg (MatrixXf pts, MatrixXf& Y, double& sigma2, int M, double mu, int max_i
 }
 
 // link to original code: https://stackoverflow.com/a/46303314
-void remove_row(MatrixXf& matrix, unsigned int rowToRemove) {
+void remove_row(MatrixXd& matrix, unsigned int rowToRemove) {
     unsigned int numRows = matrix.rows()-1;
     unsigned int numCols = matrix.cols();
 
@@ -102,15 +100,15 @@ void remove_row(MatrixXf& matrix, unsigned int rowToRemove) {
     matrix.conservativeResize(numRows,numCols);
 }
 
-MatrixXf sort_pts (MatrixXf Y_0) {
+MatrixXd sort_pts (MatrixXd Y_0) {
     int N = Y_0.rows();
-    MatrixXf Y_0_sorted = MatrixXf::Zero(N, 3);
-    std::vector<MatrixXf> Y_0_sorted_vec = {};
+    MatrixXd Y_0_sorted = MatrixXd::Zero(N, 3);
+    std::vector<MatrixXd> Y_0_sorted_vec = {};
     std::vector<bool> selected_node(N, false);
     selected_node[0] = true;
     int last_visited_b = 0;
 
-    MatrixXf G = MatrixXf::Zero(N, N);
+    MatrixXd G = MatrixXd::Zero(N, N);
     for (int i = 0; i < N; i ++) {
         for (int j = 0; j < N; j ++) {
             G(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
@@ -179,7 +177,7 @@ MatrixXf sort_pts (MatrixXf Y_0) {
     return Y_0_sorted;
 }
 
-bool isBetween (MatrixXf x, MatrixXf a, MatrixXf b) {
+bool isBetween (MatrixXd x, MatrixXd a, MatrixXd b) {
     bool in_bound = true;
 
     for (int i = 0; i < 3; i ++) {
@@ -192,8 +190,8 @@ bool isBetween (MatrixXf x, MatrixXf a, MatrixXf b) {
     return in_bound;
 }
 
-std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point_B, MatrixXf sphere_center, double radius) {
-    std::vector<MatrixXf> intersections = {};
+std::vector<MatrixXd> line_sphere_intersection (MatrixXd point_A, MatrixXd point_B, MatrixXd sphere_center, double radius) {
+    std::vector<MatrixXd> intersections = {};
     
     double a = pt2pt_dis_sq(point_A, point_B);
     double b = 2 * ((point_B(0, 0) - point_A(0, 0))*(point_A(0, 0) - sphere_center(0, 0)) + 
@@ -216,14 +214,14 @@ std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point
         double x1 = point_A(0, 0) + d1*(point_B(0, 0) - point_A(0, 0));
         double y1 = point_A(0, 1) + d1*(point_B(0, 1) - point_A(0, 1));
         double z1 = point_A(0, 2) + d1*(point_B(0, 2) - point_A(0, 2));
-        MatrixXf pt1(1, 3);
+        MatrixXd pt1(1, 3);
         pt1 << x1, y1, z1;
 
         // the second one
         double x2 = point_A(0, 0) + d2*(point_B(0, 0) - point_A(0, 0));
         double y2 = point_A(0, 1) + d2*(point_B(0, 1) - point_A(0, 1));
         double z2 = point_A(0, 2) + d2*(point_B(0, 2) - point_A(0, 2));
-        MatrixXf pt2(1, 3);
+        MatrixXd pt2(1, 3);
         pt2 << x2, y2, z2;
 
         if (isBetween(pt1, point_A, point_B)) {
@@ -239,7 +237,7 @@ std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point
         double x1 = point_A(0, 0) + d1*(point_B(0, 0) - point_A(0, 0));
         double y1 = point_A(0, 1) + d1*(point_B(0, 1) - point_A(0, 1));
         double z1 = point_A(0, 2) + d1*(point_B(0, 2) - point_A(0, 2));
-        MatrixXf pt1(1, 3);
+        MatrixXd pt1(1, 3);
         pt1 << x1, y1, z1;
 
         if (isBetween(pt1, point_A, point_B)) {
@@ -251,7 +249,7 @@ std::vector<MatrixXf> line_sphere_intersection (MatrixXf point_A, MatrixXf point
 }
 
 // node color and object color are in rgba format and range from 0-1
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
     // publish the results as a marker array
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
     for (int i = 0; i < Y.rows(); i ++) {
@@ -337,7 +335,7 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (MatrixXf Y, std::string ma
 }
 
 // overload function
-visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
     // publish the results as a marker array
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
     for (int i = 0; i < Y.size(); i ++) {
@@ -424,8 +422,8 @@ visualization_msgs::MarkerArray MatrixXf2MarkerArray (std::vector<MatrixXf> Y, s
     return results;
 }
 
-MatrixXf cross_product (MatrixXf vec1, MatrixXf vec2) {
-    MatrixXf ret = MatrixXf::Zero(1, 3);
+MatrixXd cross_product (MatrixXd vec1, MatrixXd vec2) {
+    MatrixXd ret = MatrixXd::Zero(1, 3);
     
     ret(0, 0) = vec1(0, 1)*vec2(0, 2) - vec1(0, 2)*vec2(0, 1);
     ret(0, 1) = -(vec1(0, 0)*vec2(0, 2) - vec1(0, 2)*vec2(0, 0));
@@ -434,6 +432,6 @@ MatrixXf cross_product (MatrixXf vec1, MatrixXf vec2) {
     return ret;
 }
 
-double dot_product (MatrixXf vec1, MatrixXf vec2) {
+double dot_product (MatrixXd vec1, MatrixXd vec2) {
     return vec1(0, 0)*vec2(0, 0) + vec1(0, 1)*vec2(0, 1) + vec1(0, 2)*vec2(0, 2);
 }

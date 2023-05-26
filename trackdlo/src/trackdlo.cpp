@@ -2,16 +2,22 @@
 #include "../include/trackdlo.h"
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
+
+template <typename T>
+void print_1d_vector (const std::vector<T>& vec) {
+    for (auto item : vec) {
+        std::cout << item << " ";
+    }
+    std::cout << std::endl;
+}
 
 trackdlo::trackdlo () {}
 
 trackdlo::trackdlo(int num_of_nodes) {
     // default initialize
-    Y_ = MatrixXf::Zero(num_of_nodes, 3);
+    Y_ = MatrixXd::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
     beta_ = 1.0;
@@ -44,7 +50,7 @@ trackdlo::trackdlo(int num_of_nodes,
                     bool use_prev_sigma2,
                     int kernel) 
 {
-    Y_ = MatrixXf::Zero(num_of_nodes, 3);
+    Y_ = MatrixXd::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
     beta_ = beta;
@@ -67,15 +73,15 @@ double trackdlo::get_sigma2 () {
     return sigma2_;
 }
 
-MatrixXf trackdlo::get_tracking_result () {
+MatrixXd trackdlo::get_tracking_result () {
     return Y_;
 }
 
-MatrixXf trackdlo::get_guide_nodes () {
+MatrixXd trackdlo::get_guide_nodes () {
     return guide_nodes_;
 }
 
-std::vector<MatrixXf> trackdlo::get_correspondence_pairs () {
+std::vector<MatrixXd> trackdlo::get_correspondence_pairs () {
     return correspondence_priors_;
 }
 
@@ -85,7 +91,7 @@ void trackdlo::initialize_geodesic_coord (std::vector<double> geodesic_coord) {
     }
 }
 
-void trackdlo::initialize_nodes (MatrixXf Y_init) {
+void trackdlo::initialize_nodes (MatrixXd Y_init) {
     Y_ = Y_init.replicate(1, 1);
     guide_nodes_ = Y_init.replicate(1, 1);
 }
@@ -121,12 +127,12 @@ std::vector<int> trackdlo::get_nearest_indices (int k, int M, int idx) {
     return indices_arr;
 }
 
-MatrixXf trackdlo::calc_LLE_weights (int k, MatrixXf X) {
-    MatrixXf W = MatrixXf::Zero(X.rows(), X.rows());
+MatrixXd trackdlo::calc_LLE_weights (int k, MatrixXd X) {
+    MatrixXd W = MatrixXd::Zero(X.rows(), X.rows());
     for (int i = 0; i < X.rows(); i ++) {
         std::vector<int> indices = get_nearest_indices(static_cast<int>(k/2), X.rows(), i);
-        MatrixXf xi = X.row(i);
-        MatrixXf Xi = MatrixXf(indices.size(), X.cols());
+        MatrixXd xi = X.row(i);
+        MatrixXd Xi = MatrixXd(indices.size(), X.cols());
 
         // fill in Xi: Xi = X[indices, :]
         for (int r = 0; r < indices.size(); r ++) {
@@ -134,9 +140,9 @@ MatrixXf trackdlo::calc_LLE_weights (int k, MatrixXf X) {
         }
 
         // component = np.full((len(Xi), len(xi)), xi).T - Xi.T
-        MatrixXf component = xi.replicate(Xi.rows(), 1).transpose() - Xi.transpose();
-        MatrixXf Gi = component.transpose() * component;
-        MatrixXf Gi_inv;
+        MatrixXd component = xi.replicate(Xi.rows(), 1).transpose() - Xi.transpose();
+        MatrixXd Gi = component.transpose() * component;
+        MatrixXd Gi_inv;
 
         if (Gi.determinant() != 0) {
             Gi_inv = Gi.inverse();
@@ -149,11 +155,11 @@ MatrixXf trackdlo::calc_LLE_weights (int k, MatrixXf X) {
         }
 
         // wi = Gi_inv * 1 / (1^T * Gi_inv * 1)
-        MatrixXf ones_row_vec = MatrixXf::Constant(1, Xi.rows(), 1.0);
-        MatrixXf ones_col_vec = MatrixXf::Constant(Xi.rows(), 1, 1.0);
+        MatrixXd ones_row_vec = MatrixXd::Constant(1, Xi.rows(), 1.0);
+        MatrixXd ones_col_vec = MatrixXd::Constant(Xi.rows(), 1, 1.0);
 
-        MatrixXf wi = (Gi_inv * ones_col_vec) / (ones_row_vec * Gi_inv * ones_col_vec).value();
-        MatrixXf wi_T = wi.transpose();
+        MatrixXd wi = (Gi_inv * ones_col_vec) / (ones_row_vec * Gi_inv * ones_col_vec).value();
+        MatrixXd wi_T = wi.transpose();
 
         for (int c = 0; c < indices.size(); c ++) {
             W(i, indices[c]) = wi_T(c);
@@ -163,8 +169,8 @@ MatrixXf trackdlo::calc_LLE_weights (int k, MatrixXf X) {
     return W;
 }
 
-void trackdlo::cpd_lle (MatrixXf X,
-                    MatrixXf& Y,
+void trackdlo::cpd_lle (MatrixXd X,
+                    MatrixXd& Y,
                     double& sigma2,
                     double beta,
                     double lambda,
@@ -182,8 +188,8 @@ void trackdlo::cpd_lle (MatrixXf X,
 
     // initialization
     // compute differences for G matrix computation
-    MatrixXf diff_yy = MatrixXf::Zero(M, M);
-    MatrixXf diff_yy_sqrt = MatrixXf::Zero(M, M);
+    MatrixXd diff_yy = MatrixXd::Zero(M, M);
+    MatrixXd diff_yy_sqrt = MatrixXd::Zero(M, M);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < M; j ++) {
             diff_yy(i, j) = (Y.row(i) - Y.row(j)).squaredNorm();
@@ -191,11 +197,11 @@ void trackdlo::cpd_lle (MatrixXf X,
         }
     }
 
-    MatrixXf G = (-diff_yy / (2 * beta * beta)).array().exp();
-    MatrixXf Y_0 = Y.replicate(1, 1);
+    MatrixXd G = (-diff_yy / (2 * beta * beta)).array().exp();
+    MatrixXd Y_0 = Y.replicate(1, 1);
 
     // diff_xy should be a (M * N) matrix
-    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    MatrixXd diff_xy = MatrixXd::Zero(M, N);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < N; j ++) {
             diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
@@ -211,40 +217,40 @@ void trackdlo::cpd_lle (MatrixXf X,
         // ----- E step: compute posteriori probability matrix P -----
 
         // update diff_xy
-        diff_xy = MatrixXf::Zero(M, N);
+        diff_xy = MatrixXd::Zero(M, N);
         for (int i = 0; i < M; i ++) {
             for (int j = 0; j < N; j ++) {
                 diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
             }
         }
 
-        float c = std::pow(2 * M_PI * sigma2, static_cast<double>(D) / 2);
-        float w = 0.1;
+        double c = std::pow(2 * M_PI * sigma2, static_cast<double>(D) / 2);
+        double w = 0.1;
         c *= w / (1 - w);
         c *= static_cast<double>(M) / N;
 
-        MatrixXf P = (-diff_xy / (2 * sigma2)).array().exp().matrix();
+        MatrixXd P = (-diff_xy / (2 * sigma2)).array().exp().matrix();
         // P.array().colwise() *= Y_emit_prior.array();
 
-        RowVectorXf den = P.colwise().sum();
+        RowVectorXd den = P.colwise().sum();
         den.array() += c;
 
         P = P.array().rowwise() / den.array();
 
-        MatrixXf Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
-        MatrixXf P1 = P.rowwise().sum();
+        MatrixXd Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
+        MatrixXd P1 = P.rowwise().sum();
         double Np = P1.sum();
-        MatrixXf PX = P * X;
+        MatrixXd PX = P * X;
 
         // M step
-        MatrixXf A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M);
-        MatrixXf B_matrix = PX - P1.asDiagonal() * Y_0;
+        MatrixXd A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXd::Identity(M, M);
+        MatrixXd B_matrix = PX - P1.asDiagonal() * Y_0;
 
-        // MatrixXf W = A_matrix.householderQr().solve(B_matrix);
-        // MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
-        MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        // MatrixXd W = A_matrix.householderQr().solve(B_matrix);
+        // MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
 
-        MatrixXf T = Y_0 + G * W;
+        MatrixXd T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
         double trPXtT = (PX.transpose() * T).trace();
         double trTtdP1T = (T.transpose() * P1.asDiagonal() * T).trace();
@@ -267,8 +273,8 @@ void trackdlo::cpd_lle (MatrixXf X,
     }
 }
 
-bool trackdlo::ecpd_lle (MatrixXf X_orig,
-                        MatrixXf& Y,
+bool trackdlo::ecpd_lle (MatrixXd X_orig,
+                        MatrixXd& Y,
                         double& sigma2,
                         double beta,
                         double lambda,
@@ -280,7 +286,7 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
                         bool use_geodesic,
                         bool use_prev_sigma2,
                         bool use_ecpd,
-                        std::vector<MatrixXf> correspondence_priors,
+                        std::vector<MatrixXd> correspondence_priors,
                         double alpha,
                         int kernel,
                         std::vector<int> occluded_nodes,
@@ -295,16 +301,16 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
         use_ecpd = false;
     }
 
-    MatrixXf X = X_orig.replicate(1, 1);
+    MatrixXd X = X_orig.replicate(1, 1);
 
     int M = Y.rows();
     int N = X.rows();
     int D = 3;
 
-    MatrixXf Y_0 = Y.replicate(1, 1);
+    MatrixXd Y_0 = Y.replicate(1, 1);
 
-    MatrixXf diff_yy = MatrixXf::Zero(M, M);
-    MatrixXf diff_yy_sqrt = MatrixXf::Zero(M, M);
+    MatrixXd diff_yy = MatrixXd::Zero(M, M);
+    MatrixXd diff_yy_sqrt = MatrixXd::Zero(M, M);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < M; j ++) {
             diff_yy(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
@@ -312,11 +318,11 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
         }
     }
 
-    MatrixXf converted_node_dis = MatrixXf::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
-    MatrixXf converted_node_dis_sq = MatrixXf::Zero(M, M);
+    MatrixXd converted_node_dis = MatrixXd::Zero(M, M); // this is a M*M matrix in place of diff_sqrt
+    MatrixXd converted_node_dis_sq = MatrixXd::Zero(M, M);
     std::vector<double> converted_node_coord = {0.0};   // this is not squared
 
-    MatrixXf G = MatrixXf::Zero(M, M);
+    MatrixXd G = MatrixXd::Zero(M, M);
     if (!use_geodesic) {
         if (kernel == 3) {
             G = (-diff_yy / (2 * beta * beta)).array().exp();
@@ -368,26 +374,26 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
     }
 
     // get the LLE matrix
-    MatrixXf L = calc_LLE_weights(6, Y_0);
-    MatrixXf H = (MatrixXf::Identity(M, M) - L).transpose() * (MatrixXf::Identity(M, M) - L);
+    MatrixXd L = calc_LLE_weights(6, Y_0);
+    MatrixXd H = (MatrixXd::Identity(M, M) - L).transpose() * (MatrixXd::Identity(M, M) - L);
 
     // construct R and J
-    MatrixXf priors = MatrixXf::Zero(correspondence_priors.size(), 3);
-    MatrixXf J = MatrixXf::Zero(M, M);
-    MatrixXf Y_extended = Y_0.replicate(1, 1);
-    MatrixXf G_masked = MatrixXf::Zero(M, M);
+    MatrixXd priors = MatrixXd::Zero(correspondence_priors.size(), 3);
+    MatrixXd J = MatrixXd::Zero(M, M);
+    MatrixXd Y_extended = Y_0.replicate(1, 1);
+    MatrixXd G_masked = MatrixXd::Zero(M, M);
     if (correspondence_priors.size() != 0) {
         int num_of_correspondence_priors = correspondence_priors.size();
 
         for (int i = 0; i < num_of_correspondence_priors; i ++) {
-            MatrixXf temp = MatrixXf::Zero(1, 3);
+            MatrixXd temp = MatrixXd::Zero(1, 3);
             int index = correspondence_priors[i](0, 0);
             temp(0, 0) = correspondence_priors[i](0, 1);
             temp(0, 1) = correspondence_priors[i](0, 2);
             temp(0, 2) = correspondence_priors[i](0, 3);
 
             priors.row(i) = temp;
-            J.row(index) = MatrixXf::Identity(M, M).row(index);
+            J.row(index) = MatrixXd::Identity(M, M).row(index);
             Y_extended.row(index) = temp;
             G_masked.row(index) = G.row(index);
 
@@ -399,7 +405,7 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
     }
 
     // diff_xy should be a (M * N) matrix
-    MatrixXf diff_xy = MatrixXf::Zero(M, N);
+    MatrixXd diff_xy = MatrixXd::Zero(M, N);
     for (int i = 0; i < M; i ++) {
         for (int j = 0; j < N; j ++) {
             diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
@@ -420,20 +426,20 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
             }
         }
 
-        MatrixXf P = (-0.5 * diff_xy / sigma2).array().exp();
-        MatrixXf P_stored = P.replicate(1, 1);
+        MatrixXd P = (-0.5 * diff_xy / sigma2).array().exp();
+        MatrixXd P_stored = P.replicate(1, 1);
         double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
         P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
         if (use_geodesic) {
             std::vector<int> max_p_nodes(P.cols(), 0);
 
-            // temp test
-            for (int i = 0; i < N; i ++) {
-                P.col(i).maxCoeff(&max_p_nodes[i]);
-            }
+            // // temp test
+            // for (int i = 0; i < N; i ++) {
+            //     P.col(i).maxCoeff(&max_p_nodes[i]);
+            // }
 
-            MatrixXf pts_dis_sq_geodesic = MatrixXf::Zero(M, N);
+            MatrixXd pts_dis_sq_geodesic = MatrixXd::Zero(M, N);
 
             // loop through all points
             for (int i = 0; i < N; i ++) {
@@ -492,7 +498,7 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
         
         // use cdcpd's pvis
         if (occluded_nodes.size() != 0 && mat_max != 0) {
-            MatrixXf nodes_h = Y.replicate(1, 1);
+            MatrixXd nodes_h = Y.replicate(1, 1);
             // if has corresponding guide node, use that instead of the original position
             for (auto entry : correspondence_priors) {
                 nodes_h.row(entry(0, 0)) = entry.rightCols(3);
@@ -500,14 +506,14 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
 
             // project onto the bmask to find distance to closest none zero pixel
             nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-            nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-            MatrixXf proj_matrix(3, 4);
+            nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
+            MatrixXd proj_matrix(3, 4);
             proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                             0.0, 916.265869140625, 354.02392578125, 0.0,
                             0.0, 0.0, 1.0, 0.0;
-            MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+            MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
-            MatrixXf P_vis = MatrixXf::Ones(P.rows(), P.cols());
+            MatrixXd P_vis = MatrixXd::Ones(P.rows(), P.cols());
             double total_P_vis = 0;
             for (int i = 0; i < image_coords.rows(); i ++) {
                 int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
@@ -534,43 +540,45 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
 
-        MatrixXf Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
-        MatrixXf P1 = P.rowwise().sum();
+        // std::cout << P.colwise().sum() << std::endl;
+
+        MatrixXd Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
+        MatrixXd P1 = P.rowwise().sum();
         double Np = P1.sum();
-        MatrixXf PX = P * X;
+        MatrixXd PX = P * X;
 
         // M step
-        MatrixXf A_matrix;
-        MatrixXf B_matrix;
+        MatrixXd A_matrix;
+        MatrixXd B_matrix;
         if (include_lle) {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*lle_weight * H*G + alpha*J*G;
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXd::Identity(M, M) + sigma2*lle_weight * H*G + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*lle_weight * H*Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
-                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXf::Identity(M, M) + sigma2*lle_weight * H*G;
+                A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXd::Identity(M, M) + sigma2*lle_weight * H*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*lle_weight * H*Y_0;
             }
         }
         else {
             if (use_ecpd) {
-                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M) + alpha*J*G;
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXd::Identity(M, M) + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal() * Y_0 + alpha*(Y_extended - Y_0);
             }
             else {
-                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXf::Identity(M, M);
+                A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXd::Identity(M, M);
                 B_matrix = PX - P1.asDiagonal() * Y_0;
             }
         }
 
-        // MatrixXf W = A_matrix.householderQr().solve(B_matrix);
-        // MatrixXf W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
-        // MatrixXf W = A_matrix.fullPivLu().solve(B_matrix);
-        // MatrixXf W = A_matrix.partialPivLu().solve(B_matrix);
-        // MatrixXf W = A_matrix.colPivHouseholderQr().solve(B_matrix);
-        MatrixXf W = A_matrix.fullPivHouseholderQr().solve(B_matrix);
+        // MatrixXd W = A_matrix.householderQr().solve(B_matrix);
+        // MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
+        // MatrixXd W = A_matrix.fullPivLu().solve(B_matrix);
+        // MatrixXd W = A_matrix.partialPivLu().solve(B_matrix);
+        // MatrixXd W = A_matrix.colPivHouseholderQr().solve(B_matrix);
+        MatrixXd W = A_matrix.fullPivHouseholderQr().solve(B_matrix);
 
-        MatrixXf T = Y_0 + G * W;
+        MatrixXd T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
         double trPXtT = (PX.transpose() * T).trace();
         double trTtdP1T = (T.transpose() * P1.asDiagonal() * T).trace();
@@ -597,14 +605,14 @@ bool trackdlo::ecpd_lle (MatrixXf X_orig,
 }
 
 // alignment: 0 --> align with head; 1 --> align with tail
-std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment) {
-    std::vector<MatrixXf> node_pairs = {};
+std::vector<MatrixXd> trackdlo::traverse_geodesic (std::vector<double> geodesic_coord, const MatrixXd guide_nodes, const std::vector<int> visible_nodes, int alignment) {
+    std::vector<MatrixXd> node_pairs = {};
 
     // extreme cases: only one guide node available
     // since this function will only be called when at least one of head or tail is visible, 
     // the only node will be head or tail
     if (guide_nodes.rows() == 1) {
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
         node_pairs.push_back(node_pair);
         return node_pairs;
@@ -615,7 +623,7 @@ std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_
     
     if (alignment == 0) {
         // push back the first pair
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
         node_pairs.push_back(node_pair);
 
@@ -661,7 +669,7 @@ std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_
                 continue;
             }
             double remaining_dist = total_seg_dist - (guide_nodes_total_dist - pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1)));
-            MatrixXf temp = (guide_nodes.row(guide_nodes_it + 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
+            MatrixXd temp = (guide_nodes.row(guide_nodes_it + 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it+1));
             node_pair(0, 0) = seg_dist_it;
             node_pair(0, 1) = temp(0, 0) + guide_nodes(guide_nodes_it, 0);
             node_pair(0, 2) = temp(0, 1) + guide_nodes(guide_nodes_it, 1);
@@ -675,7 +683,7 @@ std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_
     }
     else {
         // push back the first pair
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes.back(), guide_nodes(guide_nodes.rows()-1, 0), guide_nodes(guide_nodes.rows()-1, 1), guide_nodes(guide_nodes.rows()-1, 2);
         node_pairs.push_back(node_pair);
 
@@ -721,7 +729,7 @@ std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_
                 continue;
             }
             double remaining_dist = total_seg_dist - (guide_nodes_total_dist - pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1)));
-            MatrixXf temp = (guide_nodes.row(guide_nodes_it - 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1));
+            MatrixXd temp = (guide_nodes.row(guide_nodes_it - 1) - guide_nodes.row(guide_nodes_it)) * remaining_dist / pt2pt_dis(guide_nodes.row(guide_nodes_it), guide_nodes.row(guide_nodes_it-1));
             node_pair(0, 0) = seg_dist_it;
             node_pair(0, 1) = temp(0, 0) + guide_nodes(guide_nodes_it, 0);
             node_pair(0, 2) = temp(0, 1) + guide_nodes(guide_nodes_it, 1);
@@ -738,14 +746,14 @@ std::vector<MatrixXf> trackdlo::traverse_geodesic (std::vector<double> geodesic_
 }
 
 // overload
-std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXf guide_nodes, const std::vector<int> visible_nodes, int alignment, int alignment_node_idx) {
-    std::vector<MatrixXf> node_pairs = {};
+std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXd guide_nodes, const std::vector<int> visible_nodes, int alignment, int alignment_node_idx) {
+    std::vector<MatrixXd> node_pairs = {};
 
     // extreme cases: only one guide node available
     // since this function will only be called when at least one of head or tail is visible, 
     // the only node will be head or tail
     if (guide_nodes.rows() == 1) {
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
         node_pairs.push_back(node_pair);
         return node_pairs;
@@ -753,7 +761,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
 
     if (alignment == 0) {
         // push back the first pair
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes[0], guide_nodes(0, 0), guide_nodes(0, 1), guide_nodes(0, 2);
         node_pairs.push_back(node_pair);
 
@@ -769,7 +777,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
 
         int last_found_index = 0;
         int seg_dist_it = 0;
-        MatrixXf cur_center = guide_nodes.row(0);
+        MatrixXd cur_center = guide_nodes.row(0);
 
         // basically pure pursuit lol
         while (last_found_index+1 <= consecutive_visible_nodes.size()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
@@ -778,7 +786,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
             std::vector<double> intersection = {};
 
             for (int i = last_found_index; i+1 <= consecutive_visible_nodes.size()-1; i ++) {
-                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i+1), cur_center, look_ahead_dist);
+                std::vector<MatrixXd> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i+1), cur_center, look_ahead_dist);
 
                 // if no intersection found
                 if (intersections.size() == 0) {
@@ -815,7 +823,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
                 break;
             }
             else {
-                MatrixXf temp = MatrixXf::Zero(1, 4);
+                MatrixXd temp = MatrixXd::Zero(1, 4);
                 temp(0, 0) = seg_dist_it + 1;
                 temp(0, 1) = intersection[0];
                 temp(0, 2) = intersection[1];
@@ -828,7 +836,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
     }
     else if (alignment == 1){
         // push back the first pair
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes.back(), guide_nodes(guide_nodes.rows()-1, 0), guide_nodes(guide_nodes.rows()-1, 1), guide_nodes(guide_nodes.rows()-1, 2);
         node_pairs.push_back(node_pair);
 
@@ -844,7 +852,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
 
         int last_found_index = guide_nodes.rows()-1;
         int seg_dist_it = geodesic_coord.size()-1;
-        MatrixXf cur_center = guide_nodes.row(guide_nodes.rows()-1);
+        MatrixXd cur_center = guide_nodes.row(guide_nodes.rows()-1);
 
         // basically pure pursuit lol
         while (last_found_index-1 >= (guide_nodes.rows() - consecutive_visible_nodes.size()) && seg_dist_it-1 >= 0) {
@@ -855,7 +863,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
             std::vector<double> intersection = {};
 
             for (int i = last_found_index; i >= (guide_nodes.rows() - consecutive_visible_nodes.size() + 1); i --) {
-                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
+                std::vector<MatrixXd> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
 
                 // if no intersection found
                 if (intersections.size() == 0) {
@@ -892,7 +900,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
                 break;
             }
             else {
-                MatrixXf temp = MatrixXf::Zero(1, 4);
+                MatrixXd temp = MatrixXd::Zero(1, 4);
                 temp(0, 0) = seg_dist_it - 1;
                 temp(0, 1) = intersection[0];
                 temp(0, 2) = intersection[1];
@@ -905,7 +913,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
     }
     else {
         // push back the first pair
-        MatrixXf node_pair(1, 4);
+        MatrixXd node_pair(1, 4);
         node_pair << visible_nodes[alignment_node_idx], guide_nodes(alignment_node_idx, 0), guide_nodes(alignment_node_idx, 1), guide_nodes(alignment_node_idx, 2);
         node_pairs.push_back(node_pair);
 
@@ -922,7 +930,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
         // ----- traverse from the alignment node to the tail node -----
         int last_found_index = alignment_node_idx;
         int seg_dist_it = visible_nodes[alignment_node_idx];
-        MatrixXf cur_center = guide_nodes.row(alignment_node_idx);
+        MatrixXd cur_center = guide_nodes.row(alignment_node_idx);
 
         // basically pure pursuit lol
         while (last_found_index+1 <= alignment_node_idx+consecutive_visible_nodes_2.size()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
@@ -931,7 +939,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
             std::vector<double> intersection = {};
 
             for (int i = last_found_index; i+1 <= alignment_node_idx+consecutive_visible_nodes_2.size()-1; i ++) {
-                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i+1), cur_center, look_ahead_dist);
+                std::vector<MatrixXd> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i+1), cur_center, look_ahead_dist);
 
                 // if no intersection found
                 if (intersections.size() == 0) {
@@ -968,7 +976,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
                 break;
             }
             else {
-                MatrixXf temp = MatrixXf::Zero(1, 4);
+                MatrixXd temp = MatrixXd::Zero(1, 4);
                 temp(0, 0) = seg_dist_it + 1;
                 temp(0, 1) = intersection[0];
                 temp(0, 2) = intersection[1];
@@ -1002,7 +1010,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
             std::vector<double> intersection = {};
 
             for (int i = last_found_index; i-1 >= 0; i --) {
-                std::vector<MatrixXf> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
+                std::vector<MatrixXd> intersections = line_sphere_intersection(guide_nodes.row(i), guide_nodes.row(i-1), cur_center, look_ahead_dist);
 
                 // if no intersection found
                 if (intersections.size() == 0) {
@@ -1039,7 +1047,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
                 break;
             }
             else {
-                MatrixXf temp = MatrixXf::Zero(1, 4);
+                MatrixXd temp = MatrixXd::Zero(1, 4);
                 temp(0, 0) = seg_dist_it - 1;
                 temp(0, 1) = intersection[0];
                 temp(0, 2) = intersection[1];
@@ -1054,7 +1062,7 @@ std::vector<MatrixXf> trackdlo::traverse_euclidean (std::vector<double> geodesic
     return node_pairs;
 }
 
-void trackdlo::tracking_step (MatrixXf X_orig,
+void trackdlo::tracking_step (MatrixXd X_orig,
                                 Mat bmask_transformed_normalized,
                                 double mask_dist_threshold,
                                 double mat_max) {
@@ -1062,19 +1070,19 @@ void trackdlo::tracking_step (MatrixXf X_orig,
     // variable initialization
     std::vector<int> occluded_nodes = {};
     std::vector<int> visible_nodes = {};
-    std::vector<MatrixXf> valid_nodes_vec = {};
+    std::vector<MatrixXd> valid_nodes_vec = {};
     correspondence_priors_ = {};
     int state = 0;
 
     // project Y onto the original image to determine occluded nodes
-    MatrixXf nodes_h = Y_.replicate(1, 1);
+    MatrixXd nodes_h = Y_.replicate(1, 1);
     nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-    nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-    MatrixXf proj_matrix(3, 4);
+    nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
+    MatrixXd proj_matrix(3, 4);
     proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
                     0.0, 916.265869140625, 354.02392578125, 0.0,
                     0.0, 0.0, 1.0, 0.0;
-    MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+    MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
     for (int i = 0; i < image_coords.rows(); i ++) {
         int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
         int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
@@ -1091,7 +1099,7 @@ void trackdlo::tracking_step (MatrixXf X_orig,
 
     // copy valid guide nodes vec to guide nodes
     // not using topRows() because it caused weird bugs
-    guide_nodes_ = MatrixXf::Zero(valid_nodes_vec.size(), 3);
+    guide_nodes_ = MatrixXd::Zero(valid_nodes_vec.size(), 3);
     if (occluded_nodes.size() != 0) {
         for (int i = 0; i < valid_nodes_vec.size(); i ++) {
             guide_nodes_.row(i) = valid_nodes_vec[i];
@@ -1110,10 +1118,10 @@ void trackdlo::tracking_step (MatrixXf X_orig,
         ROS_INFO("All nodes visible");
 
         // get priors vec
-        std::vector<MatrixXf> priors_vec_1 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 0);
-        std::vector<MatrixXf> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 1);
-        // std::vector<MatrixXf> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-        // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
+        std::vector<MatrixXd> priors_vec_1 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 0);
+        std::vector<MatrixXd> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 1);
+        // std::vector<MatrixXd> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
+        // std::vector<MatrixXd> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
         // take average
         correspondence_priors_ = {};
@@ -1133,9 +1141,9 @@ void trackdlo::tracking_step (MatrixXf X_orig,
         ROS_INFO("Mid-section occluded");
 
         correspondence_priors_ = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 0);
-        std::vector<MatrixXf> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 1);
+        std::vector<MatrixXd> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 1);
         // priors_vec = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-        // std::vector<MatrixXf> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
+        // std::vector<MatrixXd> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
         correspondence_priors_.insert(correspondence_priors_.end(), priors_vec_2.begin(), priors_vec_2.end());
     }
