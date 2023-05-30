@@ -9,13 +9,32 @@ The TrackDLO algorithm estimates the state of Deformable Linear Objects (DLOs), 
   <img src="images/trackdlo1.gif" width="400" title="TrackDLO"> <img src="images/trackdlo2.gif" width="400" title="TrackDLO">
 </p>
 
+## Minimum Requirements
+* [ROS Noetic](http://wiki.ros.org/noetic/Installation)
+* [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page)
+* [Point Cloud Library](https://pointclouds.org/)
+* [OpenCV](https://opencv.org/releases/)
+* [Open3D](http://www.open3d.org/)
+
+## Other Requirements
+* [librealsense](https://github.com/IntelRealSense/librealsense) and [realsense-ros](https://github.com/IntelRealSense/realsense-ros/tree/ros1-legacy) (for testing with RGB-D camera stream)
+
+## Usage
+
+First, clone the repository into a ROS workspace and build the package:
+```bash
+git clone https://github.com/RMDLO/trackdlo.git
+catkin build
+```
+All parameters for the TrackDLO algorithm are configurable in `launch/TrackDLO.launch`. Rebuilding the package is not required for the parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files.
 
 ### Test TrackDLO with a RGB-D Camera Stream:
+This package has been tested with a Intel RealSense D435 camera. The exact camera configurations used are provided in `/config/preset_decimation_4.0_depth_step_100.json` and can be loaded into the camera using the launch files from `realsense-ros`. Run the following commands to start the realsense camera and the tracking node:
 1. Run ```roslaunch trackdlo realsense_node.launch```. This will bring up an RViz window visualizing the color image, mask, and tracking result (in both the image and the 3D pointcloud).
 2. Open a new terminal and run ```roslaunch trackdlo trackdlo.launch```. This will start the TrackDLO algorithm and publish messages containing the estimated node positions defining the object shape.
 
 ### Test TrackDLO with Recorded ROS Bag Data:
-1. Download the bag files from [here](https://drive.google.com/drive/folders/1AwMXysdzRQLz7w8umj66rrKa-Bh0XlVJ?usp=share_link) and place them in your ROS workspace.
+1. Download the bag files from [here](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing) and place them in your ROS workspace.
 2. Open a new terminal and run ```roslaunch trackdlo replay_bag.launch```.
 3. In another terminal, run ```roslaunch trackdlo trackdlo.launch```. This will start the tracking algorithm.
 4. Finally, open another ternimal and run ```rosbag play <name_of_the_bag_file>.bag```. This will replay the bag file and all results will be published in rviz.
@@ -28,4 +47,4 @@ The TrackDLO algorithm estimates the state of Deformable Linear Objects (DLOs), 
 
 ## Data:
 
-ROS bag data are provided for public use for testing TrackDLO [here](https://drive.google.com/drive/folders/1AwMXysdzRQLz7w8umj66rrKa-Bh0XlVJ?usp=sharing).
+[ROS bag data](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing) are provided for public use for testing TrackDLO.
