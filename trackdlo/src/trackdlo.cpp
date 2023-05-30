@@ -5,14 +5,6 @@ using Eigen::MatrixXd;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
-template <typename T>
-void print_1d_vector (const std::vector<T>& vec) {
-    for (auto item : vec) {
-        std::cout << item << " ";
-    }
-    std::cout << std::endl;
-}
-
 trackdlo::trackdlo () {}
 
 trackdlo::trackdlo(int num_of_nodes) {

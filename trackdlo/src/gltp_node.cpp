@@ -281,7 +281,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
             double cur_sigma2 = tracker.get_sigma2();
             // tracker.cpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, false, use_prev_sigma2);
-            tracker.ecpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, true, use_prev_sigma2, false, {}, 0, 3);
+            tracker.ecpd_lle(X, Y, cur_sigma2, beta, lambda, lle_weight, mu, max_iter, tol, include_lle, false, use_prev_sigma2, false, {}, 0, 3);
             
             tracker.initialize_nodes(Y);
             tracker.set_sigma2(cur_sigma2);

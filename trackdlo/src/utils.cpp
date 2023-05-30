@@ -10,14 +10,6 @@ void signal_callback_handler(int signum) {
    exit(signum);
 }
 
-template <typename T>
-void print_1d_vector (const std::vector<T>& vec) {
-    for (auto item : vec) {
-        std::cout << item << " ";
-    }
-    std::cout << std::endl;
-}
-
 double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2) {
     return (pt1 - pt2).rowwise().squaredNorm().sum();
 }

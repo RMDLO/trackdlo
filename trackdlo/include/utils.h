@@ -10,10 +10,12 @@ using cv::Mat;
 
 void signal_callback_handler(int signum);
 
-// template <typename T>
-// void print_1d_vector (const std::vector<T>& vec);
-
-void print_1d_vector_eigen (std::vector<MatrixXd> vec);
+template <typename T> void print_1d_vector (const std::vector<T>& vec) {
+    for (auto item : vec) {
+        std::cout << item << " ";
+    }
+    std::cout << std::endl;
+}
 
 double pt2pt_dis_sq (MatrixXd pt1, MatrixXd pt2);
 double pt2pt_dis (MatrixXd pt1, MatrixXd pt2);
