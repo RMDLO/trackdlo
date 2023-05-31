@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+import rospy
+import ros_numpy
+from sensor_msgs.msg import PointCloud2, PointField, Image, CameraInfo
+import sensor_msgs.point_cloud2 as pcl2
+import std_msgs.msg
+
+import struct
+import time
+import cv2
+import numpy as np
+import time
+
+import message_filters
+import open3d as o3d
+from scipy import ndimage
+
+from visualization_msgs.msg import Marker
+from visualization_msgs.msg import MarkerArray
+from scipy.spatial.transform import Rotation as R
+
+from utils import extract_connected_skeleton
+
+use_eval_rope = True
+
+proj_matrix = None
+def camera_info_callback (info):
+    global proj_matrix
+    proj_matrix = np.array(list(info.P)).reshape(3, 4)
+    print('Received camera projection matrix:')
+    print(proj_matrix)
+    camera_info_sub.unregister()
+
+def callback (rgb, depth):
+    # process rgb image
+    cur_image = ros_numpy.numpify(rgb)
+    hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
+
+    # process depth image
+    cur_depth = ros_numpy.numpify(depth)
+
+    if not use_eval_rope:
+        # color thresholding
+        lower = (90, 90, 90)
+        upper = (120, 255, 255)
+        mask = cv2.inRange(hsv_image, lower, upper)
+    else:
+        # color thresholding
+        # --- rope blue ---
+        lower = (90, 60, 40)
+        upper = (130, 255, 255)
+        mask_dlo = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+
+        # --- tape red ---
+        lower = (130, 60, 40)
+        upper = (255, 255, 255)
+        mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        lower = (0, 60, 40)
+        upper = (10, 255, 255)
+        mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+        mask_marker = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy()).astype('uint8')
+
+        # combine masks
+        mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+
+    start_time = time.time()
+    mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
+    extracted_chains = extract_connected_skeleton(mask)  # returns the pixel coord of points (in order). a list of lists
+    all_pixel_coords = []
+    for chain in extracted_chains:
+        all_pixel_coords += chain
+    print('Finished extracting chains. Time taken:', time.time()-start_time)
+
+    all_pixel_coords = np.array(all_pixel_coords)
+    all_pixel_coords = np.flip(all_pixel_coords, 1)
+
+    pc_z = cur_depth[tuple(map(tuple, all_pixel_coords.T))] / 1000.0
+    f = proj_matrix[0, 0]
+    cx = proj_matrix[0, 2]
+    cy = proj_matrix[1, 2]
+    pixel_x = all_pixel_coords[:, 1]
+    pixel_y = all_pixel_coords[:, 0]
+
+    pc_x = (pixel_x - cx) * pc_z / f
+    pc_y = (pixel_y - cy) * pc_z / f
+    extracted_chains_3d = np.vstack((pc_x, pc_y))
+    extracted_chains_3d = np.vstack((extracted_chains_3d, pc_z))
+    extracted_chains_3d = extracted_chains_3d.T
+
+    # do not include those without depth values
+    extracted_chains_3d = extracted_chains_3d[((extracted_chains_3d[:, 0] != 0) | (extracted_chains_3d[:, 1] != 0) | (extracted_chains_3d[:, 2] != 0))]
+
+    # add color
+    pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
+    pc_rgba_arr = np.full((len(extracted_chains_3d), 1), pc_rgba)
+    pc_colored = np.hstack((extracted_chains_3d, pc_rgba_arr)).astype('O')
+    pc_colored[:, 3] = pc_colored[:, 3].astype(int)
+
+    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
+    header.stamp = rospy.Time.now()
+    converted_points = pcl2.create_cloud(header, fields, pc_colored)
+    pc_pub.publish(converted_points)
+
+if __name__=='__main__':
+    rospy.init_node('init_tracker', anonymous=True)
+    camera_info_sub = rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, camera_info_callback)
+
+    rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
+    depth_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
+
+    # header
+    header = std_msgs.msg.Header()
+    header.stamp = rospy.Time.now()
+    header.frame_id = 'camera_color_optical_frame'
+    fields = [PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1),
+                PointField('rgba', 12, PointField.UINT32, 1)]
+    pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
+
+    ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub], 10)
+    ts.registerCallback(callback)
+
+    rospy.spin()
