@@ -121,6 +121,8 @@ def callback (rgb, depth):
     converted_points = pcl2.create_cloud(header, fields, pc_colored)
     pc_pub.publish(converted_points)
 
+    rospy.signal_shutdown('Finished initial node set computation.')
+
 if __name__=='__main__':
     rospy.init_node('init_tracker', anonymous=True)
     camera_info_sub = rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, camera_info_callback)
@@ -136,8 +138,8 @@ if __name__=='__main__':
                 PointField('y', 4, PointField.FLOAT32, 1),
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
-    pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
-    results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
+    pc_pub = rospy.Publisher ('/trackdlo/init_nodes', PointCloud2, queue_size=10)
+    results_pub = rospy.Publisher ('/trackdlo/init_nodes_markers', MarkerArray, queue_size=10)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub], 10)
     ts.registerCallback(callback)
