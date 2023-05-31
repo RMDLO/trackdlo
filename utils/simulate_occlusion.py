@@ -47,7 +47,7 @@ class OcclusionSimulation:
 
         key = cv2.waitKey(10)
 
-        print(np.array(self.rect)*1.5)
+        # print(np.array(self.rect)*1.5)
 
         if key == 114: # r
             # reset everyhting

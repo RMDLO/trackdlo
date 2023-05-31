@@ -23,7 +23,8 @@ from scipy import interpolate
 
 from utils import extract_connected_skeleton, ndarray2MarkerArray
 
-use_eval_rope = True
+use_eval_rope = False
+num_of_nodes = 45
 
 proj_matrix = None
 def camera_info_callback (info):
@@ -43,13 +44,13 @@ def callback (rgb, depth):
 
     if not use_eval_rope:
         # color thresholding
-        lower = (90, 90, 90)
+        lower = (90, 90, 60)
         upper = (120, 255, 255)
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
         # color thresholding
         # --- rope blue ---
-        lower = (90, 60, 40)
+        lower = (90, 90, 60)
         upper = (130, 255, 255)
         mask_dlo = cv2.inRange(hsv_image, lower, upper).astype('uint8')
 
@@ -105,7 +106,7 @@ def callback (rgb, depth):
     spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
     total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
 
-    init_nodes = spline_pts[np.linspace(0, num_true_pts-1, 30).astype(int)]
+    init_nodes = spline_pts[np.linspace(0, num_true_pts-1, num_of_nodes).astype(int)]
 
     results = ndarray2MarkerArray(init_nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
     results_pub.publish(results)

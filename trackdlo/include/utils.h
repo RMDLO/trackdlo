@@ -13,6 +13,7 @@ void signal_callback_handler(int signum);
 template <typename T> void print_1d_vector (const std::vector<T>& vec) {
     for (auto item : vec) {
         std::cout << item << " ";
+        // std::cout << item << std::endl;
     }
     std::cout << std::endl;
 }

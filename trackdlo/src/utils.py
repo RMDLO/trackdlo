@@ -149,12 +149,18 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"
 # paper link: https://ieeexplore.ieee.org/abstract/document/9697357
+visualize_process = False
 def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note: mask is one channel
 
     # smooth image
     im = Image.fromarray(mask)
     smoothed_im = im.filter(ImageFilter.ModeFilter(size=15))
     mask = np.array(smoothed_im)
+
+    if visualize_process:
+        cv2.imshow('init frame', mask)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     # # resize if necessary for better skeletonization performance
     # scale = 1
@@ -164,6 +170,11 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
     result = skeletonize(mask, method='zha')
     gray = cv2.cvtColor(result.copy(), cv2.COLOR_BGR2GRAY)
     gray[gray > 100] = 255
+
+    if visualize_process:
+        cv2.imshow('after skeletonization', gray)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     # extract contour
     _, contours, _ = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -240,6 +251,11 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
         for i in range (0, len(chain)-1):
             mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
 
+    if visualize_process:
+        cv2.imshow("added all chains frame", mask)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
     # another pruning method
     all_chain_length = []
     line_seg_to_rect_dict = {}
@@ -305,12 +321,20 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
         color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
         for i in range (0, len(chain)-1):
             mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
+    
+    if visualize_process:
+        cv2.imshow("after pruning", mask)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    if len(pruned_chains) == 1:
+        return pruned_chains
 
     # total number of possible matches = number of ends * (number of ends - 2) / 2 = 2*len(chains) * (len(chains) - 1)
     # all_possible_matches: nd array with size (num of possible matches, 5)
     # entries: [chain_1_idx, start/end, chain_2_idx, start/end, cost]; start = 0 and end = -1
     all_possible_matches = []
-    w_e = 0.01
+    w_e = 0.015
     w_c = 1
     for i in range (0, len(pruned_chains)):
         for j in range (i+1, len(pruned_chains)):
@@ -320,6 +344,7 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
             all_possible_matches.append([i, -1, j, -1, compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 3)])
 
     all_possible_matches = np.array(all_possible_matches)
+    print(all_possible_matches)
     sorted_idx = np.argsort(all_possible_matches[:,-1].copy())
     sorted_matches = all_possible_matches[sorted_idx]
 
@@ -403,25 +428,26 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
                 break
     
     # visualization code for debug
-    # mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
-    # for i in range (0, len(ordered_chains)):
-    #     chain = ordered_chains[i]
-    #     color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
-    #     for j in range (0, len(chain)-1):
-    #         mask = cv2.line(mask, chain[j], chain[j+1], color, 1)
+    if visualize_process:
+        mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
+        for i in range (0, len(ordered_chains)):
+            chain = ordered_chains[i]
+            color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
+            for j in range (0, len(chain)-1):
+                mask = cv2.line(mask, chain[j], chain[j+1], color, 1)
 
-    #     cv2.imshow("after merging", mask)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
+            cv2.imshow("after merging", mask)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
-    #     if i == len(ordered_chains)-1:
-    #         break
+            if i == len(ordered_chains)-1:
+                break
 
-    #     pt1 = ordered_chains[i][-1]
-    #     pt2 = ordered_chains[i+1][0]
-    #     mask = cv2.line(mask, pt1, pt2, (255, 255, 255), 2)
-    #     mask = cv2.circle(mask, pt1, 3, (255, 255, 255))
-    #     mask = cv2.circle(mask, pt2, 3, (255, 255, 255))
+            pt1 = ordered_chains[i][-1]
+            pt2 = ordered_chains[i+1][0]
+            mask = cv2.line(mask, pt1, pt2, (255, 255, 255), 2)
+            mask = cv2.circle(mask, pt1, 3, (255, 255, 255))
+            mask = cv2.circle(mask, pt2, 3, (255, 255, 255))
 
     return ordered_chains
 

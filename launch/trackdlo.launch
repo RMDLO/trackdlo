@@ -3,7 +3,7 @@
     <!-- 3 -> self_intersection.bag; 4 -> folding; 5 -> other short rope bag files -->
     <!-- <arg name="bag_file" default="0" /> -->
     <arg name="kernel" default="1" />
-    <arg name="use_eval_rope" default="true" />
+    <arg name="use_eval_rope" default="false" />
 
     <node name="trackdlo" pkg="trackdlo" type="trackdlo" output="screen">
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
@@ -35,5 +35,8 @@
         <param name="use_eval_rope" value="$(arg use_eval_rope)" />
         <param name="num_of_nodes" value="40" />
     </node>
+
+    <!-- launch python node for initialization -->
+    <node name="init_tracker" pkg="trackdlo" type="initialize.py" output="screen"/>
 
 </launch>

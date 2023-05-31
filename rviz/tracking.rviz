@@ -6,6 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /MarkerArray2
+        - /PointCloud22
       Splitter Ratio: 0.5
     Tree Height: 268
   - Class: rviz/Selection
@@ -92,79 +94,21 @@ Visualization Manager:
       Use rainbow: true
       Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
-      Marker Topic: /results_marker
-      Name: MarkerArray
-      Namespaces:
-        line_results0: true
-        line_results1: true
-        line_results10: true
-        line_results11: true
-        line_results12: true
-        line_results13: true
-        line_results14: true
-        line_results15: true
-        line_results16: true
-        line_results17: true
-        line_results18: true
-        line_results19: true
-        line_results2: true
-        line_results20: true
-        line_results21: true
-        line_results22: true
-        line_results23: true
-        line_results24: true
-        line_results25: true
-        line_results26: true
-        line_results27: true
-        line_results28: true
-        line_results3: true
-        line_results4: true
-        line_results5: true
-        line_results6: true
-        line_results7: true
-        line_results8: true
-        line_results9: true
-        node_results0: true
-        node_results1: true
-        node_results10: true
-        node_results11: true
-        node_results12: true
-        node_results13: true
-        node_results14: true
-        node_results15: true
-        node_results16: true
-        node_results17: true
-        node_results18: true
-        node_results19: true
-        node_results2: true
-        node_results20: true
-        node_results21: true
-        node_results22: true
-        node_results23: true
-        node_results24: true
-        node_results25: true
-        node_results26: true
-        node_results27: true
-        node_results28: true
-        node_results29: true
-        node_results3: true
-        node_results4: true
-        node_results5: true
-        node_results6: true
-        node_results7: true
-        node_results8: true
-        node_results9: true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/MarkerArray
       Enabled: false
-      Marker Topic: /guide_nodes
+      Marker Topic: /results_marker
       Name: MarkerArray
       Namespaces:
         {}
       Queue Size: 100
       Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /corr_priors
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -183,7 +127,7 @@ Visualization Manager:
       Min Color: 0; 0; 0
       Name: PointCloud2
       Position Transformer: XYZ
-      Queue Size: 1
+      Queue Size: 2
       Selectable: true
       Size (Pixels): 1
       Size (m): 0.009999999776482582
@@ -249,7 +193,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.7047415971755981
+      Distance: 0.3603033125400543
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -265,9 +209,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: -0.05479750409722328
+      Pitch: -0.35479745268821716
       Target Frame: <Fixed Frame>
-      Yaw: 3.3853931427001953
+      Yaw: 3.3053934574127197
     Saved: ~
 Window Geometry:
   Displays:
