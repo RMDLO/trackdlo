@@ -1115,8 +1115,8 @@ void trackdlo::tracking_step (MatrixXd X_orig,
         // std::vector<MatrixXd> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
         // std::vector<MatrixXd> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
-        std::cout << "num of priors when traversing from head: " << priors_vec_1.size() << std::endl;
-        std::cout << "num of priors when traversing from tail: " << priors_vec_2.size() << std::endl;
+        // priors vec 2 goes from last index -> first index
+        std::reverse(priors_vec_2.begin(), priors_vec_2.end());
 
         // take average
         correspondence_priors_ = {};
@@ -1131,10 +1131,6 @@ void trackdlo::tracking_step (MatrixXd X_orig,
                 correspondence_priors_.push_back((priors_vec_1[i] + priors_vec_2[i-(Y_.rows()-priors_vec_2.size())]) / 2.0);
             }
         }
-
-        std::cout << "num of priors after averaging: " << correspondence_priors_.size() << std::endl;
-
-        // correspondence_priors_ = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes, 0);
     }
     else if (visible_nodes[0] == 0 && visible_nodes[visible_nodes.size()-1] == Y_.rows()-1) {
         ROS_INFO("Mid-section occluded");
