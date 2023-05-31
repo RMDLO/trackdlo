@@ -1,13 +1,13 @@
 <launch>
     <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
     <!-- 3 -> self_intersection.bag; 4 -> folding; 5 -> other short rope bag files -->
-    <arg name="bag_file" default="0" />
+    <!-- <arg name="bag_file" default="0" /> -->
     <arg name="kernel" default="1" />
     <arg name="use_eval_rope" default="true" />
 
     <node name="trackdlo" pkg="trackdlo" type="trackdlo" output="screen">
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
-        <param name="bag_file" value="$(arg bag_file)" />
+        <!-- <param name="bag_file" value="$(arg bag_file)" /> -->
 
         <param name="beta" value="1" if="$(eval arg('kernel') == 0)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 0)"/>

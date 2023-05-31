@@ -22,10 +22,8 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 
 double total_len = 0;
-bool visualize_dist = false;
 
 bool use_eval_rope;
-int bag_file;
 int num_of_nodes;
 double beta;
 double lambda;
@@ -112,8 +110,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask_markers, mask, mask_rgb;
     Mat cur_image_orig = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
-    sensor_msgs::ImagePtr tracking_img_msg = nullptr;
-    tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cur_image_orig).toImageMsg();
+    // will get overwritten later if intialized
+    sensor_msgs::ImagePtr tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cur_image_orig).toImageMsg();
 
     Mat cur_image_hsv;
 
@@ -225,27 +223,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     occlusion_corner_j_2 = j;
                 }
 
-                // // should not pick up points from the gripper
-                // if (bag_file == 2) {
-                //     if (cloud_xyz(j, i).x < -0.15 || cloud_xyz(j, i).y < -0.15 || cloud_xyz(j, i).z < 0.58) {
-                //         continue;
-                //     }
-                // }
-                // else if (bag_file == 1) {
-                //     if ((cloud_xyz(j, i).x < 0.0 && cloud_xyz(j, i).y < 0.05) || cloud_xyz(j, i).z < 0.58 || 
-                //          cloud_xyz(j, i).x < -0.2 || (cloud_xyz(j, i).x < 0.1 && cloud_xyz(j, i).y < -0.05)) {
-                //         continue;
-                //     }
-                // }
-                // else if (bag_file == 3) {
-                //     if (cloud_xyz(j, i).y < -0.1 || cloud_xyz(j, i).z < 0.58) {
-                //         continue;
-                //     }
-                // }
-                // else {
-                //     if (cloud_xyz(j, i).z < 0.58) {
-                //         continue;
-                //     }
+                // if (cloud_xyz(j, i).z < 0.58) {
+                //     continue;
                 // }
 
 
@@ -264,18 +243,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         sor.setLeafSize (downsample_leaf_size, downsample_leaf_size, downsample_leaf_size);
         sor.filter (downsampled_xyz);
         pcl::toPCLPointCloud2(downsampled_xyz, cur_pc_downsampled);
-
-        // for (auto point : downsampled_xyz) {
-        //     std::vector<double> hsv = rgb2hsv(point.r, point.g, point.b);
-            
-        //     // hsv color thresholding
-        //     if (((hsv[0] > lower_red_1[0] && hsv[0] < upper_red_1[0] && hsv[1] > lower_red_1[1] && hsv[1] < upper_red_1[1] && hsv[2] > lower_red_1[2] && hsv[2] < upper_red_1[2]) || 
-        //          (hsv[0] > lower_red_2[0] && hsv[0] < upper_red_2[0] && hsv[1] > lower_red_2[1] && hsv[1] < upper_red_2[1] && hsv[2] > lower_red_2[2] && hsv[2] < upper_red_2[2])) &&
-        //         (hsv[0] > lower_blue[0] && hsv[0] < upper_blue[0] && hsv[1] > lower_blue[1] && hsv[1] < upper_blue[1] && hsv[2] > lower_blue[2] && hsv[2] < upper_blue[2]) &&
-        //         (hsv[0] > lower_yellow[0] && hsv[0] < upper_yellow[0] && hsv[1] > lower_yellow[1] && hsv[1] < upper_yellow[1] && hsv[2] > lower_yellow[2] && hsv[2] < upper_yellow[2])) {
-        //         downsampled_filtered_xyz.push_back(point);
-        //     }
-        // }
 
         MatrixXd X = downsampled_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
@@ -309,89 +276,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
                 initialized = true;
             }
-
-            // if (use_eval_rope) {
-            //     // simple blob detector
-            //     std::vector<cv::KeyPoint> keypoints_markers;
-            //     std::vector<cv::KeyPoint> keypoints_blue;
-            //     cv::SimpleBlobDetector::Params blob_params;
-            //     blob_params.filterByColor = false;
-            //     blob_params.filterByArea = true;
-            //     blob_params.minArea = 10;
-            //     blob_params.filterByCircularity = false;
-            //     blob_params.filterByInertia = true;
-            //     blob_params.filterByConvexity = false;
-            //     cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(blob_params);
-            //     // detect
-            //     detector->detect(mask_markers, keypoints_markers);
-
-            //     for (cv::KeyPoint key_point : keypoints_markers) {
-            //         auto keypoint_pc = cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y));
-            //         if (keypoint_pc.z > 0.58) {
-            //             cur_nodes_xyz.push_back(keypoint_pc);
-            //         }
-            //     }
-
-            //     // if using shorter rope
-            //     if (bag_file == 4 || bag_file == 5) {
-            //         detector->detect(mask_blue, keypoints_blue);
-
-            //         for (cv::KeyPoint key_point : keypoints_blue) {
-            //             cur_nodes_xyz.push_back(cloud_xyz(static_cast<int>(key_point.pt.x), static_cast<int>(key_point.pt.y)));
-            //         }
-            //     }
-
-            //     MatrixXd Y_0 = cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
-            //     MatrixXd Y_0_sorted = sort_pts(Y_0);
-            //     Y = Y_0_sorted.replicate(1, 1);
-                
-            //     tracker = trackdlo(Y_0_sorted.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
-
-            //     sigma2 = 0.001;
-
-            //     // record geodesic coord
-            //     double cur_sum = 0;
-            //     for (int i = 0; i < Y_0_sorted.rows()-1; i ++) {
-            //         cur_sum += (Y_0_sorted.row(i+1) - Y_0_sorted.row(i)).norm();
-            //         converted_node_coord.push_back(cur_sum);
-            //     }
-
-            //     // use ecpd to help initialize
-            //     for (int i = 0; i < Y_0_sorted.rows(); i ++) {
-            //         MatrixXd temp = MatrixXd::Zero(1, 4);
-            //         temp(0, 0) = i;
-            //         temp(0, 1) = Y_0_sorted(i, 0);
-            //         temp(0, 2) = Y_0_sorted(i, 1);
-            //         temp(0, 3) = Y_0_sorted(i, 2);
-            //         priors.push_back(temp);
-            //     }
-
-            //     tracker.ecpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, 0, true, true, false, true, priors, 1, 1, {}, 0.0, bmask_transformed_normalized, mat_max);
-            //     tracker.initialize_nodes(Y);
-            //     tracker.initialize_geodesic_coord(converted_node_coord);
-
-            //     for (int i = 0; i < Y.rows() - 1; i ++) {
-            //         total_len += pt2pt_dis(Y.row(i), Y.row(i+1));
-            //     }
-
-            // }
-            // else {
-            //     reg(X, Y, sigma2, num_of_nodes, 0.05, 100);
-            //     Y = sort_pts(Y);
-
-            //     // record geodesic coord
-            //     double cur_sum = 0;
-            //     for (int i = 0; i < Y.rows()-1; i ++) {
-            //         cur_sum += (Y.row(i+1) - Y.row(i)).norm();
-            //         converted_node_coord.push_back(cur_sum);
-            //     }
-
-            //     tracker = trackdlo(num_of_nodes, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
-            //     tracker.initialize_nodes(Y);
-            //     tracker.initialize_geodesic_coord(converted_node_coord);
-            // }
-
-            // initialized = true;
         } 
         else {
             // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
@@ -426,142 +310,31 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             // cur_image.copyTo(tracking_img);
 
             // draw points
-            if (!visualize_dist || priors.size()==Y.rows()) {
-                for (int i = 0; i < image_coords.rows(); i ++) {
+            for (int i = 0; i < image_coords.rows(); i ++) {
 
-                    int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-                    int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+                int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+                int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-                    cv::Scalar point_color;
-                    cv::Scalar line_color;
+                cv::Scalar point_color;
+                cv::Scalar line_color;
 
-                    if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
-                        point_color = cv::Scalar(0, 150, 255);
-                        line_color = cv::Scalar(0, 255, 0);
-                    }
-                    else {
-                        point_color = cv::Scalar(0, 0, 255);
-                        line_color = cv::Scalar(0, 0, 255);
-                    }
-
-                    if (i != image_coords.rows()-1) {
-                        cv::line(tracking_img, cv::Point(row, col),
-                                            cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
-                                                        static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                        line_color, 2);
-                    }
-
-                    cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
-                }
-            }
-            else {
-                // priors contain visible nodes
-                MatrixXd visible_nodes = MatrixXd::Zero(priors.size(), 3);
-                MatrixXd occluded_nodes = MatrixXd::Zero(Y.rows() - priors.size(), 3);
-                std::vector<int> visibility(Y.rows(), 0);
-
-                // record geodesic coord
-                bool use_geodesic = true;
-
-                double cur_sum = 0;
-                MatrixXd Y_geodesic = MatrixXd::Zero(Y.rows(), 3);
-                if (use_geodesic) {
-                    Y_geodesic(0, 0) = 0.0;
-                    Y_geodesic(0, 1) = 0.0;
-                    Y_geodesic(0, 2) = 0.0;
-                    for (int i = 1; i < Y.rows(); i ++) {
-                        cur_sum += (Y.row(i-1) - Y.row(i)).norm();
-                        Y_geodesic(i, 0) = cur_sum;
-                        Y_geodesic(i, 1) = 0.0;
-                        Y_geodesic(i, 2) = 0.0;
-                    }
-                }
-
-                for (int i = 0; i < priors.size(); i ++) {
-                    visibility[priors[i](0, 0)] = 1;
-                    if (!use_geodesic) {
-                        visible_nodes(i, 0) = priors[i](0, 1);
-                        visible_nodes(i, 1) = priors[i](0, 2);
-                        visible_nodes(i, 2) = priors[i](0, 3);
-                    }
-                    else {
-                        visible_nodes.row(i) = Y_geodesic.row(priors[i](0, 0));
-                    }
-                }
-                int counter = 0;
-                for (int i = 0; i < visibility.size(); i ++) {
-                    if (visibility[i] == 0) {
-                        if (!use_geodesic) {
-                            occluded_nodes.row(counter) = Y.row(i);
-                        }
-                        else {
-                            occluded_nodes.row(counter) = Y_geodesic.row(i);
-                        }
-                        counter += 1;
-                    }
-                }
-                MatrixXd diff_visible_occluded = MatrixXd::Zero(visible_nodes.rows(), occluded_nodes.rows());
-                
-                for (int i = 0; i < visible_nodes.rows(); i ++) {
-                    for (int j = 0; j < occluded_nodes.rows(); j ++) {
-                        diff_visible_occluded(i, j) = (visible_nodes.row(i) - occluded_nodes.row(j)).norm();
-                    }
-                }
-
-                double max_dist = 0;
-                for (int i = 0; i < diff_visible_occluded.rows(); i ++) {
-                    if (max_dist < diff_visible_occluded.row(i).minCoeff()) {
-                        max_dist = diff_visible_occluded.row(i).minCoeff();
-                    }
-                }
-
-                counter = -1;
-                for (int i = 0; i < image_coords.rows(); i ++) {
-
-                    int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-                    int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
-
-                    cv::Scalar point_color;
-                    cv::Scalar line_color;
-
-                    if (visibility[i] == 1) {
-                        counter += 1;
-                    }
-
-                    if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
-                        double min_dist_to_occluded_node = diff_visible_occluded.row(counter).minCoeff();
-                        point_color = cv::Scalar(static_cast<int>(min_dist_to_occluded_node/max_dist*255), 0, static_cast<int>((1-min_dist_to_occluded_node/max_dist)*255));
-                        if (visibility[i+1] == 0) {
-                            line_color = cv::Scalar(static_cast<int>(min_dist_to_occluded_node/max_dist*255 / 2), 0, static_cast<int>((255 + (1-min_dist_to_occluded_node/max_dist)*255) / 2));
-                        }
-                        else if (counter != diff_visible_occluded.rows()-1){
-                            double min_dist_to_occluded_node_next = diff_visible_occluded.row(counter+1).minCoeff();
-                            line_color = cv::Scalar(static_cast<int>((min_dist_to_occluded_node_next/max_dist + min_dist_to_occluded_node/max_dist)*255 / 2), 0, static_cast<int>(((1-min_dist_to_occluded_node_next/max_dist) + (1-min_dist_to_occluded_node/max_dist))*255 / 2));
-                        }
-                    }
-                    else {
-                        point_color = cv::Scalar(0, 0, 255);
-                        line_color = cv::Scalar(0, 0, 255);
-                    }
-
-                    if (i != image_coords.rows()-1) {
-                        cv::line(tracking_img, cv::Point(row, col),
-                                            cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
-                                                        static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                        line_color, 2);
-                    }
-
-                    cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
-                }
-            }
-            // add text
-            if (updated_opencv_mask && simulated_occlusion) {
-                if (bag_file == 4) {
-                    cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j-190, occlusion_corner_i_2-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
+                    point_color = cv::Scalar(0, 150, 255);
+                    line_color = cv::Scalar(0, 255, 0);
                 }
                 else {
-                    cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                    point_color = cv::Scalar(0, 0, 255);
+                    line_color = cv::Scalar(0, 0, 255);
                 }
+
+                if (i != image_coords.rows()-1) {
+                    cv::line(tracking_img, cv::Point(row, col),
+                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                    static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                                    line_color, 2);
+                }
+
+                cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
             }
 
             // publish image
@@ -647,7 +420,6 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
-    nh.getParam("/trackdlo/bag_file", bag_file);
     nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 

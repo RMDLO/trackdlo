@@ -252,7 +252,7 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
 
     all_chain_length = np.array(all_chain_length)
     sorted_idx = np.argsort(all_chain_length.copy())
-    chains = np.array(chains)
+    chains = np.asarray(chains, dtype=list)
     sorted_chains = chains[sorted_idx]
 
     pruned_chains = []
@@ -297,7 +297,7 @@ def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note:
 
         all_chain_length = np.array(all_chain_length)
         sorted_idx = np.argsort(all_chain_length.copy())
-        leftover_chains = np.array(leftover_chains)
+        leftover_chains = np.asarray(leftover_chains, dtype=list)
         sorted_chains = leftover_chains[sorted_idx]
 
     mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)

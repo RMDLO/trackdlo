@@ -1,11 +1,11 @@
 <launch>
     <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag -->
-    <arg name="bag_file" default="0" />
+    <!-- <arg name="bag_file" default="0" /> -->
     <arg name="use_eval_rope" default="true" />
 
     <node name="trackdlo" pkg="trackdlo" type="gltp" output="screen">
         <!-- 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag -->
-        <param name="bag_file" value="$(arg bag_file)" />
+        <!-- <param name="bag_file" value="$(arg bag_file)" /> -->
 
         <param name="beta" value="1" />
         <param name="lambda" value="5" />

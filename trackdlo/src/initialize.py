@@ -113,7 +113,7 @@ def callback (rgb, depth):
     # add color
     pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
     pc_rgba_arr = np.full((len(init_nodes), 1), pc_rgba)
-    pc_colored = np.hstack((init_nodes, pc_rgba_arr)).astype('O')
+    pc_colored = np.hstack((init_nodes, pc_rgba_arr)).astype(object)
     pc_colored[:, 3] = pc_colored[:, 3].astype(int)
 
     # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
