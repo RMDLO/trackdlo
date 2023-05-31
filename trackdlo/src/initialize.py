@@ -19,8 +19,9 @@ from scipy import ndimage
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 from scipy.spatial.transform import Rotation as R
+from scipy import interpolate
 
-from utils import extract_connected_skeleton
+from utils import extract_connected_skeleton, ndarray2MarkerArray
 
 use_eval_rope = True
 
@@ -91,10 +92,28 @@ def callback (rgb, depth):
     # do not include those without depth values
     extracted_chains_3d = extracted_chains_3d[((extracted_chains_3d[:, 0] != 0) | (extracted_chains_3d[:, 1] != 0) | (extracted_chains_3d[:, 2] != 0))]
 
+    tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.0001)
+    # 1st fit, less points
+    u_fine = np.linspace(0, 1, 100) # <-- num fit points
+    x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+    spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+
+    # 2nd fit, higher accuracy
+    num_true_pts = int(np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1))) * 1000)
+    u_fine = np.linspace(0, 1, num_true_pts) # <-- num true points
+    x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
+    spline_pts = np.vstack((x_fine, y_fine, z_fine)).T
+    total_spline_len = np.sum(np.sqrt(np.sum(np.square(np.diff(spline_pts, axis=0)), axis=1)))
+
+    init_nodes = spline_pts[np.linspace(0, num_true_pts-1, 30).astype(int)]
+
+    results = ndarray2MarkerArray(init_nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
+    results_pub.publish(results)
+
     # add color
     pc_rgba = struct.unpack('I', struct.pack('BBBB', 255, 40, 40, 255))[0]
-    pc_rgba_arr = np.full((len(extracted_chains_3d), 1), pc_rgba)
-    pc_colored = np.hstack((extracted_chains_3d, pc_rgba_arr)).astype('O')
+    pc_rgba_arr = np.full((len(init_nodes), 1), pc_rgba)
+    pc_colored = np.hstack((init_nodes, pc_rgba_arr)).astype('O')
     pc_colored[:, 3] = pc_colored[:, 3].astype(int)
 
     # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
@@ -118,6 +137,7 @@ if __name__=='__main__':
                 PointField('z', 8, PointField.FLOAT32, 1),
                 PointField('rgba', 12, PointField.UINT32, 1)]
     pc_pub = rospy.Publisher ('/pts', PointCloud2, queue_size=10)
+    results_pub = rospy.Publisher ('/results', MarkerArray, queue_size=10)
 
     ts = message_filters.TimeSynchronizer([rgb_sub, depth_sub], 10)
     ts.registerCallback(callback)
