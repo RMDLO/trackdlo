@@ -9,7 +9,7 @@ The TrackDLO algorithm estimates the shape of a Deformable Linear Object (DLO) u
   <img src="images/trackdlo1.gif" width="400" title="TrackDLO"> <img src="images/trackdlo2.gif" width="400" title="TrackDLO">
 </p>
 
-We also adapt the algorithm introduced in [Deformable One-Dimensional Object Detection for Routing and Manipulation](https://ieeexplore.ieee.org/abstract/document/9697357) and relax the assumption about the DLO's initial state to include complicated setups such as self-crossing and minor occlusion:
+We also adapt the algorithm introduced in [Deformable One-Dimensional Object Detection for Routing and Manipulation](https://ieeexplore.ieee.org/abstract/document/9697357) and relax the assumption about the DLO initial state to allow complicated setups such as self-crossing and minor occlusion:
 <p align="center">
   <img src="images/trackdlo3.gif" width="800" title="TrackDLO initialization">
 </p>
