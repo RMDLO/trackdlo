@@ -456,19 +456,19 @@ int main(int argc, char **argv) {
     int pub_queue_size = 30;
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/trackdlo/mask_with_occlusion", 10, update_opencv_mask);
     init_nodes_sub = nh.subscribe("/trackdlo/init_nodes", 1, update_init_nodes);
     camera_info_sub = nh.subscribe(camera_info_topic, 1, update_camera_info);
 
-    image_transport::Publisher mask_pub = it.advertise("/mask", pub_queue_size);
-    image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", pub_queue_size);
-    pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/pts", pub_queue_size);
-    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/results_marker", pub_queue_size);
-    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/guide_nodes", pub_queue_size);
-    corr_priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/corr_priors", pub_queue_size);
+    image_transport::Publisher mask_pub = it.advertise("/trackdlo/mask", pub_queue_size);
+    image_transport::Publisher tracking_img_pub = it.advertise("/trackdlo/tracking_img", pub_queue_size);
+    pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/filtered_pointcloud", pub_queue_size);
+    results_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/results_marker", pub_queue_size);
+    guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/guide_nodes", pub_queue_size);
+    corr_priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/corr_priors", pub_queue_size);
 
     // trackdlo point cloud topic
-    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", pub_queue_size);
+    result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/results_pc", pub_queue_size);
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, rgb_topic, 10);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, depth_topic, 10);
