@@ -28,7 +28,6 @@ MatrixXd proj_matrix(3, 4);
 double total_len = 0;
 
 bool use_eval_rope;
-int num_of_nodes;
 double beta;
 double lambda;
 double alpha;
@@ -42,6 +41,14 @@ bool use_geodesic;
 bool use_prev_sigma2;
 int kernel;
 double downsample_leaf_size;
+
+std::string camera_info_topic;
+std::string rgb_topic;
+std::string depth_topic;
+std::string hsv_threshold_upper_limit;
+std::string hsv_threshold_lower_limit;
+std::vector<int> upper;
+std::vector<int> lower;
 
 trackdlo tracker;
 
@@ -76,6 +83,39 @@ double pre_proc_total = 0;
 double algo_total = 0;
 double pub_data_total = 0;
 int frames = 0;
+
+Mat color_thresholding (Mat cur_image_hsv) {
+    std::vector<int> lower_blue = {90, 90, 60};
+    std::vector<int> upper_blue = {130, 255, 255};
+
+    std::vector<int> lower_red_1 = {130, 60, 50};
+    std::vector<int> upper_red_1 = {255, 255, 255};
+
+    std::vector<int> lower_red_2 = {0, 60, 50};
+    std::vector<int> upper_red_2 = {10, 255, 255};
+
+    std::vector<int> lower_yellow = {15, 100, 80};
+    std::vector<int> upper_yellow = {40, 255, 255};
+
+    Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask;
+    // filter blue
+    cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
+
+    // filter red
+    cv::inRange(cur_image_hsv, cv::Scalar(lower_red_1[0], lower_red_1[1], lower_red_1[2]), cv::Scalar(upper_red_1[0], upper_red_1[1], upper_red_1[2]), mask_red_1);
+    cv::inRange(cur_image_hsv, cv::Scalar(lower_red_2[0], lower_red_2[1], lower_red_2[2]), cv::Scalar(upper_red_2[0], upper_red_2[1], upper_red_2[2]), mask_red_2);
+
+    // filter yellow
+    cv::inRange(cur_image_hsv, cv::Scalar(lower_yellow[0], lower_yellow[1], lower_yellow[2]), cv::Scalar(upper_yellow[0], upper_yellow[1], upper_yellow[2]), mask_yellow);
+
+    // combine red mask
+    cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
+    // combine overall mask
+    cv::bitwise_or(mask_red, mask_blue, mask);
+    cv::bitwise_or(mask_yellow, mask, mask);
+
+    return mask;
+}
 
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::ImageConstPtr& depth_msg) {
 
@@ -113,49 +153,18 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         double time_diff;
         std::chrono::high_resolution_clock::time_point cur_time;
 
-        Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask_markers, mask, mask_rgb;
+        Mat mask, mask_rgb, mask_without_occlusion_block;
         Mat cur_image_hsv;
 
         // convert color
         cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
-        std::vector<int> lower_blue = {90, 80, 80};
-        std::vector<int> upper_blue = {130, 255, 255};
-
-        std::vector<int> lower_red_1 = {130, 60, 50};
-        std::vector<int> upper_red_1 = {255, 255, 255};
-
-        std::vector<int> lower_red_2 = {0, 60, 50};
-        std::vector<int> upper_red_2 = {10, 255, 255};
-
-        std::vector<int> lower_yellow = {15, 100, 80};
-        std::vector<int> upper_yellow = {40, 255, 255};
-
-        Mat mask_without_occlusion_block;
-
-        if (use_eval_rope) {
-            // filter blue
-            cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
-
-            // filter red
-            cv::inRange(cur_image_hsv, cv::Scalar(lower_red_1[0], lower_red_1[1], lower_red_1[2]), cv::Scalar(upper_red_1[0], upper_red_1[1], upper_red_1[2]), mask_red_1);
-            cv::inRange(cur_image_hsv, cv::Scalar(lower_red_2[0], lower_red_2[1], lower_red_2[2]), cv::Scalar(upper_red_2[0], upper_red_2[1], upper_red_2[2]), mask_red_2);
-
-            // filter yellow
-            cv::inRange(cur_image_hsv, cv::Scalar(lower_yellow[0], lower_yellow[1], lower_yellow[2]), cv::Scalar(upper_yellow[0], upper_yellow[1], upper_yellow[2]), mask_yellow);
-
-            // combine red mask
-            cv::bitwise_or(mask_red_1, mask_red_2, mask_red);
-            // combine overall mask
-            cv::bitwise_or(mask_red, mask_blue, mask_without_occlusion_block);
-            cv::bitwise_or(mask_yellow, mask_without_occlusion_block, mask_without_occlusion_block);
-            cv::bitwise_or(mask_red, mask_yellow, mask_markers);
+        if (!use_eval_rope) {
+            // color_thresholding
+            cv::inRange(cur_image_hsv, cv::Scalar(lower[0], lower[1], lower[2]), cv::Scalar(upper[0], upper[1], upper[2]), mask_without_occlusion_block);
         }
         else {
-            // filter blue
-            cv::inRange(cur_image_hsv, cv::Scalar(lower_blue[0], lower_blue[1], lower_blue[2]), cv::Scalar(upper_blue[0], upper_blue[1], upper_blue[2]), mask_blue);
-
-            mask_blue.copyTo(mask_without_occlusion_block);
+            mask_without_occlusion_block = color_thresholding(cur_image_hsv);
         }
 
         // update cur image for visualization
@@ -398,15 +407,53 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
-    nh.getParam("/trackdlo/num_of_nodes", num_of_nodes);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
+
+    nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);
+    nh.getParam("/trackdlo/rgb_topic", rgb_topic);
+    nh.getParam("/trackdlo/depth_topic", depth_topic);
+
+    nh.getParam("/trackdlo/hsv_threshold_upper_limit", hsv_threshold_upper_limit);
+    nh.getParam("/trackdlo/hsv_threshold_lower_limit", hsv_threshold_lower_limit);
+
+    // update color thresholding upper bound
+    std::string rgb_val = "";
+    for (int i = 0; i < hsv_threshold_upper_limit.length(); i ++) {
+        if (hsv_threshold_upper_limit.substr(i, 1) != " ") {
+            rgb_val += hsv_threshold_upper_limit.substr(i, 1);
+        }
+        else {
+            upper.push_back(std::stoi(rgb_val));
+            rgb_val = "";
+        }
+        
+        if (i == hsv_threshold_upper_limit.length()-1) {
+            upper.push_back(std::stoi(rgb_val));
+        }
+    }
+
+    // update color thresholding lower bound
+    rgb_val = "";
+    for (int i = 0; i < hsv_threshold_lower_limit.length(); i ++) {
+        if (hsv_threshold_lower_limit.substr(i, 1) != " ") {
+            rgb_val += hsv_threshold_lower_limit.substr(i, 1);
+        }
+        else {
+            lower.push_back(std::stoi(rgb_val));
+            rgb_val = "";
+        }
+        
+        if (i == hsv_threshold_lower_limit.length()-1) {
+            upper.push_back(std::stoi(rgb_val));
+        }
+    }
 
     int pub_queue_size = 30;
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
     init_nodes_sub = nh.subscribe("/trackdlo/init_nodes", 1, update_init_nodes);
-    camera_info_sub = nh.subscribe("/camera/aligned_depth_to_color/camera_info", 1, update_camera_info);
+    camera_info_sub = nh.subscribe(camera_info_topic, 1, update_camera_info);
 
     image_transport::Publisher mask_pub = it.advertise("/mask", pub_queue_size);
     image_transport::Publisher tracking_img_pub = it.advertise("/tracking_img", pub_queue_size);
@@ -418,8 +465,8 @@ int main(int argc, char **argv) {
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo_results_pc", pub_queue_size);
 
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth/image_rect_raw", 10);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, rgb_topic, 10);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, depth_topic, 10);
     message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image> sync(image_sub, depth_sub, 10);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 

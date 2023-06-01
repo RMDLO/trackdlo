@@ -23,9 +23,6 @@ from scipy import interpolate
 
 from utils import extract_connected_skeleton, ndarray2MarkerArray
 
-use_eval_rope = False
-num_of_nodes = 45
-
 proj_matrix = None
 def camera_info_callback (info):
     global proj_matrix
@@ -34,7 +31,29 @@ def camera_info_callback (info):
     print(proj_matrix)
     camera_info_sub.unregister()
 
+def color_thresholding (hsv_image):
+    # --- rope blue ---
+    lower = (90, 90, 60)
+    upper = (130, 255, 255)
+    mask_dlo = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+
+    # --- tape red ---
+    lower = (130, 60, 40)
+    upper = (255, 255, 255)
+    mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    lower = (0, 60, 40)
+    upper = (10, 255, 255)
+    mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
+    mask_marker = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy()).astype('uint8')
+
+    # combine masks
+    mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+
+    return mask
+
 def callback (rgb, depth):
+    global lower, upper
+
     # process rgb image
     cur_image = ros_numpy.numpify(rgb)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
@@ -44,31 +63,17 @@ def callback (rgb, depth):
 
     if not use_eval_rope:
         # color thresholding
-        lower = (90, 90, 60)
-        upper = (120, 255, 255)
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
         # color thresholding
-        # --- rope blue ---
-        lower = (90, 90, 60)
-        upper = (130, 255, 255)
-        mask_dlo = cv2.inRange(hsv_image, lower, upper).astype('uint8')
-
-        # --- tape red ---
-        lower = (130, 60, 40)
-        upper = (255, 255, 255)
-        mask_red_1 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
-        lower = (0, 60, 40)
-        upper = (10, 255, 255)
-        mask_red_2 = cv2.inRange(hsv_image, lower, upper).astype('uint8')
-        mask_marker = cv2.bitwise_or(mask_red_1.copy(), mask_red_2.copy()).astype('uint8')
-
-        # combine masks
-        mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+        mask = color_thresholding(hsv_image)
 
     start_time = time.time()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
-    extracted_chains = extract_connected_skeleton(mask)  # returns the pixel coord of points (in order). a list of lists
+
+    # returns the pixel coord of points (in order). a list of lists
+    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask)
+
     all_pixel_coords = []
     for chain in extracted_chains:
         all_pixel_coords += chain
@@ -117,7 +122,6 @@ def callback (rgb, depth):
     pc_colored = np.hstack((init_nodes, pc_rgba_arr)).astype(object)
     pc_colored[:, 3] = pc_colored[:, 3].astype(int)
 
-    # filtered_pc = filtered_pc.reshape((len(filtered_pc)*len(filtered_pc[0]), 3))
     header.stamp = rospy.Time.now()
     converted_points = pcl2.create_cloud(header, fields, pc_colored)
     pc_pub.publish(converted_points)
@@ -126,10 +130,25 @@ def callback (rgb, depth):
 
 if __name__=='__main__':
     rospy.init_node('init_tracker', anonymous=True)
-    camera_info_sub = rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, camera_info_callback)
 
-    rgb_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-    depth_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
+    num_of_nodes = rospy.get_param('/init_tracker/num_of_nodes')
+    use_eval_rope = rospy.get_param('/init_tracker/use_eval_rope')
+    camera_info_topic = rospy.get_param('/init_tracker/camera_info_topic')
+    rgb_topic = rospy.get_param('/init_tracker/rgb_topic')
+    depth_topic = rospy.get_param('/init_tracker/depth_topic')
+    visualize_initialization_process = rospy.get_param('/init_tracker/visualize_initialization_process')
+
+    hsv_threshold_upper_limit = rospy.get_param('/init_tracker/hsv_threshold_upper_limit')
+    hsv_threshold_lower_limit = rospy.get_param('/init_tracker/hsv_threshold_lower_limit')
+
+    upper_array = hsv_threshold_upper_limit.split(' ')
+    lower_array = hsv_threshold_lower_limit.split(' ')
+    upper = (int(upper_array[0]), int(upper_array[1]), int(upper_array[2]))
+    lower = (int(lower_array[0]), int(lower_array[1]), int(lower_array[2]))
+
+    camera_info_sub = rospy.Subscriber(camera_info_topic, CameraInfo, camera_info_callback)
+    rgb_sub = message_filters.Subscriber(rgb_topic, Image)
+    depth_sub = message_filters.Subscriber(depth_topic, Image)
 
     # header
     header = std_msgs.msg.Header()

@@ -149,8 +149,7 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"
 # paper link: https://ieeexplore.ieee.org/abstract/document/9697357
-visualize_process = False
-def extract_connected_skeleton (mask, seg_length=10, max_curvature=30):  # note: mask is one channel
+def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curvature=30):  # note: mask is one channel
 
     # smooth image
     im = Image.fromarray(mask)

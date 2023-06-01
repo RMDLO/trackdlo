@@ -37,6 +37,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm> 
+#include <string>
 
 #include <unistd.h>
 #include <cstdlib>
