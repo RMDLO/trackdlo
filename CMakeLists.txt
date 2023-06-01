@@ -58,17 +58,6 @@ target_link_libraries(trackdlo
 # target_compile_options(trackdlo PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
 
 add_executable(
-  gltp trackdlo/src/gltp_node.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp
-)
-target_link_libraries(gltp
-  ${catkin_LIBRARIES}
-  # ${PCL_LIBRARIES}
-  # ${OpenCV_LIBS}
-  Eigen3::Eigen
-)
-# target_compile_options(gltp PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
-
-add_executable(
   evaluation trackdlo/src/run_evaluation.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp trackdlo/src/evaluator.cpp
 )
 target_link_libraries(evaluation

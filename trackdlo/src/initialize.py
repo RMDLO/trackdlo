@@ -5,6 +5,7 @@ import ros_numpy
 from sensor_msgs.msg import PointCloud2, PointField, Image, CameraInfo
 import sensor_msgs.point_cloud2 as pcl2
 import std_msgs.msg
+import message_filters
 
 import struct
 import time
@@ -12,13 +13,7 @@ import cv2
 import numpy as np
 import time
 
-import message_filters
-import open3d as o3d
-from scipy import ndimage
-
-from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
-from scipy.spatial.transform import Rotation as R
 from scipy import interpolate
 
 from utils import extract_connected_skeleton, ndarray2MarkerArray
