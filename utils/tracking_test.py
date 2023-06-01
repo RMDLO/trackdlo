@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 import rospy
 import ros_numpy
 from sensor_msgs.msg import PointCloud2, PointField, Image
@@ -11,11 +10,7 @@ import struct
 import time
 import cv2
 import numpy as np
-
 import time
-import pickle as pkl
-import yaml
-from os.path import dirname, abspath, join
 
 import message_filters
 import open3d as o3d

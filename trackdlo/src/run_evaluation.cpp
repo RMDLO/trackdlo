@@ -8,8 +8,6 @@
 #include <std_msgs/Int32MultiArray.h>
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
@@ -24,17 +22,18 @@ double exit_at;
 double wait_before_occlusion;
 double bag_rate;
 int num_of_nodes;
-bool save_image;
+bool save_images;
 bool save_errors;
 
 int callback_count = 0;
 evaluator tracking_evaluator;
-MatrixXf head_node = MatrixXf::Zero(1, 3);
+MatrixXd head_node = MatrixXd::Zero(1, 3);
 
-MatrixXf proj_matrix(3, 4);
+MatrixXd proj_matrix(3, 4);
 ros::Publisher corners_arr_pub;
 bool initialized = false;
 
+// sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg, const sensor_msgs::PointCloud2ConstPtr& result_msg) {
 sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg, const sensor_msgs::PointCloud2ConstPtr& result_msg) {
     sensor_msgs::ImagePtr eval_img_msg = nullptr;
     
@@ -81,7 +80,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     pcl_conversions::toPCL(*result_msg, *result_cloud);
     pcl::PointCloud<pcl::PointXYZ> result_cloud_xyz;
     pcl::fromPCLPointCloud2(*result_cloud, result_cloud_xyz);
-    MatrixXf Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose();
+    MatrixXd Y_track = result_cloud_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
 
     int top_left_x = -1;
     int top_left_y = -1;
@@ -90,204 +89,235 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
     double cur_error = -1;
     if (time_from_start > tracking_evaluator.recording_start_time()) {
-
-        MatrixXf gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
-        MatrixXf Y_true = gt_nodes.replicate(1, 1);
-        // if not initialized
-        if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
-            // the one with greater x. this holds true for all 3 bag files
-            if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
-                head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
+        
+        if (bag_file != 3) {
+            MatrixXd gt_nodes = tracking_evaluator.get_ground_truth_nodes(cur_image_orig, cloud_xyz);
+            MatrixXd Y_true = gt_nodes.replicate(1, 1);
+            // if not initialized
+            if (head_node(0, 0) == 0.0 && head_node(0, 1) == 0.0 && head_node(0, 2) == 0.0) {
+                // the one with greater x. this holds true for all 3 bag files
+                if (Y_track(0, 0) > Y_track(Y_track.rows()-1, 0)) {
+                    head_node = Y_track.row(Y_track.rows()-1).replicate(1, 1);
+                }
+                else {
+                    head_node = Y_track.row(0).replicate(1, 1);
+                }
             }
-            else {
-                head_node = Y_track.row(0).replicate(1, 1);
-            }
-        }
-        Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
+            Y_true = tracking_evaluator.sort_pts(gt_nodes, head_node);
 
-        // update head node
-        head_node = Y_true.row(0).replicate(1, 1);
-        std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
+            // update head node
+            head_node = Y_true.row(0).replicate(1, 1);
+            std::cout << "Y_true size: " << Y_true.rows() << "; Y_track size: " << Y_track.rows() << std::endl;
 
-        if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
-            if (bag_file == 0) {
-                // simulate occlusion: occlude the first n nodes
-                // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
-                int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion() / 100.0);
+            if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
+                if (bag_file == 0) {
+                    // simulate occlusion: occlude the first n nodes
+                    // strategy: first calculate the 3D boundary box based on point cloud, then project the four corners back to the image
+                    int num_of_occluded_nodes = static_cast<int>(Y_track.rows() * tracking_evaluator.pct_occlusion() / 100.0);
 
-                if (num_of_occluded_nodes != 0) {
+                    if (num_of_occluded_nodes != 0) {
 
-                    double min_x = Y_true(0, 0);
-                    double min_y = Y_true(0, 1);
-                    double min_z = Y_true(0, 2);
+                        double min_x = Y_true(0, 0);
+                        double min_y = Y_true(0, 1);
+                        double min_z = Y_true(0, 2);
 
-                    double max_x = Y_true(0, 0);
-                    double max_y = Y_true(0, 1);
-                    double max_z = Y_true(0, 2);
+                        double max_x = Y_true(0, 0);
+                        double max_y = Y_true(0, 1);
+                        double max_z = Y_true(0, 2);
 
-                    for (int i = 0; i < num_of_occluded_nodes; i ++) {
-                        if (Y_true(i, 0) < min_x) {
-                            min_x = Y_true(i, 0);
+                        for (int i = 0; i < num_of_occluded_nodes; i ++) {
+                            if (Y_true(i, 0) < min_x) {
+                                min_x = Y_true(i, 0);
+                            }
+                            if (Y_true(i, 1) < min_y) {
+                                min_y = Y_true(i, 1);
+                            }
+                            if (Y_true(i, 2) < min_z) {
+                                min_z = Y_true(i, 2);
+                            }
+
+                            if (Y_true(i, 0) > max_x) {
+                                max_x = Y_true(i, 0);
+                            }
+                            if (Y_true(i, 1) > max_y) {
+                                max_y = Y_true(i, 1);
+                            }
+                            if (Y_true(i, 2) > max_z) {
+                                max_z = Y_true(i, 2);
+                            }
                         }
-                        if (Y_true(i, 1) < min_y) {
-                            min_y = Y_true(i, 1);
+
+                        MatrixXd min_corner(1, 3);
+                        min_corner << min_x, min_y, min_z;
+                        MatrixXd max_corner(1, 3);
+                        max_corner << max_x, max_y, max_z;
+
+                        MatrixXd corners = MatrixXd::Zero(2, 3);
+                        corners.row(0) = min_corner.replicate(1, 1);
+                        corners.row(1) = max_corner.replicate(1, 1);
+
+                        // project to find occlusion block coorindate
+                        MatrixXd nodes_h = corners.replicate(1, 1);
+                        nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
+                        nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
+                        MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
+
+                        int pix_coord_1_x = static_cast<int>(image_coords(0, 0)/image_coords(0, 2));
+                        int pix_coord_1_y = static_cast<int>(image_coords(0, 1)/image_coords(0, 2));
+                        int pix_coord_2_x = static_cast<int>(image_coords(1, 0)/image_coords(1, 2));
+                        int pix_coord_2_y = static_cast<int>(image_coords(1, 1)/image_coords(1, 2));
+                    
+                        int extra_border = 30;
+
+                        // best scenarios: min_corner and max_corner are the top left and bottom right corners
+                        if (pix_coord_1_x <= pix_coord_2_x && pix_coord_1_y <= pix_coord_2_y) {
+                            // cv::Point p1(pix_coord_1_x - extra_border, pix_coord_1_y - extra_border);
+                            // cv::Point p2(pix_coord_2_x + extra_border, pix_coord_2_y + extra_border);
+                            // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
+                            top_left_x = pix_coord_1_x - extra_border;
+                            if (top_left_x < 0) {top_left_x = 0;}
+                            top_left_y = pix_coord_1_y - extra_border;
+                            if (top_left_y < 0) {top_left_y = 0;}
+                            bottom_right_x = pix_coord_2_x + extra_border;
+                            if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
+                            bottom_right_y = pix_coord_2_y + extra_border;
+                            if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
                         }
-                        if (Y_true(i, 2) < min_z) {
-                            min_z = Y_true(i, 2);
+                        // best scenarios: min_corner and max_corner are the top left and bottom right corners
+                        else if (pix_coord_2_x <= pix_coord_1_x && pix_coord_2_y <= pix_coord_1_y) {
+                            // cv::Point p1(pix_coord_2_x - extra_border, pix_coord_2_y - extra_border);
+                            // cv::Point p2(pix_coord_1_x + extra_border, pix_coord_1_y + extra_border);
+                            // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
+                            top_left_x = pix_coord_2_x - extra_border;
+                            if (top_left_x < 0) {top_left_x = 0;}
+                            top_left_y = pix_coord_2_y - extra_border;
+                            if (top_left_y < 0) {top_left_y = 0;}
+                            bottom_right_x = pix_coord_1_x + extra_border;
+                            if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
+                            bottom_right_y = pix_coord_1_y + extra_border;
+                            if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
+                        }
+                        // min_corner is top right, max_corner is bottom left
+                        else if (pix_coord_2_x <= pix_coord_1_x && pix_coord_1_y <= pix_coord_2_y) {
+                            // cv::Point p1(pix_coord_2_x - extra_border, pix_coord_1_y - extra_border);
+                            // cv::Point p2(pix_coord_1_x + extra_border, pix_coord_2_y + extra_border);
+                            // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
+                            top_left_x = pix_coord_2_x - extra_border;
+                            if (top_left_x < 0) {top_left_x = 0;}
+                            top_left_y = pix_coord_1_y - extra_border;
+                            if (top_left_y < 0) {top_left_y = 0;}
+                            bottom_right_x = pix_coord_1_x + extra_border;
+                            if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
+                            bottom_right_y = pix_coord_2_y + extra_border;
+                            if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
+                        }
+                        // max_corner is top right, min_corner is bottom left
+                        else {
+                            // cv::Point p1(pix_coord_1_x - extra_border, pix_coord_2_y - extra_border);
+                            // cv::Point p2(pix_coord_2_x + extra_border, pix_coord_1_y + extra_border);
+                            // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
+                            top_left_x = pix_coord_1_x - extra_border;
+                            if (top_left_x < 0) {top_left_x = 0;}
+                            top_left_y = pix_coord_2_y - extra_border;
+                            if (top_left_y < 0) {top_left_y = 0;}
+                            bottom_right_x = pix_coord_2_x + extra_border;
+                            if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
+                            bottom_right_y = pix_coord_1_y + extra_border;
+                            if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
                         }
 
-                        if (Y_true(i, 0) > max_x) {
-                            max_x = Y_true(i, 0);
-                        }
-                        if (Y_true(i, 1) > max_y) {
-                            max_y = Y_true(i, 1);
-                        }
-                        if (Y_true(i, 2) > max_z) {
-                            max_z = Y_true(i, 2);
-                        }
+                        std_msgs::Int32MultiArray corners_arr;
+                        corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                        corners_arr_pub.publish(corners_arr);
                     }
+                }
 
-                    MatrixXf min_corner(1, 3);
-                    min_corner << min_x, min_y, min_z;
-                    MatrixXf max_corner(1, 3);
-                    max_corner << max_x, max_y, max_z;
-
-                    MatrixXf corners = MatrixXf::Zero(2, 3);
-                    corners.row(0) = min_corner.replicate(1, 1);
-                    corners.row(1) = max_corner.replicate(1, 1);
-
-                    // project to find occlusion block coorindate
-                    MatrixXf nodes_h = corners.replicate(1, 1);
-                    nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-                    nodes_h.col(nodes_h.cols()-1) = MatrixXf::Ones(nodes_h.rows(), 1);
-                    MatrixXf image_coords = (proj_matrix * nodes_h.transpose()).transpose();
-
-                    int pix_coord_1_x = static_cast<int>(image_coords(0, 0)/image_coords(0, 2));
-                    int pix_coord_1_y = static_cast<int>(image_coords(0, 1)/image_coords(0, 2));
-                    int pix_coord_2_x = static_cast<int>(image_coords(1, 0)/image_coords(1, 2));
-                    int pix_coord_2_y = static_cast<int>(image_coords(1, 1)/image_coords(1, 2));
-                
-                    int extra_border = 30;
-
-                    // best scenarios: min_corner and max_corner are the top left and bottom right corners
-                    if (pix_coord_1_x <= pix_coord_2_x && pix_coord_1_y <= pix_coord_2_y) {
-                        // cv::Point p1(pix_coord_1_x - extra_border, pix_coord_1_y - extra_border);
-                        // cv::Point p2(pix_coord_2_x + extra_border, pix_coord_2_y + extra_border);
-                        // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
-                        top_left_x = pix_coord_1_x - extra_border;
-                        if (top_left_x < 0) {top_left_x = 0;}
-                        top_left_y = pix_coord_1_y - extra_border;
-                        if (top_left_y < 0) {top_left_y = 0;}
-                        bottom_right_x = pix_coord_2_x + extra_border;
-                        if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
-                        bottom_right_y = pix_coord_2_y + extra_border;
-                        if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
-                    }
-                    // best scenarios: min_corner and max_corner are the top left and bottom right corners
-                    else if (pix_coord_2_x <= pix_coord_1_x && pix_coord_2_y <= pix_coord_1_y) {
-                        // cv::Point p1(pix_coord_2_x - extra_border, pix_coord_2_y - extra_border);
-                        // cv::Point p2(pix_coord_1_x + extra_border, pix_coord_1_y + extra_border);
-                        // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
-                        top_left_x = pix_coord_2_x - extra_border;
-                        if (top_left_x < 0) {top_left_x = 0;}
-                        top_left_y = pix_coord_2_y - extra_border;
-                        if (top_left_y < 0) {top_left_y = 0;}
-                        bottom_right_x = pix_coord_1_x + extra_border;
-                        if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
-                        bottom_right_y = pix_coord_1_y + extra_border;
-                        if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
-                    }
-                    // min_corner is top right, max_corner is bottom left
-                    else if (pix_coord_2_x <= pix_coord_1_x && pix_coord_1_y <= pix_coord_2_y) {
-                        // cv::Point p1(pix_coord_2_x - extra_border, pix_coord_1_y - extra_border);
-                        // cv::Point p2(pix_coord_1_x + extra_border, pix_coord_2_y + extra_border);
-                        // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
-                        top_left_x = pix_coord_2_x - extra_border;
-                        if (top_left_x < 0) {top_left_x = 0;}
-                        top_left_y = pix_coord_1_y - extra_border;
-                        if (top_left_y < 0) {top_left_y = 0;}
-                        bottom_right_x = pix_coord_1_x + extra_border;
-                        if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
-                        bottom_right_y = pix_coord_2_y + extra_border;
-                        if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
-                    }
-                    // max_corner is top right, min_corner is bottom left
-                    else {
-                        // cv::Point p1(pix_coord_1_x - extra_border, pix_coord_2_y - extra_border);
-                        // cv::Point p2(pix_coord_2_x + extra_border, pix_coord_1_y + extra_border);
-                        // cv::rectangle(occlusion_mask, p1, p2, cv::Scalar(0, 0, 0), -1);
-                        top_left_x = pix_coord_1_x - extra_border;
-                        if (top_left_x < 0) {top_left_x = 0;}
-                        top_left_y = pix_coord_2_y - extra_border;
-                        if (top_left_y < 0) {top_left_y = 0;}
-                        bottom_right_x = pix_coord_2_x + extra_border;
-                        if (bottom_right_x >= cur_image_orig.cols) {bottom_right_x = cur_image_orig.cols-1;}
-                        bottom_right_y = pix_coord_1_y + extra_border;
-                        if (bottom_right_y >= cur_image_orig.rows) {bottom_right_y = cur_image_orig.rows-1;}
-                    }
+                else if (bag_file == 1) {
+                    top_left_x = 840;
+                    top_left_y = 408;
+                    bottom_right_x = 1191;
+                    bottom_right_y = 678;
 
                     std_msgs::Int32MultiArray corners_arr;
                     corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
                     corners_arr_pub.publish(corners_arr);
                 }
+
+                else if (bag_file == 2) {
+                    top_left_x = 780;
+                    top_left_y = 120;
+                    bottom_right_x = 1050;
+                    bottom_right_y = 290;
+
+                    std_msgs::Int32MultiArray corners_arr;
+                    corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                    corners_arr_pub.publish(corners_arr);
+                }
+
+                else if (bag_file == 4) {
+                    top_left_x = 543;
+                    top_left_y = 276;
+                    bottom_right_x = 738;
+                    bottom_right_y = 383;
+
+                    std_msgs::Int32MultiArray corners_arr;
+                    corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                    corners_arr_pub.publish(corners_arr);
+                }
+
+                else if (bag_file == 5) {
+                    top_left_x = 300;
+                    top_left_y = 317;
+                    bottom_right_x = 698;
+                    bottom_right_y = 440;
+
+                    std_msgs::Int32MultiArray corners_arr;
+                    corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
+                    corners_arr_pub.publish(corners_arr);
+                }
+
+                else {
+                    throw std::invalid_argument("Invalid bag file ID!");
+                }
             }
 
-            else if (bag_file == 1) {
-                top_left_x = 840;
-                top_left_y = 408;
-                bottom_right_x = 1191;
-                bottom_right_y = 678;
-
-                std_msgs::Int32MultiArray corners_arr;
-                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
-                corners_arr_pub.publish(corners_arr);
+            // compute error
+            if (save_errors) {
+                cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
             }
-
-            else if (bag_file == 2) {
-                top_left_x = 750;
-                top_left_y = 70;
-                bottom_right_x = 1012;
-                bottom_right_y = 320;
-
-                std_msgs::Int32MultiArray corners_arr;
-                corners_arr.data = {top_left_x, top_left_y, bottom_right_x, bottom_right_y};
-                corners_arr_pub.publish(corners_arr);
-            }
-
             else {
-                throw std::invalid_argument("Invalid bag file ID!");
+                cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
             }
-        }
+            std::cout << "error = " << cur_error << std::endl;
 
-        // compute error
-        if (save_errors) {
-            cur_error = tracking_evaluator.compute_and_save_error(Y_track, Y_true);
-        }
-        else {
-            cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
-        }
-        std::cout << "error = " << cur_error << std::endl;
+            // optional pub and save result image
+            if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
+                cv::Point p1(top_left_x, top_left_y);
+                cv::Point p2(bottom_right_x, bottom_right_y);
+                cv::rectangle(eval_img, p1, p2, cv::Scalar(0, 0, 0), -1);
+                eval_img = 0.5*eval_img + 0.5*cur_image_orig;
 
-        // optional pub and save result image
-        if (time_from_start > tracking_evaluator.recording_start_time() + tracking_evaluator.wait_before_occlusion()) {
-            cv::Point p1(top_left_x, top_left_y);
-            cv::Point p2(bottom_right_x, bottom_right_y);
-            cv::rectangle(eval_img, p1, p2, cv::Scalar(0, 0, 0), -1);
-            eval_img = 0.5*eval_img + 0.5*cur_image_orig;
-            cv::putText(eval_img, "occlusion", cv::Point(top_left_x, top_left_y-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
-        }
-        else {
-            cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
+                if (bag_file == 4) {
+                    // cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j-190, occlusion_corner_i_2-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                    cv::putText(eval_img, "occlusion", cv::Point(top_left_x-190, bottom_right_y-5), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                }
+                else {
+                    cv::putText(eval_img, "occlusion", cv::Point(top_left_x, top_left_y-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+                }
+            }
+            else {
+                cur_error = tracking_evaluator.compute_error(Y_track, Y_true);
+            }
         }
     }
 
     // project tracking results onto the image
-    MatrixXf Y_track_h = Y_track.replicate(1, 1);
+    MatrixXd Y_track_h = Y_track.replicate(1, 1);
     Y_track_h.conservativeResize(Y_track_h.rows(), Y_track_h.cols()+1);
-    Y_track_h.col(Y_track_h.cols()-1) = MatrixXf::Ones(Y_track_h.rows(), 1);
+    Y_track_h.col(Y_track_h.cols()-1) = MatrixXd::Ones(Y_track_h.rows(), 1);
 
     // project and pub image
-    MatrixXf image_coords_Y = (proj_matrix * Y_track_h.transpose()).transpose();
+    MatrixXd image_coords_Y = (proj_matrix * Y_track_h.transpose()).transpose();
     // draw points
     for (int i = 0; i < image_coords_Y.rows(); i ++) {
 
@@ -296,6 +326,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         cv::Scalar point_color;
         cv::Scalar line_color;
+        int line_width = 3;
+        int point_radius = 7;
+        // was 2 and 5
 
         if (row <= bottom_right_x && row >= top_left_x && col <= bottom_right_y && col >= top_left_y) {
             point_color = cv::Scalar(0, 0, 255);
@@ -310,31 +343,44 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::line(eval_img, cv::Point(row, col),
                 cv::Point(static_cast<int>(image_coords_Y(i+1, 0)/image_coords_Y(i+1, 2)), 
                 static_cast<int>(image_coords_Y(i+1, 1)/image_coords_Y(i+1, 2))),
-                line_color, 2);
+                line_color, line_width);
         }
 
-        cv::circle(eval_img, cv::Point(row, col), 5, point_color, -1);
+        cv::circle(eval_img, cv::Point(row, col), point_radius, point_color, -1);
     }
 
-    if (cur_error != -1) {
-        std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
-        cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
-    }
+    // if (cur_error != -1) {
+    //     std::string err = "Avg error per node: " + std::to_string(cur_error * 1000);
+    //     cv::putText(eval_img, err.substr(0, err.find(".")+3) + "mm", cv::Point(20, eval_img.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 0), 2);
+    // }
 
     // save image
-    if (save_image) {
+    if (save_images) {
         double diff = time_from_start - tracking_evaluator.recording_start_time();
-        if ((int)(diff/1) == tracking_evaluator.image_counter() && fabs(diff-(tracking_evaluator.image_counter()*1)) <= 0.1) {
+        double time_step = 0.5;
+        if (bag_file == 0) {
+            time_step = 1.0;
+        }
+        if ((int)(diff/time_step) == tracking_evaluator.image_counter() && fabs(diff-(tracking_evaluator.image_counter()*time_step)) <= 0.1) {
             std::string dir;
             // 0 -> statinary.bag; 1 -> with_gripper_perpendicular.bag; 2 -> with_gripper_parallel.bag
             if (bag_file == 0) {
-                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             else if (bag_file == 1) {
-                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_perpendicular_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             else if (bag_file == 2) {
-                dir = save_location + "images/" + alg + "/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_parallel_motion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 3) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_self_occlusion_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 4) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_short_rope_folding_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
+            }
+            else if (bag_file == 5) {
+                dir = save_location + "images/" + alg + "_" + std::to_string(trial) + "_" + std::to_string(pct_occlusion) + "_short_rope_stationary_frame_" + std::to_string(tracking_evaluator.image_counter()) + ".png";
             }
             cv::imwrite(dir, eval_img);
             tracking_evaluator.increment_image_counter();
@@ -365,7 +411,7 @@ int main(int argc, char **argv) {
     nh.getParam("/evaluation/wait_before_occlusion", wait_before_occlusion);
     nh.getParam("/evaluation/bag_rate", bag_rate);
     nh.getParam("/evaluation/num_of_nodes", num_of_nodes);
-    nh.getParam("/evaluation/save_image", save_image);
+    nh.getParam("/evaluation/save_images", save_images);
     nh.getParam("/evaluation/save_errors", save_errors);
 
     // get bag file length

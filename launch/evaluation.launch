@@ -6,7 +6,7 @@
     <arg name="bag_rate" default="0.5" />
 
     <!-- save one image every second -->
-    <arg name="save_image" default="false" />
+    <arg name="save_images" default="false" />
 
     <!-- save error values to text file -->
     <arg name="save_errors" default="true" />
@@ -14,25 +14,38 @@
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/stationary.bag" if="$(eval arg('bag_file') == 0)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/perpendicular_motion.bag" if="$(eval arg('bag_file') == 1)" />
     <arg name="bag_dir" value="$(find trackdlo)/data/bags/parallel_motion.bag" if="$(eval arg('bag_file') == 2)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/self_occlusion.bag" if="$(eval arg('bag_file') == 3)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/short_rope_folding.bag" if="$(eval arg('bag_file') == 4)" />
+    <arg name="bag_dir" value="$(find trackdlo)/data/bags/short_rope_stationary.bag" if="$(eval arg('bag_file') == 5)" />
+
     <arg name="save_location" default="$(find trackdlo)/data/dlo_tracking/"/>
 
-    <!-- pct_occlusion takes value from 0 to 1 -->
+    <!-- pct_occlusion takes value from 0 to 100 -->
     <arg name="pct_occlusion" default="25"/>
 
     <!-- determines how many seconds to wait before injecting occlusion -->
     <arg name="start_record_at" value="8.0" if="$(eval arg('bag_file') == 0)" />
     <arg name="start_record_at" value="5.0" if="$(eval arg('bag_file') == 1)" />
     <arg name="start_record_at" value="6.0" if="$(eval arg('bag_file') == 2)" />
+    <arg name="start_record_at" value="3.0" if="$(eval arg('bag_file') == 3)" />
+    <arg name="start_record_at" value="1.0" if="$(eval arg('bag_file') == 4)" />
+    <arg name="start_record_at" value="1.0" if="$(eval arg('bag_file') == 5)" />
 
     <!-- determines when to end evalution (in seconds, with respect to start_time) -->
     <arg name="exit_at" value="33.0" if="$(eval arg('bag_file') == 0)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 1)"/>
     <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 2)"/>
+    <arg name="exit_at" value="-1" if="$(eval arg('bag_file') == 3)"/>
+    <arg name="exit_at" value="14.5" if="$(eval arg('bag_file') == 4)"/>
+    <arg name="exit_at" value="31.0" if="$(eval arg('bag_file') == 5)"/>
 
     <!-- determines how much data to record before injecting occlusion -->
     <arg name="wait_before_occlusion" value="5.0" if="$(eval arg('bag_file') == 0)" />
     <arg name="wait_before_occlusion" value="3.0" if="$(eval arg('bag_file') == 1)" />
     <arg name="wait_before_occlusion" value="3.0" if="$(eval arg('bag_file') == 2)" />
+    <arg name="wait_before_occlusion" value="0.0" if="$(eval arg('bag_file') == 3)" />
+    <arg name="wait_before_occlusion" value="0.0" if="$(eval arg('bag_file') == 4)" />
+    <arg name="wait_before_occlusion" value="0.0" if="$(eval arg('bag_file') == 5)" />
 
     <node name="evaluation" pkg="trackdlo" type="evaluation" output="screen">
         <param name="bag_file" value="$(arg bag_file)" />
@@ -46,7 +59,7 @@
         <param name="wait_before_occlusion" value="$(arg wait_before_occlusion)" />
         <param name="bag_rate" value="$(arg bag_rate)" />
         <param name="num_of_nodes" value="40" />
-        <param name="save_image" value="$(arg save_image)" />
+        <param name="save_images" value="$(arg save_images)" />
         <param name="save_errors" value="$(arg save_errors)" />
     </node>
 

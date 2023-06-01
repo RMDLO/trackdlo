@@ -7,8 +7,6 @@
 #include <stdexcept>
 
 using Eigen::MatrixXd;
-using Eigen::MatrixXf;
-using Eigen::RowVectorXf;
 using Eigen::RowVectorXd;
 using cv::Mat;
 
@@ -71,15 +69,15 @@ double evaluator::rate () {
     return bag_rate_;
 }
 
-MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
+MatrixXd evaluator::sort_pts (MatrixXd Y_0, MatrixXd head) {
     int N = Y_0.rows();
-    MatrixXf Y_0_sorted = MatrixXf::Zero(N, 3);
-    std::vector<MatrixXf> Y_0_sorted_vec = {};
+    MatrixXd Y_0_sorted = MatrixXd::Zero(N, 3);
+    std::vector<MatrixXd> Y_0_sorted_vec = {};
     std::vector<bool> selected_node(N, false);
     selected_node[0] = true;
     int last_visited_b = 0;
 
-    MatrixXf G = MatrixXf::Zero(N, N);
+    MatrixXd G = MatrixXd::Zero(N, N);
     for (int i = 0; i < N; i ++) {
         for (int j = 0; j < N; j ++) {
             G(i, j) = (Y_0.row(i) - Y_0.row(j)).squaredNorm();
@@ -152,7 +150,7 @@ MatrixXf evaluator::sort_pts (MatrixXf Y_0, MatrixXf head) {
     return Y_0_sorted;
 }
 
-MatrixXf evaluator::get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz) {
+MatrixXd evaluator::get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::PointXYZRGB> cloud_xyz) {
     Mat mask_blue, mask_red_1, mask_red_2, mask_red, mask_yellow, mask_markers, mask, mask_rgb;
     Mat cur_image_hsv, mask_without_occlusion_block;
 
@@ -229,19 +227,19 @@ MatrixXf evaluator::get_ground_truth_nodes (Mat rgb_img, pcl::PointCloud<pcl::Po
     }
 
     // the node set returned is not sorted
-    return cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose();
+    return cur_nodes_xyz.getMatrixXfMap().topRows(3).transpose().cast<double>();
 }
 
-double evaluator::calc_min_distance (MatrixXf A, MatrixXf B, MatrixXf E, MatrixXf& closest_pt_on_AB_to_E) {
-    MatrixXf AB = B - A;
-    MatrixXf AE = E - A;
+double evaluator::calc_min_distance (MatrixXd A, MatrixXd B, MatrixXd E, MatrixXd& closest_pt_on_AB_to_E) {
+    MatrixXd AB = B - A;
+    MatrixXd AE = E - A;
 
     double distance = cross_product(AE, AB).norm() / AB.norm();
     closest_pt_on_AB_to_E = A + AB*dot_product(AE, AB) / dot_product(AB, AB);
 
-    MatrixXf AP = closest_pt_on_AB_to_E - A;
+    MatrixXd AP = closest_pt_on_AB_to_E - A;
     if (dot_product(AP, AB) < 0 || dot_product(AP, AB) > dot_product(AB, AB)) {
-        MatrixXf BE = E - B;
+        MatrixXd BE = E - B;
         double distance_AE = sqrt(dot_product(AE, AE));
         double distance_BE = sqrt(dot_product(BE, BE));
         if (distance_AE > distance_BE) {
@@ -257,16 +255,16 @@ double evaluator::calc_min_distance (MatrixXf A, MatrixXf B, MatrixXf E, MatrixX
     return distance;
 }
 
-double evaluator::get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true) {
+double evaluator::get_piecewise_error (MatrixXd Y_track, MatrixXd Y_true) {
     double total_distances_to_curve = 0.0;
-    std::vector<MatrixXf> closest_pts_on_Y_true = {};
+    std::vector<MatrixXd> closest_pts_on_Y_true = {};
 
     for (int idx = 0; idx < Y_track.rows(); idx ++) {
         double dist = -1;
-        MatrixXf closest_pt = MatrixXf::Zero(1, 3);
+        MatrixXd closest_pt = MatrixXd::Zero(1, 3);
 
         for (int i = 0; i < Y_true.rows()-1; i ++) {
-            MatrixXf closest_pt_i = MatrixXf::Zero(1, 3);
+            MatrixXd closest_pt_i = MatrixXd::Zero(1, 3);
             double dist_i = calc_min_distance(Y_true.row(i), Y_true.row(i+1), Y_track.row(idx), closest_pt_i);
             if (dist == -1 || dist_i < dist) {
                 dist = dist_i;
@@ -278,12 +276,13 @@ double evaluator::get_piecewise_error (MatrixXf Y_track, MatrixXf Y_true) {
         closest_pts_on_Y_true.push_back(closest_pt);
     }
 
-    double error_frame = total_distances_to_curve / num_of_nodes_;
+    // double error_frame = total_distances_to_curve / num_of_nodes_;
+    double error_frame = total_distances_to_curve / Y_track.rows();
 
     return error_frame;
 }
 
-double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
+double evaluator::compute_and_save_error (MatrixXd Y_track, MatrixXd Y_true) {
     // compute error
     double E1 = get_piecewise_error(Y_track, Y_true);
     double E2 = get_piecewise_error(Y_true, Y_track);
@@ -301,6 +300,12 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     }
     else if (bag_file_ == 2) {
         dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_parallel_motion_error.txt";
+    }
+    else if (bag_file_ == 4) {
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_short_rope_folding_error.txt";
+    }
+    else if (bag_file_ == 5) {
+        dir = save_location_ + alg_ + "_" + std::to_string(trial_) + "_" + std::to_string(pct_occlusion_) + "_short_rope_stationary_error.txt";
     }
     else {
         throw std::invalid_argument("Invalid bag file ID!");
@@ -325,7 +330,7 @@ double evaluator::compute_and_save_error (MatrixXf Y_track, MatrixXf Y_true) {
     return cur_frame_error;
 }
 
-double evaluator::compute_error (MatrixXf Y_track, MatrixXf Y_true) {
+double evaluator::compute_error (MatrixXd Y_track, MatrixXd Y_true) {
     // compute error
     double E1 = get_piecewise_error(Y_track, Y_true);
     double E2 = get_piecewise_error(Y_true, Y_track);
