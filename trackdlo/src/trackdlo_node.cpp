@@ -322,6 +322,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
         }
 
+        // add text
+        if (updated_opencv_mask && simulated_occlusion) {
+            cv::putText(tracking_img, "occlusion", cv::Point(occlusion_corner_j, occlusion_corner_i-10), cv::FONT_HERSHEY_DUPLEX, 1.2, cv::Scalar(0, 0, 240), 2);
+        }
+
         // publish image
         tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", tracking_img).toImageMsg();
 

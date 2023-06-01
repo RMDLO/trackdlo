@@ -1,5 +1,5 @@
 <launch>
-    <!-- change the below parameters ro match your camera/scene setup -->
+    <!-- change the below parameters to match your camera/scene setup -->
     <arg name="camera_info_topic" default="/camera/aligned_depth_to_color/camera_info" />
     <arg name="rgb_topic" default="/camera/color/image_raw" />
     <arg name="depth_topic" default="/camera/depth/image_rect_raw" />
