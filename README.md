@@ -23,7 +23,7 @@ We also adapt the algorithm introduced in [Deformable One-Dimensional Object Det
 * [Scipy](https://scipy.org/install/) (Our version: 1.23.3)
 
 ## Other Requirements
-* [librealsense](https://github.com/IntelRealSense/librealsense) and [realsense-ros](https://github.com/IntelRealSense/realsense-ros/tree/ros1-legacy) (for testing with RGB-D camera stream)
+* [librealsense](https://github.com/IntelRealSense/librealsense) and [realsense-ros](https://github.com/IntelRealSense/realsense-ros/tree/ros1-legacy) (for testing with the Realsense D435 camera and the corresponding camera configuration file we provided)
 
 ## Usage
 
@@ -52,7 +52,7 @@ Other useful parameters:
 Once all parameters in `trackdlo.launch` are set to proper values, you can run TrackDLO with the following steps:
 1. Launch your RGB-D camera node
 2. Launch the rviz window for visualizing results: `roslaunch trackdlo visualize_output.launch`
-3. Launcch the TrackDLO node: `roslaunch trackdlo trackdlo.launch`
+3. Launch the TrackDLO node: `roslaunch trackdlo trackdlo.launch`
 
 The TrackDLO node outputs the following:
 * `/trackdlo/results_marker`: the tracking results in MarkerArray format, with nodes visualized with spheres and edges visualized with cylinders
