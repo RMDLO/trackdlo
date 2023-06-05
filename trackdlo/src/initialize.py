@@ -56,7 +56,7 @@ def callback (rgb, depth):
     # process depth image
     cur_depth = ros_numpy.numpify(depth)
 
-    if not use_eval_rope:
+    if not multi_color_dlo:
         # color thresholding
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
@@ -127,7 +127,7 @@ if __name__=='__main__':
     rospy.init_node('init_tracker', anonymous=True)
 
     num_of_nodes = rospy.get_param('/init_tracker/num_of_nodes')
-    use_eval_rope = rospy.get_param('/init_tracker/use_eval_rope')
+    multi_color_dlo = rospy.get_param('/init_tracker/multi_color_dlo')
     camera_info_topic = rospy.get_param('/init_tracker/camera_info_topic')
     rgb_topic = rospy.get_param('/init_tracker/rgb_topic')
     depth_topic = rospy.get_param('/init_tracker/depth_topic')

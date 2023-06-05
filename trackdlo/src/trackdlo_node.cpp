@@ -27,7 +27,7 @@ MatrixXd proj_matrix(3, 4);
 
 double total_len = 0;
 
-bool use_eval_rope;
+bool multi_color_dlo;
 double beta;
 double lambda;
 double alpha;
@@ -159,7 +159,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // convert color
         cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
-        if (!use_eval_rope) {
+        if (!multi_color_dlo) {
             // color_thresholding
             cv::inRange(cur_image_hsv, cv::Scalar(lower[0], lower[1], lower[2]), cv::Scalar(upper[0], upper[1], upper[2]), mask_without_occlusion_block);
         }
@@ -183,8 +183,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
         // distance transform
+        std::chrono::high_resolution_clock::time_point temp_time_point = std::chrono::high_resolution_clock::now();
+
         Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
-        cv::distanceTransform((255-mask), bmask_transformed, cv::noArray(), cv::DIST_L2, 5);
+        cv::distanceTransform((255-mask), bmask_transformed, cv::DIST_L2, 3);
+
+        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - temp_time_point).count() / 1000.0;
+        ROS_INFO_STREAM("Distance transform: " + std::to_string(time_diff) + " ms");
+        temp_time_point = std::chrono::high_resolution_clock::now();
 
         double mat_min, mat_max;
         cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
@@ -411,7 +417,7 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
     nh.getParam("/trackdlo/kernel", kernel); 
 
-    nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
+    nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);

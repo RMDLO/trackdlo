@@ -4,3 +4,4 @@ data/output/*.png
 data/output/*/*.json
 data/*.bag
 data/
+test.cpp

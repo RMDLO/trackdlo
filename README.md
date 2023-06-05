@@ -43,7 +43,7 @@ To run TrackDLO, three ROS topic names are required in `launch/trackdlo.launch`.
 
 This package uses color thresholding to obtain the DLO segmentation mask. Below are two different ways to set the color thresholding parameters:
 * If the DLO of interest only has one color: you can use the parameters `hsv_threshold_upper/lower_limit` and set their values with format `h_value s_value v_value` (`h_value<space>s_value<space>v_value`)
-* If the DLO of interest has multiple colors: you can modify the function `color_thresholding` in `trackdlo/src/initialize.py` and `trackdlo/src/trackdlo_node.cpp` to customize the DLO segmentation process
+* If the DLO of interest has multiple colors: set `multi_color_dlo` to `true` in `launch/trackdlo.launch`, then you can modify the function `color_thresholding` in `trackdlo/src/initialize.py` and `trackdlo/src/trackdlo_node.cpp` to customize the DLO segmentation process
 
 Other useful parameters:
 * `num_of_nodes`: the number of nodes initialized for the DLO
