@@ -176,7 +176,7 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
         cv2.destroyAllWindows()
 
     # extract contour
-    _, contours, _ = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[-2:]
 
     chains = []
 

@@ -55,7 +55,7 @@ class trackdlo
     public:
         // default constructor
         trackdlo();
-        trackdlo(int num_of_nodes);
+        trackdlo(int num_of_nodes, MatrixXd proj_matrix);
         // fancy constructor
         trackdlo(int num_of_nodes,
                  double beta,
@@ -69,7 +69,8 @@ class trackdlo
                  bool include_lle,
                  bool use_geodesic,
                  bool use_prev_sigma2,
-                 int kernel);
+                 int kernel,
+                 MatrixXd proj_matrix);
 
         double get_sigma2();
         MatrixXd get_tracking_result();
@@ -79,43 +80,31 @@ class trackdlo
         void initialize_nodes (MatrixXd Y_init);
         void set_sigma2 (double sigma2);
 
-        void cpd_lle (MatrixXd X,
-                        MatrixXd& Y,
-                        double& sigma2,
-                        double beta,
-                        double lambda,
-                        double gamma,
-                        double mu,
-                        int max_iter = 30,
-                        double tol = 0.00001,
-                        bool include_lle = true,
-                        bool use_geodesic = false,
-                        bool use_prev_sigma2 = false);
-
-        bool ecpd_lle (MatrixXd X_orig,
-                        MatrixXd& Y,
-                        double& sigma2,
-                        double beta,
-                        double lambda,
-                        double gamma,
-                        double mu,
-                        int max_iter = 30,
-                        double tol = 0.00001,
-                        bool include_lle = true,
-                        bool use_geodesic = false,
-                        bool use_prev_sigma2 = false,
-                        bool use_ecpd = false,
-                        std::vector<MatrixXd> correspondence_priors = {},
-                        double alpha = 0,
-                        int kernel = 3,
-                        std::vector<int> occluded_nodes = {},
-                        double k_vis = 0,
-                        Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
-                        double mat_max = 0);
+        bool cpd_lle (MatrixXd X_orig,
+                      MatrixXd& Y,
+                      double& sigma2,
+                      double beta,
+                      double lambda,
+                      double gamma,
+                      double mu,
+                      int max_iter = 30,
+                      double tol = 0.00001,
+                      bool include_lle = true,
+                      bool use_geodesic = false,
+                      bool use_prev_sigma2 = false,
+                      bool use_ecpd = false,
+                      std::vector<MatrixXd> correspondence_priors = {},
+                      double alpha = 0,
+                      int kernel = 3,
+                      std::vector<int> occluded_nodes = {},
+                      double k_vis = 0,
+                      Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
+                      double mat_max = 0);
         void tracking_step (MatrixXd X_orig, Mat bmask_transformed_normalized, double mask_dist_threshold, double mat_max);
 
     private:
         MatrixXd Y_;
+        MatrixXd proj_matrix_;
         MatrixXd guide_nodes_;
         double sigma2_;
         double beta_;

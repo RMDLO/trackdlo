@@ -126,8 +126,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     sensor_msgs::ImagePtr tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cur_image_orig).toImageMsg();
     
     if (!initialized) {
-        if (received_init_nodes) {
-            tracker = trackdlo(init_nodes.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+        if (received_init_nodes && received_proj_matrix) {
+            tracker = trackdlo(init_nodes.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel, proj_matrix);
 
             sigma2 = 0.001;
 
@@ -141,9 +141,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracker.initialize_nodes(init_nodes);
             tracker.initialize_geodesic_coord(converted_node_coord);
             Y = init_nodes.replicate(1, 1);
-        }
 
-        if (received_init_nodes && received_proj_matrix) {
             initialized = true;
         }
     }
@@ -467,7 +465,7 @@ int main(int argc, char **argv) {
     camera_info_sub = nh.subscribe(camera_info_topic, 1, update_camera_info);
 
     image_transport::Publisher mask_pub = it.advertise("/trackdlo/mask", pub_queue_size);
-    image_transport::Publisher tracking_img_pub = it.advertise("/trackdlo/tracking_img", pub_queue_size);
+    image_transport::Publisher tracking_img_pub = it.advertise("/trackdlo/results_img", pub_queue_size);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/filtered_pointcloud", pub_queue_size);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/results_marker", pub_queue_size);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/guide_nodes", pub_queue_size);
