@@ -42,7 +42,7 @@ The repository is organized into the following directories:
 First, clone the repository into a ROS workspace and build the package:
 ```bash
 git clone https://github.com/RMDLO/trackdlo.git
-catkin build
+catkin build trackdlo
 ```
 All parameters for the TrackDLO algorithm are configurable in `launch/trackdlo.launch`. Rebuilding the package is not required for the parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files.
 

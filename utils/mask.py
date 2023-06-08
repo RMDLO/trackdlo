@@ -16,7 +16,7 @@ def callback (rgb, pc):
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)
 
     # color thresholding
-    lower = (90, 90, 30)
+    lower = (90, 90, 50)
     upper = (130, 255, 255)
     mask = cv2.inRange(hsv_image, lower, upper)
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)

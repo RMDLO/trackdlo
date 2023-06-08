@@ -153,7 +153,7 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
 
     # smooth image
     im = Image.fromarray(mask)
-    smoothed_im = im.filter(ImageFilter.ModeFilter(size=15))
+    smoothed_im = im.filter(ImageFilter.ModeFilter(size=20))
     mask = np.array(smoothed_im)
 
     if visualize_process:

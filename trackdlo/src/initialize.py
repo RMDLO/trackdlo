@@ -49,6 +49,8 @@ def color_thresholding (hsv_image):
 def callback (rgb, depth):
     global lower, upper
 
+    print("Initializing...")
+
     # process rgb image
     cur_image = ros_numpy.numpify(rgb)
     hsv_image = cv2.cvtColor(cur_image.copy(), cv2.COLOR_RGB2HSV)

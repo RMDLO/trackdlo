@@ -28,6 +28,7 @@ MatrixXd proj_matrix(3, 4);
 double total_len = 0;
 
 bool multi_color_dlo;
+double visibility_threshold;
 double beta;
 double lambda;
 double alpha;
@@ -127,7 +128,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     if (!initialized) {
         if (received_init_nodes && received_proj_matrix) {
-            tracker = trackdlo(init_nodes.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel, proj_matrix);
+            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel, proj_matrix);
 
             sigma2 = 0.001;
 
@@ -180,22 +181,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
 
-        // distance transform
-        std::chrono::high_resolution_clock::time_point temp_time_point = std::chrono::high_resolution_clock::now();
-
-        Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
-        cv::distanceTransform((255-mask), bmask_transformed, cv::DIST_L2, 3);
-
-        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - temp_time_point).count() / 1000.0;
-        ROS_INFO_STREAM("Distance transform: " + std::to_string(time_diff) + " ms");
-        temp_time_point = std::chrono::high_resolution_clock::now();
-
-        double mat_min, mat_max;
-        cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
-        Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
-        bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-        double mask_dist_threshold = 10;
-
         sensor_msgs::PointCloud2 output;
         sensor_msgs::PointCloud2 result_pc;
 
@@ -241,6 +226,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     point.y = (pixel_y - cy) * pc_z / fy;
                     point.z = pc_z;
 
+                    // currently missing point field so color doesn't show up in rviz
                     point.r = cur_image_orig.at<cv::Vec3b>(i, j)[0];
                     point.g = cur_image_orig.at<cv::Vec3b>(i, j)[1];
                     point.b = cur_image_orig.at<cv::Vec3b>(i, j)[2];
@@ -260,6 +246,27 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd X = cur_pc_downsampled.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
+        // for each node in Y, determine a point in X closest to it
+        std::vector<int> visible_nodes = {};
+        std::vector<MatrixXd> visible_nodes_vec = {};
+        for (int m = 0; m < Y.rows(); m ++) {
+            int closest_pt_idx = 0;
+            double shortest_dist = 100000;
+            // loop through all points in X
+            for (int n = 0; n < X.rows(); n ++) {
+                double dist = (Y.row(m) - X.row(n)).norm();
+                if (dist < shortest_dist) {
+                    closest_pt_idx = n;
+                    shortest_dist = dist;
+                }
+            }
+            // if close enough to X, the node is visible
+            if (shortest_dist <= visibility_threshold) {
+                visible_nodes.push_back(m);
+                visible_nodes_vec.push_back(Y.row(m));
+            }
+        }
+
         MatrixXd guide_nodes;
         std::vector<MatrixXd> priors;
 
@@ -269,8 +276,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pre_proc_total += time_diff;
         cur_time = std::chrono::high_resolution_clock::now();
         
-        // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
-        tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+        tracker.tracking_step(X, visible_nodes, visible_nodes_vec);
         // tracker.ecpd_lle(X, Y, sigma2, 3, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0, 1);
     
         Y = tracker.get_tracking_result();
@@ -285,8 +291,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // projection and pub image
         MatrixXd nodes_h = Y.replicate(1, 1);
-        // MatrixXd nodes_h = guide_nodes.replicate(1, 1);
-
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
 
@@ -295,8 +299,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         Mat tracking_img;
         tracking_img = 0.5*cur_image_orig + 0.5*cur_image;
-
-        // cur_image.copyTo(tracking_img);
 
         // draw points
         for (int i = 0; i < image_coords.rows(); i ++) {
@@ -307,7 +309,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::Scalar point_color;
             cv::Scalar line_color;
 
-            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
+            if (std::find(visible_nodes.begin(), visible_nodes.end(), i) != visible_nodes.end()) {
                 point_color = cv::Scalar(0, 150, 255);
                 line_color = cv::Scalar(0, 255, 0);
             }
@@ -416,6 +418,7 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/kernel", kernel); 
 
     nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
+    nh.getParam("/trackdlo/visibility_threshold", visibility_threshold);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);
