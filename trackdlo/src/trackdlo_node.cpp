@@ -29,6 +29,7 @@ double total_len = 0;
 
 bool multi_color_dlo;
 double visibility_threshold;
+int dlo_pixel_width;
 double beta;
 double lambda;
 double alpha;
@@ -246,9 +247,84 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd X = cur_pc_downsampled.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
+        // addressing self-occlusion attempt 1
+        // // for each node in Y, determine a point in X closest to it
+        // std::vector<int> visible_nodes = {};
+        // std::vector<MatrixXd> visible_nodes_vec = {};
+        // for (int m = 0; m < Y.rows(); m ++) {
+        //     int closest_pt_idx = 0;
+        //     double shortest_dist = 100000;
+        //     // loop through all points in X
+        //     for (int n = 0; n < X.rows(); n ++) {
+        //         double dist = (Y.row(m) - X.row(n)).norm();
+        //         if (dist < shortest_dist) {
+        //             closest_pt_idx = n;
+        //             shortest_dist = dist;
+        //         }
+        //     }
+        //     // if close enough to X, the node is visible
+        //     if (shortest_dist <= visibility_threshold) {
+        //         visible_nodes.push_back(m);
+        //         visible_nodes_vec.push_back(Y.row(m));
+        //     }
+        // }
+
+        // addressing self-occlusion attempt 2
+        // // project Y^{t-1} onto mask^t
+        // MatrixXd Y_h = Y.replicate(1, 1);
+        // Y_h.conservativeResize(Y_h.rows(), Y_h.cols()+1);
+        // Y_h.col(Y_h.cols()-1) = MatrixXd::Ones(Y_h.rows(), 1);
+        // MatrixXd image_coords_mask = (proj_matrix * Y_h.transpose()).transpose();
+
+        // std::vector<int> visible_nodes = {};
+        // std::vector<MatrixXd> visible_nodes_vec = {};
+        // for (int i = 0; i < image_coords_mask.rows(); i ++) {
+        //     int col = static_cast<int>(image_coords_mask(i, 0)/image_coords_mask(i, 2));
+        //     int row = static_cast<int>(image_coords_mask(i, 1)/image_coords_mask(i, 2));
+
+        //     // tip nodes have a different criteria
+        //     if (i == 0 || i == Y.rows()-1) {
+        //         double shortest_dist = 100000;
+        //         // loop through all points in X
+        //         for (int n = 0; n < X.rows(); n ++) {
+        //             double dist = (Y.row(i) - X.row(n)).norm();
+        //             if (dist < shortest_dist) {
+        //                 shortest_dist = dist;
+        //             }
+        //         }
+        //         // if close enough to X, the node is visible
+        //         if (shortest_dist <= visibility_threshold) {
+        //             visible_nodes.push_back(i);
+        //             visible_nodes_vec.push_back(Y.row(i));
+        //         }
+        //     }
+        //     else {
+        //         if (mask.at<uchar>(row, col) != 0) {
+        //             // also check dist to camera
+        //             double pixel_x = static_cast<double>(col);
+        //             double pixel_y = static_cast<double>(row);
+        //             double cx = proj_matrix(0, 2);
+        //             double cy = proj_matrix(1, 2);
+        //             double fx = proj_matrix(0, 0);
+        //             double fy = proj_matrix(1, 1);
+        //             double pc_z = cur_depth.at<uint16_t>(row, col) / 1000.0;
+
+        //             MatrixXd deprojected_pt = MatrixXd::Zero(1, 3);
+        //             deprojected_pt(0, 0) = (pixel_x - cx) * pc_z / fx;
+        //             deprojected_pt(0, 1) = (pixel_y - cy) * pc_z / fy;
+        //             deprojected_pt(0, 2) = pc_z;
+
+        //             if ((Y.row(i) - deprojected_pt).norm() <= visibility_threshold) {
+        //                 visible_nodes.push_back(i);
+        //                 visible_nodes_vec.push_back(Y.row(i));
+        //             }
+        //         }
+        //     }
+        // }
+
+        // addressing self-occlusion attempt 3
         // for each node in Y, determine a point in X closest to it
-        std::vector<int> visible_nodes = {};
-        std::vector<MatrixXd> visible_nodes_vec = {};
+        std::map<int, double> shortest_node_pt_dists;
         for (int m = 0; m < Y.rows(); m ++) {
             int closest_pt_idx = 0;
             double shortest_dist = 100000;
@@ -260,11 +336,57 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     shortest_dist = dist;
                 }
             }
-            // if close enough to X, the node is visible
-            if (shortest_dist <= visibility_threshold) {
-                visible_nodes.push_back(m);
-                visible_nodes_vec.push_back(Y.row(m));
+            shortest_node_pt_dists.insert(std::pair<int, double>(m, shortest_dist));
+        }
+
+        // for current nodes and edges in Y, sort them based on how far away they are from the camera
+        std::vector<double> averaged_node_camera_dists = {};
+        std::vector<int> indices_vec = {};
+        for (int i = 0; i < Y.rows()-1; i ++) {
+            averaged_node_camera_dists.push_back(((Y.row(i) + Y.row(i+1)) / 2).norm());
+            indices_vec.push_back(i);
+        }
+        // sort
+        std::sort(indices_vec.begin(), indices_vec.end(),
+            [&](const int& a, const int& b) {
+                return (averaged_node_camera_dists[a] < averaged_node_camera_dists[b]);
             }
+        );
+        Mat projected_edges = Mat::zeros(mask.rows, mask.cols, CV_8U);
+
+        // project Y^{t-1} onto projected_edges
+        MatrixXd Y_h = Y.replicate(1, 1);
+        Y_h.conservativeResize(Y_h.rows(), Y_h.cols()+1);
+        Y_h.col(Y_h.cols()-1) = MatrixXd::Ones(Y_h.rows(), 1);
+        MatrixXd image_coords_mask = (proj_matrix * Y_h.transpose()).transpose();
+
+        std::vector<int> visible_nodes = {};
+        std::vector<MatrixXd> visible_nodes_vec = {};
+        // draw edges closest to the camera first
+        for (int idx : indices_vec) {
+            int col_1 = static_cast<int>(image_coords_mask(idx, 0)/image_coords_mask(idx, 2));
+            int row_1 = static_cast<int>(image_coords_mask(idx, 1)/image_coords_mask(idx, 2));
+
+            int col_2 = static_cast<int>(image_coords_mask(idx+1, 0)/image_coords_mask(idx+1, 2));
+            int row_2 = static_cast<int>(image_coords_mask(idx+1, 1)/image_coords_mask(idx+1, 2));
+
+            // only add to visible nodes if did not overlap with existing edges
+            if (projected_edges.at<uchar>(row_1, col_1) == 0 && shortest_node_pt_dists[idx] <= visibility_threshold) {
+                visible_nodes.push_back(idx);
+            }
+            // do not consider adjacent nodes directly on top of each other
+            if (projected_edges.at<uchar>(row_2, col_2) == 0 && shortest_node_pt_dists[idx+1] <= visibility_threshold) {
+                visible_nodes.push_back(idx+1);
+            }
+
+            // add edges for checking overlap with upcoming nodes
+            cv::line(projected_edges, cv::Point(col_1, row_1), cv::Point(col_2, row_2), cv::Scalar(255, 255, 255), dlo_pixel_width);
+        }
+
+        // sort visible nodes to preserve the original connectivity
+        std::sort(visible_nodes.begin(), visible_nodes.end());
+        for (int node_idx : visible_nodes) {
+            visible_nodes_vec.push_back(Y.row(node_idx));
         }
 
         MatrixXd guide_nodes;
@@ -303,8 +425,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // draw points
         for (int i = 0; i < image_coords.rows(); i ++) {
 
-            int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-            int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+            int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+            int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
             cv::Scalar point_color;
             cv::Scalar line_color;
@@ -319,13 +441,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
 
             if (i != image_coords.rows()-1) {
-                cv::line(tracking_img, cv::Point(row, col),
-                                    cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
-                                                static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                line_color, 2);
+                cv::line(tracking_img, cv::Point(x, y),
+                                       cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                 static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                       line_color, 2);
             }
 
-            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+            cv::circle(tracking_img, cv::Point(x, y), 5, point_color, -1);
         }
 
         // add text
@@ -419,6 +541,7 @@ int main(int argc, char **argv) {
 
     nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
     nh.getParam("/trackdlo/visibility_threshold", visibility_threshold);
+    nh.getParam("/trackdlo/dlo_pixel_width", dlo_pixel_width);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);
