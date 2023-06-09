@@ -980,7 +980,7 @@ void trackdlo::tracking_step (MatrixXd X,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 3, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0, 1);
+    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 5, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0, 1);
 
     if (visible_nodes_vec.size() == Y_.rows()) {
         ROS_INFO("All nodes visible");

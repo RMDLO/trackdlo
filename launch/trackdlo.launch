@@ -24,7 +24,7 @@
         <param name="beta" value="1" if="$(eval arg('kernel') == 0)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 0)"/>
 
-        <param name="beta" value="0.4" if="$(eval arg('kernel') == 1)"/>
+        <param name="beta" value="0.3" if="$(eval arg('kernel') == 1)"/>
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
 
         <param name="beta" value="0.35" if="$(eval arg('kernel') == 2)"/>
@@ -46,6 +46,7 @@
         <param name="downsample_leaf_size" value="0.01" />
         <param name="multi_color_dlo" type="bool" value="$(arg multi_color_dlo)" />
         <param name="visibility_threshold" type="double" value="0.008" />
+        <param name="dlo_pixel_width" value="30" />
     </node>
 
     <!-- launch python node for initialization -->
