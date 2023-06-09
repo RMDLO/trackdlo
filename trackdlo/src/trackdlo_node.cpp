@@ -27,7 +27,9 @@ MatrixXd proj_matrix(3, 4);
 
 double total_len = 0;
 
-bool use_eval_rope;
+bool multi_color_dlo;
+double visibility_threshold;
+int dlo_pixel_width;
 double beta;
 double lambda;
 double alpha;
@@ -126,8 +128,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     sensor_msgs::ImagePtr tracking_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cur_image_orig).toImageMsg();
     
     if (!initialized) {
-        if (received_init_nodes) {
-            tracker = trackdlo(init_nodes.rows(), beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+        if (received_init_nodes && received_proj_matrix) {
+            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel, proj_matrix);
 
             sigma2 = 0.001;
 
@@ -141,9 +143,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracker.initialize_nodes(init_nodes);
             tracker.initialize_geodesic_coord(converted_node_coord);
             Y = init_nodes.replicate(1, 1);
-        }
 
-        if (received_init_nodes && received_proj_matrix) {
             initialized = true;
         }
     }
@@ -159,7 +159,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // convert color
         cv::cvtColor(cur_image_orig, cur_image_hsv, cv::COLOR_BGR2HSV);
 
-        if (!use_eval_rope) {
+        if (!multi_color_dlo) {
             // color_thresholding
             cv::inRange(cur_image_hsv, cv::Scalar(lower[0], lower[1], lower[2]), cv::Scalar(upper[0], upper[1], upper[2]), mask_without_occlusion_block);
         }
@@ -181,16 +181,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         cv::cvtColor(mask, mask_rgb, cv::COLOR_GRAY2BGR);
-
-        // distance transform
-        Mat bmask_transformed (mask.rows, mask.cols, CV_32F);
-        cv::distanceTransform((255-mask), bmask_transformed, cv::noArray(), cv::DIST_L2, 5);
-
-        double mat_min, mat_max;
-        cv::minMaxLoc(bmask_transformed, &mat_min, &mat_max);
-        Mat bmask_transformed_normalized = bmask_transformed/mat_max * 255;
-        bmask_transformed_normalized.convertTo(bmask_transformed_normalized, CV_8U);
-        double mask_dist_threshold = 10;
 
         sensor_msgs::PointCloud2 output;
         sensor_msgs::PointCloud2 result_pc;
@@ -237,6 +227,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     point.y = (pixel_y - cy) * pc_z / fy;
                     point.z = pc_z;
 
+                    // currently missing point field so color doesn't show up in rviz
                     point.r = cur_image_orig.at<cv::Vec3b>(i, j)[0];
                     point.g = cur_image_orig.at<cv::Vec3b>(i, j)[1];
                     point.b = cur_image_orig.at<cv::Vec3b>(i, j)[2];
@@ -256,6 +247,73 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd X = cur_pc_downsampled.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
+        // calculate node visibility
+        // for each node in Y, determine a point in X closest to it
+        std::map<int, double> shortest_node_pt_dists;
+        for (int m = 0; m < Y.rows(); m ++) {
+            int closest_pt_idx = 0;
+            double shortest_dist = 100000;
+            // loop through all points in X
+            for (int n = 0; n < X.rows(); n ++) {
+                double dist = (Y.row(m) - X.row(n)).norm();
+                if (dist < shortest_dist) {
+                    closest_pt_idx = n;
+                    shortest_dist = dist;
+                }
+            }
+            shortest_node_pt_dists.insert(std::pair<int, double>(m, shortest_dist));
+        }
+
+        // for current nodes and edges in Y, sort them based on how far away they are from the camera
+        std::vector<double> averaged_node_camera_dists = {};
+        std::vector<int> indices_vec = {};
+        for (int i = 0; i < Y.rows()-1; i ++) {
+            averaged_node_camera_dists.push_back(((Y.row(i) + Y.row(i+1)) / 2).norm());
+            indices_vec.push_back(i);
+        }
+        // sort
+        std::sort(indices_vec.begin(), indices_vec.end(),
+            [&](const int& a, const int& b) {
+                return (averaged_node_camera_dists[a] < averaged_node_camera_dists[b]);
+            }
+        );
+        Mat projected_edges = Mat::zeros(mask.rows, mask.cols, CV_8U);
+
+        // project Y^{t-1} onto projected_edges
+        MatrixXd Y_h = Y.replicate(1, 1);
+        Y_h.conservativeResize(Y_h.rows(), Y_h.cols()+1);
+        Y_h.col(Y_h.cols()-1) = MatrixXd::Ones(Y_h.rows(), 1);
+        MatrixXd image_coords_mask = (proj_matrix * Y_h.transpose()).transpose();
+
+        std::vector<int> visible_nodes = {};
+        std::vector<MatrixXd> visible_nodes_vec = {};
+        // draw edges closest to the camera first
+        for (int idx : indices_vec) {
+            int col_1 = static_cast<int>(image_coords_mask(idx, 0)/image_coords_mask(idx, 2));
+            int row_1 = static_cast<int>(image_coords_mask(idx, 1)/image_coords_mask(idx, 2));
+
+            int col_2 = static_cast<int>(image_coords_mask(idx+1, 0)/image_coords_mask(idx+1, 2));
+            int row_2 = static_cast<int>(image_coords_mask(idx+1, 1)/image_coords_mask(idx+1, 2));
+
+            // only add to visible nodes if did not overlap with existing edges
+            if (projected_edges.at<uchar>(row_1, col_1) == 0 && shortest_node_pt_dists[idx] <= visibility_threshold) {
+                visible_nodes.push_back(idx);
+            }
+            // do not consider adjacent nodes directly on top of each other
+            if (projected_edges.at<uchar>(row_2, col_2) == 0 && shortest_node_pt_dists[idx+1] <= visibility_threshold) {
+                visible_nodes.push_back(idx+1);
+            }
+
+            // add edges for checking overlap with upcoming nodes
+            cv::line(projected_edges, cv::Point(col_1, row_1), cv::Point(col_2, row_2), cv::Scalar(255, 255, 255), dlo_pixel_width);
+        }
+
+        // sort visible nodes to preserve the original connectivity
+        std::sort(visible_nodes.begin(), visible_nodes.end());
+        for (int node_idx : visible_nodes) {
+            visible_nodes_vec.push_back(Y.row(node_idx));
+        }
+
         MatrixXd guide_nodes;
         std::vector<MatrixXd> priors;
 
@@ -265,8 +323,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pre_proc_total += time_diff;
         cur_time = std::chrono::high_resolution_clock::now();
         
-        // ecpd_lle (X, Y, sigma2, 0.5, 1, 1, 0.05, 50, 0.00001, false, true, false, false, {}, 0, "Gaussian");
-        tracker.tracking_step(X, bmask_transformed_normalized, mask_dist_threshold, mat_max);
+        tracker.tracking_step(X, visible_nodes, visible_nodes_vec);
         // tracker.ecpd_lle(X, Y, sigma2, 3, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0, 1);
     
         Y = tracker.get_tracking_result();
@@ -281,8 +338,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // projection and pub image
         MatrixXd nodes_h = Y.replicate(1, 1);
-        // MatrixXd nodes_h = guide_nodes.replicate(1, 1);
-
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
 
@@ -292,18 +347,16 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         Mat tracking_img;
         tracking_img = 0.5*cur_image_orig + 0.5*cur_image;
 
-        // cur_image.copyTo(tracking_img);
-
         // draw points
         for (int i = 0; i < image_coords.rows(); i ++) {
 
-            int row = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-            int col = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
+            int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
+            int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
             cv::Scalar point_color;
             cv::Scalar line_color;
 
-            if (static_cast<int>(bmask_transformed_normalized.at<uchar>(col, row)) < mask_dist_threshold / mat_max * 255) {
+            if (std::find(visible_nodes.begin(), visible_nodes.end(), i) != visible_nodes.end()) {
                 point_color = cv::Scalar(0, 150, 255);
                 line_color = cv::Scalar(0, 255, 0);
             }
@@ -313,13 +366,13 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
 
             if (i != image_coords.rows()-1) {
-                cv::line(tracking_img, cv::Point(row, col),
-                                    cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
-                                                static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                line_color, 2);
+                cv::line(tracking_img, cv::Point(x, y),
+                                       cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
+                                                 static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
+                                       line_color, 2);
             }
 
-            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+            cv::circle(tracking_img, cv::Point(x, y), 5, point_color, -1);
         }
 
         // add text
@@ -411,7 +464,9 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
     nh.getParam("/trackdlo/kernel", kernel); 
 
-    nh.getParam("/trackdlo/use_eval_rope", use_eval_rope);
+    nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
+    nh.getParam("/trackdlo/visibility_threshold", visibility_threshold);
+    nh.getParam("/trackdlo/dlo_pixel_width", dlo_pixel_width);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);
@@ -461,7 +516,7 @@ int main(int argc, char **argv) {
     camera_info_sub = nh.subscribe(camera_info_topic, 1, update_camera_info);
 
     image_transport::Publisher mask_pub = it.advertise("/trackdlo/mask", pub_queue_size);
-    image_transport::Publisher tracking_img_pub = it.advertise("/trackdlo/tracking_img", pub_queue_size);
+    image_transport::Publisher tracking_img_pub = it.advertise("/trackdlo/results_img", pub_queue_size);
     pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/filtered_pointcloud", pub_queue_size);
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/results_marker", pub_queue_size);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/guide_nodes", pub_queue_size);

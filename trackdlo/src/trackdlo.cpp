@@ -7,8 +7,9 @@ using cv::Mat;
 
 trackdlo::trackdlo () {}
 
-trackdlo::trackdlo(int num_of_nodes) {
+trackdlo::trackdlo(int num_of_nodes, MatrixXd proj_matrix) {
     // default initialize
+    proj_matrix_ = proj_matrix.replicate(1, 1);
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
@@ -26,9 +27,11 @@ trackdlo::trackdlo(int num_of_nodes) {
     kernel_ = 1;
     geodesic_coord_ = {};
     correspondence_priors_ = {};
+    visibility_threshold_ = 0.02;
 }
 
 trackdlo::trackdlo(int num_of_nodes,
+                    double visibility_threshold,
                     double beta,
                     double lambda,
                     double alpha,
@@ -40,9 +43,12 @@ trackdlo::trackdlo(int num_of_nodes,
                     bool include_lle,
                     bool use_geodesic,
                     bool use_prev_sigma2,
-                    int kernel) 
+                    int kernel,
+                    MatrixXd proj_matrix) 
 {
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
+    visibility_threshold_ = visibility_threshold;
+    proj_matrix_ = proj_matrix.replicate(1, 1);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
     beta_ = beta;
@@ -161,111 +167,7 @@ MatrixXd trackdlo::calc_LLE_weights (int k, MatrixXd X) {
     return W;
 }
 
-void trackdlo::cpd_lle (MatrixXd X,
-                    MatrixXd& Y,
-                    double& sigma2,
-                    double beta,
-                    double lambda,
-                    double gamma,
-                    double mu,
-                    int max_iter,
-                    double tol,
-                    bool include_lle,
-                    bool use_geodesic,
-                    bool use_prev_sigma2)
-{
-    int M = Y.rows();
-    int N = X.rows();
-    int D = 3;
-
-    // initialization
-    // compute differences for G matrix computation
-    MatrixXd diff_yy = MatrixXd::Zero(M, M);
-    MatrixXd diff_yy_sqrt = MatrixXd::Zero(M, M);
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < M; j ++) {
-            diff_yy(i, j) = (Y.row(i) - Y.row(j)).squaredNorm();
-            diff_yy_sqrt(i, j) = (Y.row(i) - Y.row(j)).norm();
-        }
-    }
-
-    MatrixXd G = (-diff_yy / (2 * beta * beta)).array().exp();
-    MatrixXd Y_0 = Y.replicate(1, 1);
-
-    // diff_xy should be a (M * N) matrix
-    MatrixXd diff_xy = MatrixXd::Zero(M, N);
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < N; j ++) {
-            diff_xy(i, j) = (Y_0.row(i) - X.row(j)).squaredNorm();
-        }
-    }
-
-    // initialize sigma2
-    if (!use_prev_sigma2 || sigma2 == 0) {
-        sigma2 = diff_xy.sum() / static_cast<double>(D * M * N);
-    }
-
-    for (int it = 0; it < max_iter; it ++) {
-        // ----- E step: compute posteriori probability matrix P -----
-
-        // update diff_xy
-        diff_xy = MatrixXd::Zero(M, N);
-        for (int i = 0; i < M; i ++) {
-            for (int j = 0; j < N; j ++) {
-                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
-            }
-        }
-
-        double c = std::pow(2 * M_PI * sigma2, static_cast<double>(D) / 2);
-        double w = 0.1;
-        c *= w / (1 - w);
-        c *= static_cast<double>(M) / N;
-
-        MatrixXd P = (-diff_xy / (2 * sigma2)).array().exp().matrix();
-        // P.array().colwise() *= Y_emit_prior.array();
-
-        RowVectorXd den = P.colwise().sum();
-        den.array() += c;
-
-        P = P.array().rowwise() / den.array();
-
-        MatrixXd Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
-        MatrixXd P1 = P.rowwise().sum();
-        double Np = P1.sum();
-        MatrixXd PX = P * X;
-
-        // M step
-        MatrixXd A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXd::Identity(M, M);
-        MatrixXd B_matrix = PX - P1.asDiagonal() * Y_0;
-
-        // MatrixXd W = A_matrix.householderQr().solve(B_matrix);
-        // MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
-        MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
-
-        MatrixXd T = Y_0 + G * W;
-        double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
-        double trPXtT = (PX.transpose() * T).trace();
-        double trTtdP1T = (T.transpose() * P1.asDiagonal() * T).trace();
-
-        sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D);
-
-        if (pt2pt_dis_sq(Y, Y_0 + G*W) < tol) {
-            Y = Y_0 + G*W;
-            ROS_INFO_STREAM("Iteration until convergence: " + std::to_string(it+1));
-            break;
-        }
-        else {
-            Y = Y_0 + G*W;
-        }
-
-        if (it == max_iter - 1) {
-            ROS_ERROR("optimization did not converge!");
-            break;
-        }
-    }
-}
-
-bool trackdlo::ecpd_lle (MatrixXd X_orig,
+bool trackdlo::cpd_lle (MatrixXd X,
                         MatrixXd& Y,
                         double& sigma2,
                         double beta,
@@ -281,10 +183,9 @@ bool trackdlo::ecpd_lle (MatrixXd X_orig,
                         std::vector<MatrixXd> correspondence_priors,
                         double alpha,
                         int kernel,
-                        std::vector<int> occluded_nodes,
+                        std::vector<int> visible_nodes,
                         double k_vis,
-                        Mat bmask_transformed_normalized,
-                        double mat_max) 
+                        double visibility_threshold) 
 {
 
     bool converged = true;
@@ -292,8 +193,6 @@ bool trackdlo::ecpd_lle (MatrixXd X_orig,
     if (correspondence_priors.size() == 0) {
         use_ecpd = false;
     }
-
-    MatrixXd X = X_orig.replicate(1, 1);
 
     int M = Y.rows();
     int N = X.rows();
@@ -412,10 +311,24 @@ bool trackdlo::ecpd_lle (MatrixXd X_orig,
     for (int it = 0; it < max_iter; it ++) {
 
         // update diff_xy
-        for (int i = 0; i < M; i ++) {
-            for (int j = 0; j < N; j ++) {
-                diff_xy(i, j) = (Y.row(i) - X.row(j)).squaredNorm();
+        std::map<int, double> shortest_node_pt_dists;
+        for (int m = 0; m < M; m ++) {
+            // for each node in Y, determine a point in X closest to it
+            // for P_vis calculations
+            double shortest_dist = 10000;
+            for (int n = 0; n < N; n ++) {
+                diff_xy(m, n) = (Y.row(m) - X.row(n)).squaredNorm();
+                double dist = (Y.row(m) - X.row(n)).norm();
+                if (dist < shortest_dist) {
+                    shortest_dist = dist;
+                }
             }
+            // if close enough to X, the node is visible
+            if (shortest_dist <= visibility_threshold) {
+                shortest_dist = 0;
+            }
+            // push back the pair
+            shortest_node_pt_dists.insert(std::pair<int, double>(m, shortest_dist));
         }
 
         MatrixXd P = (-0.5 * diff_xy / sigma2).array().exp();
@@ -488,31 +401,20 @@ bool trackdlo::ecpd_lle (MatrixXd X_orig,
         }
 
         
-        // use cdcpd's pvis
-        if (occluded_nodes.size() != 0 && mat_max != 0) {
-            MatrixXd nodes_h = Y.replicate(1, 1);
-            // if has corresponding guide node, use that instead of the original position
-            for (auto entry : correspondence_priors) {
-                nodes_h.row(entry(0, 0)) = entry.rightCols(3);
-            }
-
-            // project onto the bmask to find distance to closest none zero pixel
-            nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-            nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
-            MatrixXd proj_matrix(3, 4);
-            proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
-                            0.0, 916.265869140625, 354.02392578125, 0.0,
-                            0.0, 0.0, 1.0, 0.0;
-            MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
-
+        // modified membership probability (adapted from cdcpd)
+        if (visible_nodes.size() != Y.rows() && !visible_nodes.empty() && k_vis != 0) {
             MatrixXd P_vis = MatrixXd::Ones(P.rows(), P.cols());
             double total_P_vis = 0;
-            for (int i = 0; i < image_coords.rows(); i ++) {
-                int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-                int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
 
-                double pixel_dist = static_cast<double>(bmask_transformed_normalized.at<uchar>(y, x)) * mat_max / 255;
-                double P_vis_i = exp(-k_vis*pixel_dist);
+            for (int i = 0; i < Y.rows(); i ++) {
+                double shortest_node_pt_dist = shortest_node_pt_dists[i];
+
+                // if this node is visible, the shortest dist is always 0
+                if (std::find(visible_nodes.begin(), visible_nodes.end(), i) != visible_nodes.end()){
+                    shortest_node_pt_dist = 0;
+                }
+
+                double P_vis_i = exp(-k_vis * shortest_node_pt_dist);
                 total_P_vis += P_vis_i;
 
                 P_vis.row(i) = P_vis_i * P_vis.row(i);
@@ -532,6 +434,8 @@ bool trackdlo::ecpd_lle (MatrixXd X_orig,
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
 
+        // test code when not using pvis
+        // P = P.array().rowwise() / (P.colwise().sum().array() + c);
         // std::cout << P.colwise().sum() << std::endl;
 
         MatrixXd Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
@@ -737,7 +641,6 @@ std::vector<MatrixXd> trackdlo::traverse_geodesic (std::vector<double> geodesic_
     return node_pairs;
 }
 
-// overload
 std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic_coord, const MatrixXd guide_nodes, const std::vector<int> visible_nodes, int alignment, int alignment_node_idx) {
     std::vector<MatrixXd> node_pairs = {};
 
@@ -919,7 +822,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
             }
         }
 
-        // ----- traverse from the alignment node to the tail node -----
+        // traverse from the alignment node to the tail node
         int last_found_index = alignment_node_idx;
         int seg_dist_it = visible_nodes[alignment_node_idx];
         MatrixXd cur_center = guide_nodes.row(alignment_node_idx);
@@ -980,7 +883,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
         }
 
 
-        // ----- traverse from alignment node to head node -----
+        // traverse from alignment node to head node
         std::vector<int> consecutive_visible_nodes_1 = {visible_nodes[alignment_node_idx]};
         for (int i = alignment_node_idx-1; i >= 0; i ++) {
             if (visible_nodes[i+1] - visible_nodes[i] == 1) {
@@ -1054,47 +957,20 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
     return node_pairs;
 }
 
-void trackdlo::tracking_step (MatrixXd X_orig,
-                                Mat bmask_transformed_normalized,
-                                double mask_dist_threshold,
-                                double mat_max) {
+void trackdlo::tracking_step (MatrixXd X,
+                              std::vector<int> visible_nodes,
+                              std::vector<MatrixXd> visible_nodes_vec) {
     
     // variable initialization
-    std::vector<int> occluded_nodes = {};
-    std::vector<int> visible_nodes = {};
-    std::vector<MatrixXd> valid_nodes_vec = {};
     correspondence_priors_ = {};
     int state = 0;
 
-    // project Y onto the original image to determine occluded nodes
-    MatrixXd nodes_h = Y_.replicate(1, 1);
-    nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
-    nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
-    MatrixXd proj_matrix(3, 4);
-    proj_matrix << 918.359130859375, 0.0, 645.8908081054688, 0.0,
-                    0.0, 916.265869140625, 354.02392578125, 0.0,
-                    0.0, 0.0, 1.0, 0.0;
-    MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
-    for (int i = 0; i < image_coords.rows(); i ++) {
-        int x = static_cast<int>(image_coords(i, 0)/image_coords(i, 2));
-        int y = static_cast<int>(image_coords(i, 1)/image_coords(i, 2));
-
-        // not currently using the original distance transform because I can't figure it out
-        if (static_cast<int>(bmask_transformed_normalized.at<uchar>(y, x)) < mask_dist_threshold / mat_max * 255) {
-            valid_nodes_vec.push_back(Y_.row(i));
-            visible_nodes.push_back(i);
-        }
-        else {
-            occluded_nodes.push_back(i);
-        }
-    }
-
-    // copy valid guide nodes vec to guide nodes
+    // copy visible nodes vec to guide nodes
     // not using topRows() because it caused weird bugs
-    guide_nodes_ = MatrixXd::Zero(valid_nodes_vec.size(), 3);
-    if (occluded_nodes.size() != 0) {
-        for (int i = 0; i < valid_nodes_vec.size(); i ++) {
-            guide_nodes_.row(i) = valid_nodes_vec[i];
+    guide_nodes_ = MatrixXd::Zero(visible_nodes_vec.size(), 3);
+    if (visible_nodes_vec.size() != Y_.rows()) {
+        for (int i = 0; i < visible_nodes_vec.size(); i ++) {
+            guide_nodes_.row(i) = visible_nodes_vec[i];
         }
     }
     else {
@@ -1104,9 +980,9 @@ void trackdlo::tracking_step (MatrixXd X_orig,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    ecpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, 3, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0, 1);
+    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 5, 1, 1, 0.05, 50, 0.00001, true, true, true, false, {}, 0, 1);
 
-    if (occluded_nodes.size() == 0) {
+    if (visible_nodes_vec.size() == Y_.rows()) {
         ROS_INFO("All nodes visible");
 
         // get priors vec
@@ -1172,5 +1048,5 @@ void trackdlo::tracking_step (MatrixXd X_orig,
     }
 
     // include_lle == false because we have no space to discuss it in the paper
-    ecpd_lle (X_orig, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, include_lle_, use_geodesic_, use_prev_sigma2_, true, correspondence_priors_, alpha_, kernel_, occluded_nodes, k_vis_, bmask_transformed_normalized, mat_max);
+    cpd_lle (X, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, include_lle_, use_geodesic_, use_prev_sigma2_, true, correspondence_priors_, alpha_, kernel_, visible_nodes, k_vis_, visibility_threshold_);
 }

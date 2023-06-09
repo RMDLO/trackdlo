@@ -153,13 +153,16 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
 
     # smooth image
     im = Image.fromarray(mask)
-    smoothed_im = im.filter(ImageFilter.ModeFilter(size=15))
+    smoothed_im = im.filter(ImageFilter.ModeFilter(size=20))
     mask = np.array(smoothed_im)
 
     if visualize_process:
         cv2.imshow('init frame', mask)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        while True:
+            key = cv2.waitKey(10)
+            if key == 27:  # escape
+                cv2.destroyAllWindows()
+                break
 
     # # resize if necessary for better skeletonization performance
     # scale = 1
@@ -172,11 +175,14 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
 
     if visualize_process:
         cv2.imshow('after skeletonization', gray)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        while True:
+            key = cv2.waitKey(10)
+            if key == 27:  # escape
+                cv2.destroyAllWindows()
+                break
 
     # extract contour
-    _, contours, _ = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[-2:]
 
     chains = []
 
@@ -252,8 +258,11 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
 
     if visualize_process:
         cv2.imshow("added all chains frame", mask)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        while True:
+            key = cv2.waitKey(10)
+            if key == 27:  # escape
+                cv2.destroyAllWindows()
+                break
 
     # another pruning method
     all_chain_length = []
@@ -323,8 +332,11 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
     
     if visualize_process:
         cv2.imshow("after pruning", mask)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        while True:
+            key = cv2.waitKey(10)
+            if key == 27:  # escape
+                cv2.destroyAllWindows()
+                break
 
     if len(pruned_chains) == 1:
         return pruned_chains
@@ -436,8 +448,11 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
                 mask = cv2.line(mask, chain[j], chain[j+1], color, 1)
 
             cv2.imshow("after merging", mask)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            while True:
+                key = cv2.waitKey(10)
+                if key == 27:  # escape
+                    cv2.destroyAllWindows()
+                    break
 
             if i == len(ordered_chains)-1:
                 break

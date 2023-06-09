@@ -4,10 +4,7 @@ project(trackdlo)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-O2)   # -std=c++11
-
-# set(CMAKE_CXX_STANDARD 14)
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_compile_options(-O3)   # -std=c++11
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -28,6 +25,7 @@ find_package(OpenCV REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(PCL 1.8 REQUIRED COMPONENTS common io filters visualization features kdtree)
 include_directories(include SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
@@ -40,19 +38,13 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
-include_directories(
-# include
-  ${catkin_INCLUDE_DIRS}
-  ${PCL_LIBRARY_DIRS}
-)
-
 add_executable(
   trackdlo trackdlo/src/trackdlo_node.cpp trackdlo/src/trackdlo.cpp trackdlo/src/utils.cpp
 )
 target_link_libraries(trackdlo
   ${catkin_LIBRARIES}
-  # ${PCL_LIBRARIES}
-  # ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
   Eigen3::Eigen
 )
 # target_compile_options(trackdlo PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
@@ -62,8 +54,19 @@ add_executable(
 )
 target_link_libraries(evaluation
   ${catkin_LIBRARIES}
-  # ${PCL_LIBRARIES}
-  # ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
   Eigen3::Eigen
 )
 # target_compile_options(evaluation PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
+
+# add_executable(
+#   cv_test trackdlo/src/test.cpp
+# )
+# target_link_libraries(cv_test
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBS}
+#   Eigen3::Eigen
+# )
+# target_compile_options(cv_test PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
