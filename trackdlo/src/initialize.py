@@ -69,14 +69,15 @@ def callback (rgb, depth):
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # returns the pixel coord of points (in order). a list of lists
-    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask)
+    img_scale = 8
+    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask, img_scale=img_scale, seg_length=3, max_curvature=30)
 
     all_pixel_coords = []
     for chain in extracted_chains:
         all_pixel_coords += chain
     print('Finished extracting chains. Time taken:', time.time()-start_time)
 
-    all_pixel_coords = np.array(all_pixel_coords)
+    all_pixel_coords = np.array(all_pixel_coords) * img_scale
     all_pixel_coords = np.flip(all_pixel_coords, 1)
 
     pc_z = cur_depth[tuple(map(tuple, all_pixel_coords.T))] / 1000.0

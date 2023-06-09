@@ -149,12 +149,15 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"
 # paper link: https://ieeexplore.ieee.org/abstract/document/9697357
-def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curvature=30):  # note: mask is one channel
+def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_length=3, max_curvature=30):  # note: mask is one channel
 
     # smooth image
     im = Image.fromarray(mask)
     smoothed_im = im.filter(ImageFilter.ModeFilter(size=20))
     mask = np.array(smoothed_im)
+
+    # resize if necessary for better skeletonization performance
+    mask = cv2.resize(mask, (int(mask.shape[1]/img_scale), int(mask.shape[0]/img_scale)))
 
     if visualize_process:
         cv2.imshow('init frame', mask)
@@ -163,10 +166,6 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
             if key == 27:  # escape
                 cv2.destroyAllWindows()
                 break
-
-    # # resize if necessary for better skeletonization performance
-    # scale = 1
-    # mask = cv2.resize(mask, (int(mask.shape[1]/scale), int(mask.shape[0]/scale)))
     
     # perform skeletonization
     result = skeletonize(mask, method='zha')
