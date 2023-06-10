@@ -59,3 +59,14 @@ target_link_libraries(evaluation
   Eigen3::Eigen
 )
 # target_compile_options(evaluation PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)
+
+# add_executable(
+#   cv_test trackdlo/src/test.cpp
+# )
+# target_link_libraries(cv_test
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBS}
+#   Eigen3::Eigen
+# )
+# target_compile_options(cv_test PRIVATE -O3 -Wall -Wextra -Wconversion -Wshadow -g)

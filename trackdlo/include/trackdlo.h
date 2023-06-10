@@ -58,6 +58,7 @@ class trackdlo
         trackdlo(int num_of_nodes, MatrixXd proj_matrix);
         // fancy constructor
         trackdlo(int num_of_nodes,
+                 double visibility_threshold,
                  double beta,
                  double lambda,
                  double alpha,
@@ -80,7 +81,7 @@ class trackdlo
         void initialize_nodes (MatrixXd Y_init);
         void set_sigma2 (double sigma2);
 
-        bool cpd_lle (MatrixXd X_orig,
+        bool cpd_lle (MatrixXd X,
                       MatrixXd& Y,
                       double& sigma2,
                       double beta,
@@ -96,11 +97,13 @@ class trackdlo
                       std::vector<MatrixXd> correspondence_priors = {},
                       double alpha = 0,
                       int kernel = 3,
-                      std::vector<int> occluded_nodes = {},
+                      std::vector<int> visible_nodes = {},
                       double k_vis = 0,
-                      Mat bmask_transformed_normalized = Mat::zeros(cv::Size(0, 0), CV_64F),
-                      double mat_max = 0);
-        void tracking_step (MatrixXd X_orig, Mat bmask_transformed_normalized, double mask_dist_threshold, double mat_max);
+                      double visibility_threshold = 0.01);
+
+        void tracking_step (MatrixXd X,
+                            std::vector<int> visible_nodes,
+                            std::vector<MatrixXd> visible_nodes_vec);
 
     private:
         MatrixXd Y_;
@@ -121,6 +124,7 @@ class trackdlo
         int kernel_;
         std::vector<double> geodesic_coord_;
         std::vector<MatrixXd> correspondence_priors_;
+        double visibility_threshold_;
 
         std::vector<int> get_nearest_indices (int k, int M, int idx);
         MatrixXd calc_LLE_weights (int k, MatrixXd X);
