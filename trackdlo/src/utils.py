@@ -149,7 +149,7 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"
 # paper link: https://ieeexplore.ieee.org/abstract/document/9697357
-def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curvature=30):  # note: mask is one channel
+def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curvature=20):  # note: mask is one channel
 
     # smooth image
     im = Image.fromarray(mask)
@@ -372,10 +372,13 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
 
     # select the chain that was only used once as the tip
     start_chain_idx = None
+    tip_chain_indices = []
     for i in range (0, len(pruned_chains)):
         if chain_usage_count[str(i)] == 1:
             start_chain_idx = i
-            break
+            tip_chain_indices.append(i)
+            if len(tip_chain_indices) == 2:
+                break
 
     ordered_chains = []
     cur_idx = start_chain_idx
@@ -389,6 +392,13 @@ def extract_connected_skeleton (visualize_process, mask, seg_length=10, max_curv
                 continue
 
             if useful_matches[i][0] == cur_idx or useful_matches[i][2] == cur_idx:
+                # do not use the tip chain unless this is the last chain to add
+                if len(ordered_chains) != len(pruned_chains)-1:
+                    if useful_matches[i][0] == cur_idx and useful_matches[i][2] in tip_chain_indices:
+                        continue
+                    elif useful_matches[i][2] == cur_idx and useful_matches[i][0] in tip_chain_indices:
+                        continue
+
                 used_matches.append(useful_matches[i])
 
                 if useful_matches[i][2] == cur_idx:

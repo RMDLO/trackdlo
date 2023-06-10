@@ -320,10 +320,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::line(tracking_img, cv::Point(row, col),
                                     cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                 static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                                line_color, 2);
+                                                line_color, 5);
             }
 
-            cv::circle(tracking_img, cv::Point(row, col), 5, point_color, -1);
+            cv::circle(tracking_img, cv::Point(row, col), 7, point_color, -1);
         }
 
         // add text
