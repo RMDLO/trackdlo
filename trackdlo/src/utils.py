@@ -1,4 +1,5 @@
 from skimage.morphology import skeletonize
+from scipy.optimize import linear_sum_assignment
 import cv2
 import numpy as np
 from PIL import Image, ImageFilter
@@ -127,21 +128,18 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
         cost_curvature_1 = np.arccos(np.dot(chain1[0] - chain2[0], chain1[1] - chain1[0]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain1[0] - chain2[0], chain2[0] - chain2[1]) / (np.linalg.norm(chain2[0] - chain2[1]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
-        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # start + end
     elif mode == 1:
         cost_euclidean = np.linalg.norm(chain1[0] - chain2[-1])
         cost_curvature_1 = np.arccos(np.dot(chain1[0] - chain2[-1], chain1[1] - chain1[0]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain1[0] - chain2[-1], chain2[-1] - chain2[-2]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
-        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # end + start
     elif mode == 2:
         cost_euclidean = np.linalg.norm(chain1[-1] - chain2[0])
         cost_curvature_1 = np.arccos(np.dot(chain2[0] - chain1[-1], chain1[-1] - chain1[-2]) / (np.linalg.norm(chain1[-1] - chain1[-2]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain2[0] - chain1[-1], chain2[1] - chain2[0]) / (np.linalg.norm(chain2[0] - chain2[1]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
-        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # end + end
     else:
         # treat the second chain as needing to be reversed
@@ -149,8 +147,8 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
         cost_curvature_1 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain1[-1] - chain1[-2]) / (np.linalg.norm(chain1[-1] - chain1[-2]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain2[-2] - chain2[-1]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
-        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     
+    # print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     return total_cost
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"
@@ -177,6 +175,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
     result = skeletonize(mask, method='zha')
     gray = cv2.cvtColor(result.copy(), cv2.COLOR_BGR2GRAY)
     gray[gray > 100] = 255
+    print('Finished skeletonization')
 
     if visualize_process:
         cv2.imshow('after skeletonization', gray)
@@ -255,14 +254,15 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
                 chain = []
                 cur_seg_start_point = None
 
-    mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
-    for chain in chains:
-        color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
-        for i in range (0, len(chain)-1):
-            mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
+    print('Finished contour traversal')
 
     if visualize_process:
-        cv2.imshow("added all chains frame", mask)
+        mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
+        for chain in chains:
+            color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
+            for i in range (0, len(chain)-1):
+                mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
+        cv2.imshow('added all chains frame', mask)
         while True:
             key = cv2.waitKey(10)
             if key == 27:  # escape
@@ -329,13 +329,14 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
         leftover_chains = np.asarray(leftover_chains, dtype=list)
         sorted_chains = leftover_chains[sorted_idx]
 
-    mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
-    for chain in pruned_chains:
-        color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
-        for i in range (0, len(chain)-1):
-            mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
+    print('Finished pruning')
     
     if visualize_process:
+        mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
+        for chain in pruned_chains:
+            color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
+            for i in range (0, len(chain)-1):
+                mask = cv2.line(mask, chain[i], chain[i+1], color, 1)
         cv2.imshow("after pruning", mask)
         while True:
             key = cv2.waitKey(10)
@@ -347,117 +348,78 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
         return pruned_chains
 
     # total number of possible matches = number of ends * (number of ends - 2) / 2 = 2*len(chains) * (len(chains) - 1)
-    # all_possible_matches: nd array with size (num of possible matches, 5)
-    # entries: [chain_1_idx, start/end, chain_2_idx, start/end, cost]; start = 0 and end = -1
-    all_possible_matches = []
+    # cost matrix size: num of tips + 2
+    # cost matrix entry label format: tip1 start, tip1 end, tip2 start, tip2 end, ...
+    matrix_size = 2*len(pruned_chains) + 2
+    cost_matrix = np.zeros((matrix_size, matrix_size))
     w_e = 0.001
     w_c = 1
     for i in range (0, len(pruned_chains)):
-        for j in range (i+1, len(pruned_chains)):
-            all_possible_matches.append([i, 0, j, 0, compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 0)])
-            all_possible_matches.append([i, 0, j, -1, compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 1)])
-            all_possible_matches.append([i, -1, j, 0, compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 2)])
-            all_possible_matches.append([i, -1, j, -1, compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 3)])
+        for j in range (0, len(pruned_chains)):
+            # two types of matches should be discouraged: 
+            # matching with itself and matching with the other tip on the same segment
+            #          tj_start tj_end
+            # ti_start      ...    ...
+            #   ti_end      ...    ...
+            if i == j:
+                cost_matrix[2*i, 2*j] = 100000
+                cost_matrix[2*i, 2*j+1] = 100000
+                cost_matrix[2*i+1, 2*j] = 100000
+                cost_matrix[2*i+1, 2*j+1] = 100000
+            else:
+                # ti_start to tj_start
+                cost_matrix[2*i, 2*j] = compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 0)
+                # ti_start to tj_end
+                cost_matrix[2*i, 2*j+1] = compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 1)
+                # ti_end to tj_start
+                cost_matrix[2*i+1, 2*j] = compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 2)
+                # ti_end to ti_end
+                cost_matrix[2*i+1, 2*j+1] = compute_cost(pruned_chains[i], pruned_chains[j], w_e, w_c, 3)
+    
+    # cost for being the dlo's two ends
+    cost_matrix[:, -1] = 1000
+    cost_matrix[:, -2] = 1000
+    cost_matrix[-1, :] = 1000
+    cost_matrix[-2, :] = 1000
+    # prevent matching with itself
+    cost_matrix[matrix_size-2:matrix_size, matrix_size-2:matrix_size] = 100000
 
-    all_possible_matches = np.array(all_possible_matches)
-    print(all_possible_matches)
-    sorted_idx = np.argsort(all_possible_matches[:,-1].copy())
-    sorted_matches = all_possible_matches[sorted_idx]
-
-    # visualize
-    used_matches = []
-    count = 0
-    useful_matches = []
-    chain_usage_count = {}
-    for i in range (0, len(pruned_chains)):
-        chain_usage_count[str(i)] = 0
-
-    for i in range (0, len(all_possible_matches)):
-        if sorted_matches[i, 0:2].tolist() in used_matches or sorted_matches[i, 2:4].tolist() in used_matches:
-            continue
-        
-        useful_matches.append(sorted_matches[i].tolist())
-        chain_usage_count[str(int(sorted_matches[i, 0]))] += 1
-        chain_usage_count[str(int(sorted_matches[i, 2]))] += 1
-
-        used_matches.append(sorted_matches[i, 0:2].tolist())
-        used_matches.append(sorted_matches[i, 2:4].tolist())
-
-        count += 1
-        if count >= len(pruned_chains) - 1:
-            break
-
-    # select the chain that was only used once as the tip
-    start_chain_idx = None
-    tip_chain_indices = []
-    for i in range (0, len(pruned_chains)):
-        if chain_usage_count[str(i)] == 1:
-            start_chain_idx = i
-            tip_chain_indices.append(i)
-            if len(tip_chain_indices) == 2:
-                break
-
+    row_idx, col_idx = linear_sum_assignment(cost_matrix)
+    cur_idx = col_idx[row_idx[-1]]
     ordered_chains = []
-    cur_idx = start_chain_idx
-    last_was_reversed = False
-    used_matches = []
-    ordered_chains.append(pruned_chains[start_chain_idx])
 
-    for _ in range (0, len(pruned_chains)):
-        print('====={}====='.format(_))
-        print(last_was_reversed)
-        print(useful_matches)
-        for i in range (0, len(useful_matches)):
-            if useful_matches[i] in used_matches:
-                print('useful_matches[i] in used_matches')
-                continue
+    mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
+    while True:
+        cur_chain_idx = int(cur_idx/2)
+        cur_chain = pruned_chains[cur_chain_idx]
 
-            if useful_matches[i][0] == cur_idx or useful_matches[i][2] == cur_idx:
-                # do not use the tip chain unless this is the last chain to add
-                if len(ordered_chains) != len(pruned_chains)-1:
-                    if useful_matches[i][0] == cur_idx and useful_matches[i][2] in tip_chain_indices:
-                        print('len(ordered_chains) != len(pruned_chains)-1')
-                        continue
-                    elif useful_matches[i][2] == cur_idx and useful_matches[i][0] in tip_chain_indices:
-                        print('len(ordered_chains) != len(pruned_chains)-1')
-                        continue
+        if cur_idx % 2 == 1:
+            cur_chain.reverse()
+        ordered_chains.append(cur_chain)
 
-                used_matches.append(useful_matches[i])
+        if cur_idx % 2 == 0:
+            next_idx = col_idx[cur_idx+1]  # find where this chain's end is connecting to 
+        else:
+            next_idx = col_idx[cur_idx-1]  # find where this chain's start is connecting to
 
-                if useful_matches[i][2] == cur_idx:
-                    temp = useful_matches[i][2:4].copy()
-                    useful_matches[i][2:4] = useful_matches[i][0:2].copy()
-                    useful_matches[i][0:2] = temp.copy()
-                
-                if last_was_reversed:
-                    if useful_matches[i][1] == 0:
-                        useful_matches[i][1] = -1
-                    else:
-                        useful_matches[i][1] = 0
-                
-                # if connecting from start to start, reverse the second chain and insert it in front of the first chain
-                if useful_matches[i][1] == 0 and useful_matches[i][3] == 0:
-                    rev_chain = pruned_chains[int(useful_matches[i][2])].copy()
-                    rev_chain.reverse()
-                    ordered_chains.insert(0, rev_chain)
-                    last_was_reversed = True
-                # if connecting from start to end, insert the second chain in front of the first chain
-                elif useful_matches[i][1] == 0 and useful_matches[i][3] == -1:
-                    ordered_chains.insert(0, pruned_chains[int(useful_matches[i][2])])
-                    last_was_reversed = False
-                # if connecting from end to start, append the second chain to the list
-                elif useful_matches[i][1] == -1 and useful_matches[i][3] == 0:
-                    ordered_chains.append(pruned_chains[int(useful_matches[i][2])])
-                    last_was_reversed = False
-                # if connecting from end to end, reverse the second chain and append it to the list
-                else:
-                    rev_chain = pruned_chains[int(useful_matches[i][2])].copy()
-                    rev_chain.reverse()
-                    ordered_chains.append(rev_chain)
-                    last_was_reversed = True
-                
-                cur_idx = useful_matches[i][2]
-                break
+        # if visualize_process:
+        #     mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
+        #     color = (int(np.random.random()*200)+55, int(np.random.random()*200)+55, int(np.random.random()*200)+55)
+        #     for j in range (0, len(cur_chain)-1):
+        #         mask = cv2.line(mask, cur_chain[j], cur_chain[j+1], color, 1)
+        #     cv2.imshow('in merging', mask)
+        #     while True:
+        #         key = cv2.waitKey(10)
+        #         if key == 27:  # escape
+        #             cv2.destroyAllWindows()
+        #             break
+
+        # if reached the other end, stop
+        if next_idx == matrix_size-1 or next_idx == matrix_size-2:
+            break
+        cur_idx = next_idx
+    
+    print('Finished merging')
     
     # visualization code for debug
     if visualize_process:
@@ -468,7 +430,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
             for j in range (0, len(chain)-1):
                 mask = cv2.line(mask, chain[j], chain[j+1], color, 1)
 
-            cv2.imshow("after merging", mask)
+            cv2.imshow('after merging', mask)
             while True:
                 key = cv2.waitKey(10)
                 if key == 27:  # escape
