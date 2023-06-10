@@ -122,28 +122,34 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
 
     # start + start
     if mode == 0:
+        # treat the second chain as needing to be reversed
         cost_euclidean = np.linalg.norm(chain1[0] - chain2[0])
-        cost_curvature_1 = np.arccos(np.dot(chain2[0] - chain1[0], chain1[0] - chain1[1]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
+        cost_curvature_1 = np.arccos(np.dot(chain1[0] - chain2[0], chain1[1] - chain1[0]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain1[0] - chain2[0], chain2[0] - chain2[1]) / (np.linalg.norm(chain2[0] - chain2[1]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
+        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # start + end
     elif mode == 1:
         cost_euclidean = np.linalg.norm(chain1[0] - chain2[-1])
-        cost_curvature_1 = np.arccos(np.dot(chain2[-1] - chain1[0], chain1[0] - chain1[1]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
+        cost_curvature_1 = np.arccos(np.dot(chain1[0] - chain2[-1], chain1[1] - chain1[0]) / (np.linalg.norm(chain1[0] - chain1[1]) * cost_euclidean))
         cost_curvature_2 = np.arccos(np.dot(chain1[0] - chain2[-1], chain2[-1] - chain2[-2]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
+        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # end + start
     elif mode == 2:
         cost_euclidean = np.linalg.norm(chain1[-1] - chain2[0])
         cost_curvature_1 = np.arccos(np.dot(chain2[0] - chain1[-1], chain1[-1] - chain1[-2]) / (np.linalg.norm(chain1[-1] - chain1[-2]) * cost_euclidean))
-        cost_curvature_2 = np.arccos(np.dot(chain1[-1] - chain2[0], chain2[0] - chain2[1]) / (np.linalg.norm(chain2[0] - chain2[1]) * cost_euclidean))
+        cost_curvature_2 = np.arccos(np.dot(chain2[0] - chain1[-1], chain2[1] - chain2[0]) / (np.linalg.norm(chain2[0] - chain2[1]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
+        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     # end + end
     else:
+        # treat the second chain as needing to be reversed
         cost_euclidean = np.linalg.norm(chain1[-1] - chain2[-1])
         cost_curvature_1 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain1[-1] - chain1[-2]) / (np.linalg.norm(chain1[-1] - chain1[-2]) * cost_euclidean))
-        cost_curvature_2 = np.arccos(np.dot(chain1[-1] - chain2[-1], chain2[-1] - chain2[-2]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
+        cost_curvature_2 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain2[-2] - chain2[-1]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
+        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     
     return total_cost
 
@@ -344,7 +350,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
     # all_possible_matches: nd array with size (num of possible matches, 5)
     # entries: [chain_1_idx, start/end, chain_2_idx, start/end, cost]; start = 0 and end = -1
     all_possible_matches = []
-    w_e = 0.015
+    w_e = 0.001
     w_c = 1
     for i in range (0, len(pruned_chains)):
         for j in range (i+1, len(pruned_chains)):
@@ -398,16 +404,22 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
     ordered_chains.append(pruned_chains[start_chain_idx])
 
     for _ in range (0, len(pruned_chains)):
+        print('====={}====='.format(_))
+        print(last_was_reversed)
+        print(useful_matches)
         for i in range (0, len(useful_matches)):
             if useful_matches[i] in used_matches:
+                print('useful_matches[i] in used_matches')
                 continue
 
             if useful_matches[i][0] == cur_idx or useful_matches[i][2] == cur_idx:
                 # do not use the tip chain unless this is the last chain to add
                 if len(ordered_chains) != len(pruned_chains)-1:
                     if useful_matches[i][0] == cur_idx and useful_matches[i][2] in tip_chain_indices:
+                        print('len(ordered_chains) != len(pruned_chains)-1')
                         continue
                     elif useful_matches[i][2] == cur_idx and useful_matches[i][0] in tip_chain_indices:
+                        print('len(ordered_chains) != len(pruned_chains)-1')
                         continue
 
                 used_matches.append(useful_matches[i])

@@ -69,8 +69,8 @@ def callback (rgb, depth):
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # returns the pixel coord of points (in order). a list of lists
-    img_scale = 8
-    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask, img_scale=img_scale, seg_length=3, max_curvature=30)
+    img_scale = 1
+    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask, img_scale=img_scale, seg_length=10, max_curvature=20)
 
     all_pixel_coords = []
     for chain in extracted_chains:
