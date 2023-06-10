@@ -38,7 +38,7 @@
         <param name="mu" value="0.1" />
         <param name="max_iter" value="50" />
         <param name="tol" value="0.00001" />
-        <param name="k_vis" value="0.2" />
+        <param name="k_vis" value="1" />
         <param name="include_lle" value="false" />
         <param name="use_geodesic" value="true" />
         <param name="use_prev_sigma2" value="true" />
