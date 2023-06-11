@@ -340,8 +340,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
-
-        // project and pub image
         MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
         Mat tracking_img;
@@ -369,10 +367,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 cv::line(tracking_img, cv::Point(x, y),
                                        cv::Point(static_cast<int>(image_coords(i+1, 0)/image_coords(i+1, 2)), 
                                                  static_cast<int>(image_coords(i+1, 1)/image_coords(i+1, 2))),
-                                       line_color, 2);
+                                       line_color, 5);
             }
 
-            cv::circle(tracking_img, cv::Point(x, y), 5, point_color, -1);
+            cv::circle(tracking_img, cv::Point(x, y), 7, point_color, -1);
         }
 
         // add text
