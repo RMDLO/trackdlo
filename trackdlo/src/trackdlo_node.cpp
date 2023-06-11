@@ -340,8 +340,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd nodes_h = Y.replicate(1, 1);
         nodes_h.conservativeResize(nodes_h.rows(), nodes_h.cols()+1);
         nodes_h.col(nodes_h.cols()-1) = MatrixXd::Ones(nodes_h.rows(), 1);
-
-        // project and pub image
         MatrixXd image_coords = (proj_matrix * nodes_h.transpose()).transpose();
 
         Mat tracking_img;
