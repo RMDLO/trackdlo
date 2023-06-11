@@ -10,11 +10,11 @@ This repository contains the TrackDLO Robot Operating System (ROS) package. The 
 
 ## Get Started
 
-See the [requirements and run instructions](https://github.com/RMDLO/trackdlo/blob/main/docs/RUN.md) to learn how to use TrackDLO.
+See the [requirements and run instructions](https://github.com/RMDLO/trackdlo/blob/master/docs/RUN.md) to learn how to use TrackDLO.
 
 ## Learn More
 
-To learn more about TrackDLO, read our [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/main/docs/LEARN_MORE.md)
+To learn more about TrackDLO, read our [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md).
 
 ## Bibtex:
 
