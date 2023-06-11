@@ -1,9 +1,11 @@
-# TrackDLO ROS Package
+<p align="center">
+  <img src="images/trackdlo.png" width="600" title="TrackDLO">
+</p>
 
-This is the implementation of our paper *TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence* (under review) by Jingyi Xiang, Holly Dinkel, Harry Zhao, Naixiang Gao, Brian Coltin, Trey Smith, and Timothy Bretl. We provide the implementation in C++.
+This repository contains the TrackDLO Robot Operating System (ROS) package. The TrackDLO ROS package is an implementation of our paper *TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence* (under review) by Jingyi Xiang, Holly Dinkel, Harry Zhao, Naixiang Gao, Brian Coltin, Trey Smith, and Timothy Bretl. The TrackDLO algorithm is implemented in C++.
 
-## Overview
-The TrackDLO algorithm estimates the shape of a Deformable Linear Object (DLO) under occlusion from a sequence of RGB-D images, for use in manipulation tasks. TrackDLO runs in real-time and requires no physics simulation or gripper movement information. The algorithm improves on previous approaches by addressing three common scenarios which cause their failure: tip occlusion, mid-section occlusion, and self-occlusion.
+## Abstract
+The TrackDLO algorithm estimates the shape of a Deformable Linear Object (DLO) under occlusion from a sequence of RGB-D images for use in manipulation tasks. TrackDLO runs in real-time and requires no prior state information as input. The algorithm improves on previous approaches by addressing three common scenarios which cause tracking failure: tip occlusion, mid-section occlusion, and self-intersection. This is achieved through the application of Motion Coherence Theory to impute the spatial velocity of occluded nodes; the use of a geodesic distance function to better track self-intersecting DLOs; and the introduction of a non-Gaussian kernel which only penalizes lower-order spatial displacement derivatives to better reflect DLO physics. The source code and benchmarking dataset are publicly released in this repository.
 
 <p align="center">
   <img src="images/trackdlo1.gif" width="400" title="TrackDLO"> <img src="images/trackdlo2.gif" width="400" title="TrackDLO">
