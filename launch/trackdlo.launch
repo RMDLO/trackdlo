@@ -70,7 +70,7 @@
         <param name="downsample_leaf_size" value="0.01" />
         <param name="multi_color_dlo" type="bool" value="$(arg multi_color_dlo)" />
         <param name="visibility_threshold" type="double" value="0.008" />
-        <param name="dlo_pixel_width" value="40" />
+        <param name="dlo_pixel_width" value="50" />
     </node>
 
     <!-- launch python node for initialization -->

@@ -96,8 +96,8 @@ def callback (rgb, depth):
     # do not include those without depth values
     extracted_chains_3d = extracted_chains_3d[((extracted_chains_3d[:, 0] != 0) | (extracted_chains_3d[:, 1] != 0) | (extracted_chains_3d[:, 2] != 0))]
 
-    # tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.001)
-    tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.002)
+    tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.001)
+    # tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.002)
     # 1st fit, less points
     u_fine = np.linspace(0, 1, 300) # <-- num fit points
     x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)

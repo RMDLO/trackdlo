@@ -352,7 +352,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
     # cost matrix entry label format: tip1 start, tip1 end, tip2 start, tip2 end, ...
     matrix_size = 2*len(pruned_chains) + 2
     cost_matrix = np.zeros((matrix_size, matrix_size))
-    w_e = 0.01
+    w_e = 0.001
     w_c = 1
     for i in range (0, len(pruned_chains)):
         for j in range (0, len(pruned_chains)):
