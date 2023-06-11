@@ -390,7 +390,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_pointcloud2, output);
 
         // publish the results as a marker array
-        visualization_msgs::MarkerArray results = MatrixXd2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 1.0}, {0.0, 1.0, 0.0, 1.0});
+        // {1.0, 150.0/255.0, 0.0, 1.0}, {0.0, 1.0, 0.0, 1.0}
+        visualization_msgs::MarkerArray results = MatrixXd2MarkerArray(Y, "camera_color_optical_frame", "node_results", {0.0, 176.0/255.0, 240.0/255.0, 1.0}, {0.0, 176.0/255.0, 240.0/255.0, 1.0}, 0.012, 0.006, visible_nodes, {1.0, 0.0, 0.0, 1.0}, {1.0, 0.0, 0.0, 1.0});
         visualization_msgs::MarkerArray guide_nodes_results = MatrixXd2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
         visualization_msgs::MarkerArray corr_priors_results = MatrixXd2MarkerArray(priors, "camera_color_optical_frame", "corr_prior_results", {0.0, 0.0, 0.0, 0.5}, {1.0, 0.0, 0.0, 0.5});
 
