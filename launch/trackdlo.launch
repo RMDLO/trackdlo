@@ -3,12 +3,12 @@
     <arg name="camera_info_topic" default="/camera/aligned_depth_to_color/camera_info" />
     <arg name="rgb_topic" default="/camera/color/image_raw" />
     <arg name="depth_topic" default="/camera/aligned_depth_to_color/image_raw" />
-    <!-- <arg name="hsv_threshold_upper_limit" default="130 255 255" />
-    <arg name="hsv_threshold_lower_limit" default="90 90 30" /> -->
-    <arg name="hsv_threshold_upper_limit" default="150 150 40" />
-    <arg name="hsv_threshold_lower_limit" default="0 0 0" />
-    <arg name="num_of_nodes" default="40" />
-    <arg name="visualize_initialization_process" default="false" />
+    <arg name="hsv_threshold_upper_limit" default="130 255 255" />
+    <arg name="hsv_threshold_lower_limit" default="100 200 60" />
+    <!-- <arg name="hsv_threshold_upper_limit" default="150 150 40" />
+    <arg name="hsv_threshold_lower_limit" default="0 0 0" /> -->
+    <arg name="num_of_nodes" default="45" />
+    <arg name="visualize_initialization_process" default="true" />
 
     <!-- modifying the below parameters is usually not needed -->
     <!-- kernel: 0 -> Laplacian; 1 -> 1st order; 2nd -> 2nd order; 3 -> Gaussian -->
@@ -67,10 +67,10 @@
         <param name="use_prev_sigma2" value="true" />
         
         <param name="kernel" value="$(arg kernel)" />
-        <param name="downsample_leaf_size" value="0.01" />
+        <param name="downsample_leaf_size" value="0.008" />
         <param name="multi_color_dlo" type="bool" value="$(arg multi_color_dlo)" />
         <param name="visibility_threshold" type="double" value="0.008" />
-        <param name="dlo_pixel_width" value="30" />
+        <param name="dlo_pixel_width" value="40" />
     </node>
 
     <!-- launch python node for initialization -->

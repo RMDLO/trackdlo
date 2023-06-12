@@ -148,7 +148,7 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
         cost_curvature_2 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain2[-2] - chain2[-1]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
     
-    if total_cost is np.nan:
+    if total_cost is np.nan or cost_curvature_1 is np.nan or cost_curvature_2 is np.nan:
         print('total cost is nan!')
         print('chain1 =', chain1)
         print('chain2 =', chain2)
@@ -179,7 +179,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
     result = skeletonize(mask, method='zha')
     gray = cv2.cvtColor(result.copy(), cv2.COLOR_BGR2GRAY)
     gray[gray > 100] = 255
-    print('Finished skeletonization')
+    print('Finished skeletonization. Traversing skeleton contours...')
 
     if visualize_process:
         cv2.imshow('after skeletonization', gray)
@@ -258,7 +258,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
                 chain = []
                 cur_seg_start_point = None
 
-    print('Finished contour traversal')
+    print('Finished contour traversal. Pruning extracted chains...')
 
     if visualize_process:
         mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
@@ -333,7 +333,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
         leftover_chains = np.asarray(leftover_chains, dtype=list)
         sorted_chains = leftover_chains[sorted_idx]
 
-    print('Finished pruning')
+    print('Finished pruning. Merging remaining chains...')
     
     if visualize_process:
         mask = np.zeros((gray.shape[0], gray.shape[1], 3), np.uint8)
@@ -423,7 +423,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
             break
         cur_idx = next_idx
     
-    print('Finished merging')
+    print('Finished merging.')
     
     # visualization code for debug
     if visualize_process:
