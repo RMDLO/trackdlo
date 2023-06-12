@@ -70,7 +70,7 @@ def callback (rgb, depth):
 
     # returns the pixel coord of points (in order). a list of lists
     img_scale = 1
-    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask, img_scale=img_scale, seg_length=10, max_curvature=30)
+    extracted_chains = extract_connected_skeleton(visualize_initialization_process, mask, img_scale=img_scale, seg_length=10, max_curvature=20)
 
     all_pixel_coords = []
     for chain in extracted_chains:

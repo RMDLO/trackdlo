@@ -148,7 +148,11 @@ def compute_cost (chain1, chain2, w_e, w_c, mode):
         cost_curvature_2 = np.arccos(np.dot(chain2[-1] - chain1[-1], chain2[-2] - chain2[-1]) / (np.linalg.norm(chain2[-1] - chain2[-2]) * cost_euclidean))
         total_cost = w_e * cost_euclidean + w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0
     
-    # print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
+    if total_cost is np.nan:
+        print('total cost is nan!')
+        print('chain1 =', chain1)
+        print('chain2 =', chain2)
+        print('euclidean cost = {}, w_e*cost = {}; curvature cost = {}, w_c*cost = {}'.format(cost_euclidean, w_e*cost_euclidean, (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0, w_c * (np.abs(cost_curvature_1) + np.abs(cost_curvature_2)) / 2.0))
     return total_cost
 
 # partial implementation of paper "Deformable One-Dimensional Object Detection for Routing and Manipulation"

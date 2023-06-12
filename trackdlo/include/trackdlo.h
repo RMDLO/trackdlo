@@ -55,7 +55,7 @@ class trackdlo
     public:
         // default constructor
         trackdlo();
-        trackdlo(int num_of_nodes, MatrixXd proj_matrix);
+        trackdlo(int num_of_nodes);
         // fancy constructor
         trackdlo(int num_of_nodes,
                  double visibility_threshold,
@@ -70,8 +70,7 @@ class trackdlo
                  bool include_lle,
                  bool use_geodesic,
                  bool use_prev_sigma2,
-                 int kernel,
-                 MatrixXd proj_matrix);
+                 int kernel);
 
         double get_sigma2();
         MatrixXd get_tracking_result();
@@ -101,13 +100,15 @@ class trackdlo
                       double k_vis = 0,
                       double visibility_threshold = 0.01);
 
-        void tracking_step (MatrixXd X,
-                            std::vector<int> visible_nodes,
-                            std::vector<MatrixXd> visible_nodes_vec);
+        void tracking_step (MatrixXd X, 
+                            std::vector<int> visible_nodes, 
+                            std::vector<int> visible_nodes_extended, 
+                            MatrixXd proj_matrix, 
+                            int img_rows, 
+                            int img_cols);
 
     private:
         MatrixXd Y_;
-        MatrixXd proj_matrix_;
         MatrixXd guide_nodes_;
         double sigma2_;
         double beta_;
