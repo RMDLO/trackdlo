@@ -12,8 +12,8 @@ void signal_callback_handler(int signum);
 
 template <typename T> void print_1d_vector (const std::vector<T>& vec) {
     for (auto item : vec) {
-        // std::cout << item << " ";
-        std::cout << item << std::endl;
+        std::cout << item << " ";
+        // std::cout << item << std::endl;
     }
     std::cout << std::endl;
 }
@@ -27,8 +27,27 @@ MatrixXd sort_pts (MatrixXd Y_0);
 
 std::vector<MatrixXd> line_sphere_intersection (MatrixXd point_A, MatrixXd point_B, MatrixXd sphere_center, double radius);
 
-visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
-visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color);
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
+                                                      std::string marker_frame, 
+                                                      std::string marker_ns, 
+                                                      std::vector<float> node_color, 
+                                                      std::vector<float> line_color, 
+                                                      double node_scale = 0.01,
+                                                      double line_scale = 0.005,
+                                                      std::vector<int> visible_nodes = {}, 
+                                                      std::vector<float> occluded_node_color = {},
+                                                      std::vector<float> occluded_line_color = {});
+
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
+                                                      std::string marker_frame, 
+                                                      std::string marker_ns,  
+                                                      std::vector<float> node_color, 
+                                                      std::vector<float> line_color,
+                                                      double node_scale = 0.01,
+                                                      double line_scale = 0.005,
+                                                      std::vector<int> visible_nodes = {}, 
+                                                      std::vector<float> occluded_node_color = {},
+                                                      std::vector<float> occluded_line_color = {});
 
 MatrixXd cross_product (MatrixXd vec1, MatrixXd vec2);
 double dot_product (MatrixXd vec1, MatrixXd vec2);

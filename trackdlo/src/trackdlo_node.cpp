@@ -129,7 +129,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     if (!initialized) {
         if (received_init_nodes && received_proj_matrix) {
-            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel, proj_matrix);
+            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
 
             sigma2 = 0.001;
 
@@ -247,6 +247,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd X = cur_pc_downsampled.getMatrixXfMap().topRows(3).transpose().cast<double>();
         ROS_INFO_STREAM("Number of points in downsampled point cloud: " + std::to_string(X.rows()));
 
+        MatrixXd guide_nodes;
+        std::vector<MatrixXd> priors;
+
+        // log time
+        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time_cb).count() / 1000.0;
+        ROS_INFO_STREAM("Before tracking step: " + std::to_string(time_diff) + " ms");
+        pre_proc_total += time_diff;
+        cur_time = std::chrono::high_resolution_clock::now();
+
         // calculate node visibility
         // for each node in Y, determine a point in X closest to it
         std::map<int, double> shortest_node_pt_dists;
@@ -286,7 +295,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd image_coords_mask = (proj_matrix * Y_h.transpose()).transpose();
 
         std::vector<int> visible_nodes = {};
-        std::vector<MatrixXd> visible_nodes_vec = {};
         // draw edges closest to the camera first
         for (int idx : indices_vec) {
             int col_1 = static_cast<int>(image_coords_mask(idx, 0)/image_coords_mask(idx, 2));
@@ -296,12 +304,20 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             int row_2 = static_cast<int>(image_coords_mask(idx+1, 1)/image_coords_mask(idx+1, 2));
 
             // only add to visible nodes if did not overlap with existing edges
-            if (projected_edges.at<uchar>(row_1, col_1) == 0 && shortest_node_pt_dists[idx] <= visibility_threshold) {
-                visible_nodes.push_back(idx);
+            if (shortest_node_pt_dists[idx] <= visibility_threshold) {
+                if (projected_edges.at<uchar>(row_1, col_1) == 0) {
+                    if (std::find(visible_nodes.begin(), visible_nodes.end(), idx) == visible_nodes.end()) {
+                        visible_nodes.push_back(idx);
+                    }
+                }
             }
             // do not consider adjacent nodes directly on top of each other
-            if (projected_edges.at<uchar>(row_2, col_2) == 0 && shortest_node_pt_dists[idx+1] <= visibility_threshold) {
-                visible_nodes.push_back(idx+1);
+            if (shortest_node_pt_dists[idx+1] <= visibility_threshold) {
+                if (projected_edges.at<uchar>(row_2, col_2) == 0) {
+                    if (std::find(visible_nodes.begin(), visible_nodes.end(), idx+1) == visible_nodes.end()) {
+                        visible_nodes.push_back(idx+1);
+                    }
+                }
             }
 
             // add edges for checking overlap with upcoming nodes
@@ -310,20 +326,27 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         // sort visible nodes to preserve the original connectivity
         std::sort(visible_nodes.begin(), visible_nodes.end());
-        for (int node_idx : visible_nodes) {
-            visible_nodes_vec.push_back(Y.row(node_idx));
+
+        // minor mid-section occlusion is usually fine
+        // extend visible nodes so that gaps as small as 2 to 3 nodes are filled
+        std::vector<int> visible_nodes_extended = {};
+        for (int i = 0; i < visible_nodes.size()-1; i ++) {
+            visible_nodes_extended.push_back(visible_nodes[i]);
+            // extend two nodes
+            if (visible_nodes[i+1] - visible_nodes[i] <= 3) {
+                for (int j = 1; j < visible_nodes[i+1] - visible_nodes[i]; j ++) {
+                    visible_nodes_extended.push_back(visible_nodes[i] + j);
+                }
+            }
         }
+        visible_nodes_extended.push_back(visible_nodes[visible_nodes.size()-1]);
 
-        MatrixXd guide_nodes;
-        std::vector<MatrixXd> priors;
-
-        // log time
-        time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time_cb).count() / 1000.0;
-        ROS_INFO_STREAM("Before tracking step: " + std::to_string(time_diff) + " ms");
-        pre_proc_total += time_diff;
-        cur_time = std::chrono::high_resolution_clock::now();
+        std::cout << "visible nodes: ";
+        print_1d_vector(visible_nodes);
+        std::cout << "visible nodes extended: ";
+        print_1d_vector(visible_nodes_extended);
         
-        tracker.tracking_step(X, visible_nodes, visible_nodes_vec);
+        tracker.tracking_step(X, visible_nodes, visible_nodes_extended, proj_matrix, mask.rows, mask.cols);
         // tracker.ecpd_lle(X, Y, sigma2, 3, 1, 1, 0.1, 50, 0.00001, true, true, true, false, {}, 0, 1);
     
         Y = tracker.get_tracking_result();
@@ -390,7 +413,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl_conversions::moveFromPCL(cur_pc_pointcloud2, output);
 
         // publish the results as a marker array
-        visualization_msgs::MarkerArray results = MatrixXd2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 1.0}, {0.0, 1.0, 0.0, 1.0});
+        visualization_msgs::MarkerArray results = MatrixXd2MarkerArray(Y, "camera_color_optical_frame", "node_results", {1.0, 150.0/255.0, 0.0, 1.0}, {0.0, 1.0, 0.0, 1.0}, 0.01, 0.005, visible_nodes, {1.0, 0.0, 0.0, 1.0}, {1.0, 0.0, 0.0, 1.0});
         visualization_msgs::MarkerArray guide_nodes_results = MatrixXd2MarkerArray(guide_nodes, "camera_color_optical_frame", "guide_node_results", {0.0, 0.0, 0.0, 0.5}, {0.0, 0.0, 1.0, 0.5});
         visualization_msgs::MarkerArray corr_priors_results = MatrixXd2MarkerArray(priors, "camera_color_optical_frame", "corr_prior_results", {0.0, 0.0, 0.0, 0.5}, {1.0, 0.0, 0.0, 0.5});
 

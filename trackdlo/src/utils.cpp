@@ -241,9 +241,20 @@ std::vector<MatrixXd> line_sphere_intersection (MatrixXd point_A, MatrixXd point
 }
 
 // node color and object color are in rgba format and range from 0-1
-visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
-    // publish the results as a marker array
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
+                                                      std::string marker_frame, 
+                                                      std::string marker_ns, 
+                                                      std::vector<float> node_color, 
+                                                      std::vector<float> line_color, 
+                                                      double node_scale,
+                                                      double line_scale,
+                                                      std::vector<int> visible_nodes, 
+                                                      std::vector<float> occluded_node_color,
+                                                      std::vector<float> occluded_line_color) {    // publish the results as a marker array
+    
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
+    
+    bool last_node_visible = true;
     for (int i = 0; i < Y.rows(); i ++) {
         visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
     
@@ -267,21 +278,32 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string ma
         cur_node_result.pose.orientation.z = 0.0;
 
         // set scale
-        cur_node_result.scale.x = 0.01;
-        cur_node_result.scale.y = 0.01;
-        cur_node_result.scale.z = 0.01;
+        cur_node_result.scale.x = node_scale;
+        cur_node_result.scale.y = node_scale;
+        cur_node_result.scale.z = node_scale;
 
         // set color
-        cur_node_result.color.r = node_color[0];
-        cur_node_result.color.g = node_color[1];
-        cur_node_result.color.b = node_color[2];
-        cur_node_result.color.a = node_color[3];
+        bool cur_node_visible;
+        if (visible_nodes.size() != 0 && std::find(visible_nodes.begin(), visible_nodes.end(), i) == visible_nodes.end()) {
+            cur_node_result.color.r = occluded_node_color[0];
+            cur_node_result.color.g = occluded_node_color[1];
+            cur_node_result.color.b = occluded_node_color[2];
+            cur_node_result.color.a = occluded_node_color[3];
+            cur_node_visible = false;
+        }
+        else {
+            cur_node_result.color.r = node_color[0];
+            cur_node_result.color.g = node_color[1];
+            cur_node_result.color.b = node_color[2];
+            cur_node_result.color.a = node_color[3];
+            cur_node_visible = true;
+        }
 
         results.markers.push_back(cur_node_result);
 
-        // don't add line if at the last node
-        if (i == Y.rows()-1) {
-            break;
+        // don't add line if at the first node
+        if (i == 0) {
+            continue;
         }
 
         visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
@@ -294,14 +316,14 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string ma
         cur_line_result.id = i;
 
         // add position
-        cur_line_result.pose.position.x = (Y(i, 0) + Y(i+1, 0)) / 2.0;
-        cur_line_result.pose.position.y = (Y(i, 1) + Y(i+1, 1)) / 2.0;
-        cur_line_result.pose.position.z = (Y(i, 2) + Y(i+1, 2)) / 2.0;
+        cur_line_result.pose.position.x = (Y(i, 0) + Y(i-1, 0)) / 2.0;
+        cur_line_result.pose.position.y = (Y(i, 1) + Y(i-1, 1)) / 2.0;
+        cur_line_result.pose.position.z = (Y(i, 2) + Y(i-1, 2)) / 2.0;
 
         // add orientation
         Eigen::Quaternionf q;
         Eigen::Vector3f vec1(0.0, 0.0, 1.0);
-        Eigen::Vector3f vec2(Y(i+1, 0) - Y(i, 0), Y(i+1, 1) - Y(i, 1), Y(i+1, 2) - Y(i, 2));
+        Eigen::Vector3f vec2(Y(i, 0) - Y(i-1, 0), Y(i, 1) - Y(i-1, 1), Y(i, 2) - Y(i-1, 2));
         q.setFromTwoVectors(vec1, vec2);
 
         cur_line_result.pose.orientation.w = q.w();
@@ -310,15 +332,23 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string ma
         cur_line_result.pose.orientation.z = q.z();
 
         // set scale
-        cur_line_result.scale.x = 0.005;
-        cur_line_result.scale.y = 0.005;
-        cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i+1));
+        cur_line_result.scale.x = line_scale;
+        cur_line_result.scale.y = line_scale;
+        cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i-1));
 
         // set color
-        cur_line_result.color.r = line_color[0];
-        cur_line_result.color.g = line_color[1];
-        cur_line_result.color.b = line_color[2];
-        cur_line_result.color.a = line_color[3];
+        if (last_node_visible && cur_node_visible) {
+            cur_line_result.color.r = line_color[0];
+            cur_line_result.color.g = line_color[1];
+            cur_line_result.color.b = line_color[2];
+            cur_line_result.color.a = line_color[3];
+        }
+        else {
+            cur_line_result.color.r = occluded_line_color[0];
+            cur_line_result.color.g = occluded_line_color[1];
+            cur_line_result.color.b = occluded_line_color[2];
+            cur_line_result.color.a = occluded_line_color[3];
+        }
 
         results.markers.push_back(cur_line_result);
     }
@@ -327,9 +357,20 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y, std::string ma
 }
 
 // overload function
-visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, std::string marker_frame, std::string marker_ns, std::vector<float> node_color, std::vector<float> line_color) {
+visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
+                                                      std::string marker_frame, 
+                                                      std::string marker_ns, 
+                                                      std::vector<float> node_color, 
+                                                      std::vector<float> line_color, 
+                                                      double node_scale,
+                                                      double line_scale,
+                                                      std::vector<int> visible_nodes, 
+                                                      std::vector<float> occluded_node_color,
+                                                      std::vector<float> occluded_line_color) {
     // publish the results as a marker array
     visualization_msgs::MarkerArray results = visualization_msgs::MarkerArray();
+
+    bool last_node_visible = true;
     for (int i = 0; i < Y.size(); i ++) {
         visualization_msgs::Marker cur_node_result = visualization_msgs::Marker();
 
@@ -360,16 +401,27 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, s
         cur_node_result.scale.z = 0.01;
 
         // set color
-        cur_node_result.color.r = node_color[0];
-        cur_node_result.color.g = node_color[1];
-        cur_node_result.color.b = node_color[2];
-        cur_node_result.color.a = node_color[3];
+        bool cur_node_visible;
+        if (visible_nodes.size() != 0 && std::find(visible_nodes.begin(), visible_nodes.end(), i) == visible_nodes.end()) {
+            cur_node_result.color.r = occluded_node_color[0];
+            cur_node_result.color.g = occluded_node_color[1];
+            cur_node_result.color.b = occluded_node_color[2];
+            cur_node_result.color.a = occluded_node_color[3];
+            cur_node_visible = false;
+        }
+        else {
+            cur_node_result.color.r = node_color[0];
+            cur_node_result.color.g = node_color[1];
+            cur_node_result.color.b = node_color[2];
+            cur_node_result.color.a = node_color[3];
+            cur_node_visible = true;
+        }
 
         results.markers.push_back(cur_node_result);
 
-        // don't add line if at the last node
-        if (i == Y.size()-1) {
-            break;
+        // don't add line if at the first node
+        if (i == 0) {
+            continue;
         }
 
         visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
@@ -382,14 +434,14 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, s
         cur_line_result.id = i;
 
         // add position
-        cur_line_result.pose.position.x = (Y[i](0, dim-3) + Y[i+1](0, dim-3)) / 2.0;
-        cur_line_result.pose.position.y = (Y[i](0, dim-2) + Y[i+1](0, dim-2)) / 2.0;
-        cur_line_result.pose.position.z = (Y[i](0, dim-1) + Y[i+1](0, dim-1)) / 2.0;
+        cur_line_result.pose.position.x = (Y[i](0, dim-3) + Y[i-1](0, dim-3)) / 2.0;
+        cur_line_result.pose.position.y = (Y[i](0, dim-2) + Y[i-1](0, dim-2)) / 2.0;
+        cur_line_result.pose.position.z = (Y[i](0, dim-1) + Y[i-1](0, dim-1)) / 2.0;
 
         // add orientation
         Eigen::Quaternionf q;
         Eigen::Vector3f vec1(0.0, 0.0, 1.0);
-        Eigen::Vector3f vec2(Y[i+1](0, dim-3) - Y[i](0, dim-3), Y[i+1](0, dim-2) - Y[i](0, dim-2), Y[i+1](0, dim-1) - Y[i](0, dim-1));
+        Eigen::Vector3f vec2(Y[i](0, dim-3) - Y[i-1](0, dim-3), Y[i](0, dim-2) - Y[i-1](0, dim-2), Y[i](0, dim-1) - Y[i-1](0, dim-1));
         q.setFromTwoVectors(vec1, vec2);
 
         cur_line_result.pose.orientation.w = q.w();
@@ -400,13 +452,21 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y, s
         // set scale
         cur_line_result.scale.x = 0.005;
         cur_line_result.scale.y = 0.005;
-        cur_line_result.scale.z = sqrt(pow(Y[i+1](0, dim-3) - Y[i](0, dim-3), 2) + pow(Y[i+1](0, dim-2) - Y[i](0, dim-2), 2) + pow(Y[i+1](0, dim-1) - Y[i](0, dim-1), 2));
+        cur_line_result.scale.z = sqrt(pow(Y[i](0, dim-3) - Y[i-1](0, dim-3), 2) + pow(Y[i](0, dim-2) - Y[i-1](0, dim-2), 2) + pow(Y[i](0, dim-1) - Y[i-1](0, dim-1), 2));
 
         // set color
-        cur_line_result.color.r = line_color[0];
-        cur_line_result.color.g = line_color[1];
-        cur_line_result.color.b = line_color[2];
-        cur_line_result.color.a = line_color[3];
+        if (last_node_visible && cur_node_visible) {
+            cur_line_result.color.r = line_color[0];
+            cur_line_result.color.g = line_color[1];
+            cur_line_result.color.b = line_color[2];
+            cur_line_result.color.a = line_color[3];
+        }
+        else {
+            cur_line_result.color.r = occluded_line_color[0];
+            cur_line_result.color.g = occluded_line_color[1];
+            cur_line_result.color.b = occluded_line_color[2];
+            cur_line_result.color.a = occluded_line_color[3];
+        }
 
         results.markers.push_back(cur_line_result);
     }

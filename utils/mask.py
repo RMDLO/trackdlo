@@ -17,17 +17,22 @@ def callback (rgb, pc):
 
     # color thresholding
 
-    # blue
-    lower = (100, 120, 30)
+    # rope blue
+    # lower = (100, 120, 30)
+    # upper = (130, 255, 255)
+    # mask = cv2.inRange(hsv_image, lower, upper)
+
+    # latex blue
+    lower = (100, 230, 60)
     upper = (130, 255, 255)
-    mask_blue = cv2.inRange(hsv_image, lower, upper)
+    mask = cv2.inRange(hsv_image, lower, upper)
 
     # green
-    lower = (60, 130, 60)
-    upper = (95, 255, 255)
-    mask_green = cv2.inRange(hsv_image, lower, upper)
+    # lower = (60, 130, 60)
+    # upper = (95, 255, 255)
+    # mask_green = cv2.inRange(hsv_image, lower, upper)
 
-    mask = cv2.bitwise_or(mask_blue, mask_green)
+    # mask = cv2.bitwise_or(mask_blue, mask_green)
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
 
     # publish mask
