@@ -14,6 +14,7 @@ Installation and execution of TrackDLO was verified with the below dependencies.
 * [SciPy](https://scipy.org/install/) (Our version: 1.23.3)
 * [scikit-image](https://scikit-image.org/) (Our version: 0.18.0)
 * [Pillow](https://pillow.readthedocs.io/en/stable/installation.html) (Our version: 9.2.0)
+* [ROS Numpy](https://pypi.org/project/rosnumpy/) (Our version: 0.0.5)
 
 ## Other Requirements
 
