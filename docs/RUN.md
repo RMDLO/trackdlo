@@ -4,7 +4,7 @@ This guide contains information about required dependencies and how to run the T
 
 ## Minimum Requirements
 
-Installation and execution of TrackDLO was verified with the below dependencies.
+Installation and execution of TrackDLO was verified with the below dependencies on an Ubuntu 20.04 system with ROS Noetic.
 
 * [ROS Noetic](http://wiki.ros.org/noetic/Installation)
 * [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (Our version: 3.3.7)
@@ -15,6 +15,8 @@ Installation and execution of TrackDLO was verified with the below dependencies.
 * [scikit-image](https://scikit-image.org/) (Our version: 0.18.0)
 * [Pillow](https://pillow.readthedocs.io/en/stable/installation.html) (Our version: 9.2.0)
 * [ROS Numpy](https://pypi.org/project/rosnumpy/) (Our version: 0.0.5)
+
+We also provide Docker files for compatibility with other system configurations, refer to the ![DOCKER.md](https://github.com/RMDLO/trackdlo/blob/master/docs/DOCKER.md) for more information.
 
 ## Other Requirements
 
@@ -37,6 +39,7 @@ The repository is organized into the following directories:
 First, clone the repository into a ROS workspace and build the package:
 
 ```bash
+$ cd YOUR_ROS_WORKSPACE/src
 $ git clone https://github.com/RMDLO/trackdlo.git
 $ catkin build trackdlo
 ```
@@ -87,7 +90,6 @@ roslaunch trackdlo realsense_node.launch
 $ roslaunch trackdlo trackdlo.launch
 ```
 
-
 ## Run TrackDLO with Recorded ROS Bag Data:
 1. Download the `.bag` files from [here](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing) and place them in your ROS workspace.
 2. Open a new terminal and run 
@@ -102,7 +104,6 @@ $ roslaunch trackdlo trackdlo.launch
 ```bash
 $ rosbag play <name_of_the_bag_file>.bag
 ```
-
 
 ## Data:
 
