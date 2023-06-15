@@ -14,24 +14,24 @@ The current configuration was tested on an x86 host computer running Ubuntu 20.0
 2. **Build the Docker Image**
    ```bash
    $ cd trackdlo/docker
-   $ docker build -t nvidia-dope:noetic-v1 -f Dockerfile.noetic ..
+   $ docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
    ```
-   This will take several minutes and requires an internet connection.
 
-3. **Plug in your camera**
+This will take several minutes and require connection to the internet. This command will install all dependencies and build the TrackDLO ROS workspace within the image.
+
+3. **Connect a Camera**
    Docker will not recognize a USB device that is plugged in after the container is started.
 
-4. **Run the container**
+4. **Run the Container**
    ```
-   $ ./run_dope_docker.sh [name] [host dir] [container dir]
+   $ ./run_docker.sh [name] [host dir] [container dir]
    ```
-   Parameters:
-   - `name` is an optional field that specifies the name of this image. By default, it is `nvidia-dope-v2`.  By using different names, you can create multiple containers from the same image.
-   - `host dir` and `container dir` are a pair of optional fields that allow you to specify a mapping between a directory on your host machine and a location inside the container.  This is useful for sharing code and data between the two systems.  By default, it maps the directory containing dope to `/root/catkin_ws/src/dope` in the container.
+   Optional Parameters:
+   - `name` specifies the name of the image. By default, it is `trackdlo`. Multiple containers can be created from the same image by changing this parameter.
+   - `host dir` and `container dir` map a directory on the host machine to a location inside the container. This enables sharing code and data between the two systems. By default, the `run_docker.sh` bash script maps the directory containing trackdlo to `/root/tracking_ws/src/trackdlo` in the container.
 
-      Only the first invocation of this script with a given name will create a container. Subsequent executions will attach to the running container allowing you -- in effect -- to have multiple terminal sessions into a single container.
-
-5. **Build DOPE**
-   Return to step 7 of the [installation instructions](../readme.md) (downloading the weights).
+    Only the first call of this script with a given name will create a container. Subsequent executions will attach to the running container to enable running multiple terminal sessions in a single container.
 
    *Note:* Since the Docker container binds directly to the host's network, it will see `roscore` even if running outside the docker container.
+
+For more information about using ROS with docker, see the ![ROS tutorial](http://wiki.ros.org/docker/Tutorials/Docker).
