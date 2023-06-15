@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build, test, push base docker
-      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
+      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
 
   build-bionic:
 
@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build, test, push base docker
-      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
+      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
 
   build-jammy:
 
@@ -28,4 +28,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build, test, push base docker
-      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
+      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..

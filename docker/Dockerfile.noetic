@@ -43,13 +43,13 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
   && apt-get clean
 
 # Install required Python components
-COPY docker/requirements.txt ${HOME}
+COPY ./docker/requirements.txt ${HOME}
 RUN python3 -m pip install -r ${HOME}/requirements.txt
 
 # Set up a catkin workspace
 ENV CATKIN_WS ${HOME}/tracking_ws
 COPY . ${CATKIN_WS}/src/trackdlo
-COPY docker/init_workspace.sh ${HOME}
+COPY ./docker/init_workspace.sh ${HOME}
 RUN ${CATKIN_WS}/src/trackdlo/docker/init_workspace.sh
 RUN echo "source ${CATKIN_WS}/devel/setup.bash" >> ${HOME}/.bashrc
 
