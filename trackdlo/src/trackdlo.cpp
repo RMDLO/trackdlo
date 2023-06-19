@@ -335,12 +335,6 @@ bool trackdlo::cpd_lle (MatrixXd X,
 
         if (use_geodesic) {
             std::vector<int> max_p_nodes(P.cols(), 0);
-
-            // // temp test
-            // for (int i = 0; i < N; i ++) {
-            //     P.col(i).maxCoeff(&max_p_nodes[i]);
-            // }
-
             MatrixXd pts_dis_sq_geodesic = MatrixXd::Zero(M, N);
 
             // loop through all points
@@ -405,49 +399,6 @@ bool trackdlo::cpd_lle (MatrixXd X,
 
             for (int i = 0; i < Y.rows(); i ++) {
                 double shortest_node_pt_dist = shortest_node_pt_dists[i];
-                // double shortest_node_pt_dist;
-
-                // // if this node is visible, the shortest dist is always 0
-                // if (std::find(visible_nodes.begin(), visible_nodes.end(), i) != visible_nodes.end()){
-                //     shortest_node_pt_dist = 0;
-                // }
-                // else {
-                //     // find the closest visible node
-                //     for (int j = 0; j <= Y.rows()-1; j ++) {
-                //         int left_node = i - j;
-                //         int right_node = i + j;
-                //         double left_dist = 100000;
-                //         double right_dist = 100000;
-                //         bool found_visible_node = false;
-                        
-                //         // make sure node index doesn't go out of bound
-                //         if (left_node >= 0) {
-                //             // if i - j is visible, record the geodesic distance between the nodes
-                //             if (std::find(visible_nodes.begin(), visible_nodes.end(), left_node) != visible_nodes.end()){
-                //                 left_dist = abs(converted_node_coord[left_node] - converted_node_coord[i]);
-                //                 found_visible_node = true;
-                //             }
-                //         }
-                //         if (right_node <= Y.rows()-1) {
-                //             // if i + j is visible, record the geodesic distance between the nodes
-                //             if (std::find(visible_nodes.begin(), visible_nodes.end(), right_node) != visible_nodes.end()){
-                //                 right_dist = abs(converted_node_coord[right_dist] - converted_node_coord[i]);
-                //                 found_visible_node = true;
-                //             }
-                //         }
-
-                //         // take the shortest distance
-                //         if (found_visible_node) {
-                //             if (left_dist < right_dist) {
-                //                 shortest_node_pt_dist = left_dist;
-                //             }
-                //             else {
-                //                 shortest_node_pt_dist = right_dist;
-                //             }
-                //             break;
-                //         }
-                //     }
-                // }
 
                 double P_vis_i = exp(-k_vis * shortest_node_pt_dist);
                 total_P_vis += P_vis_i;
@@ -502,12 +453,7 @@ bool trackdlo::cpd_lle (MatrixXd X,
             }
         }
 
-        // MatrixXd W = A_matrix.householderQr().solve(B_matrix);
-        // MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
-        // MatrixXd W = A_matrix.fullPivLu().solve(B_matrix);
-        // MatrixXd W = A_matrix.partialPivLu().solve(B_matrix);
-        // MatrixXd W = A_matrix.colPivHouseholderQr().solve(B_matrix);
-        MatrixXd W = A_matrix.fullPivHouseholderQr().solve(B_matrix);
+        MatrixXd W = A_matrix.completeOrthogonalDecomposition().solve(B_matrix);
 
         MatrixXd T = Y_0 + G * W;
         double trXtdPt1X = (X.transpose() * Pt1.asDiagonal() * X).trace();
@@ -516,7 +462,7 @@ bool trackdlo::cpd_lle (MatrixXd X,
 
         sigma2 = (trXtdPt1X - 2*trPXtT + trTtdP1T) / (Np * D);
 
-        if (pt2pt_dis_sq(Y, Y_0 + G*W) < tol) {
+        if (pt2pt_dis(Y, Y_0 + G*W) / Y.rows() < tol) {
             Y = Y_0 + G*W;
             ROS_INFO_STREAM("Iteration until convergence: " + std::to_string(it+1));
             break;
@@ -1018,7 +964,8 @@ void trackdlo::tracking_step (MatrixXd X,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 3, 1, 1, mu_, 50, 0.00001, true, true, true, false, {}, 0, 1, visible_nodes_extended, 0, visibility_threshold_);
+    // tracker.cpd_lle(X, Y, sigma2, 1, 1, 1, 0.05, 50, tol, true, false, true);
+    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 3, 1, 1, mu_, 50, tol_, true, true, true, false, {}, 0, 1);
 
     if (visible_nodes_extended.size() == Y_.rows()) {
         if (visible_nodes.size() == visible_nodes_extended.size()) {
