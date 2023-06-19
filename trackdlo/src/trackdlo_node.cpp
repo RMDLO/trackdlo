@@ -281,6 +281,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 }
                 // count valid point in the last iteration
                 if (m == Y.rows()-1) {
+                    // assumption: DLO movement between frames is small
+                    // get rid of points too far away from the node point set Y^{t-1}
+                    // this is necessary because exp(-dist/sigma2) can become too small to represent in MatrixXd
+                    // if a point x_n in X is too far away from all nodes, all entries in row n of P will be zero,
+                    // even if they technically aren't all zeros
                     if (shortest_pt_node_dists[n] < 0.07) {
                         X_temp.row(valid_pt_counter) = X.row(n);
                         valid_pt_counter += 1;
