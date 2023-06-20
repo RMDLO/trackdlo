@@ -21,7 +21,7 @@ class OcclusionSimulation:
         self.mouse_mask = None
 
         self.rgb_sub = rospy.Subscriber('/camera/color/image_raw', Image, self.callback)
-        self.occlusion_mask_img_pub = rospy.Publisher('/trackdlo/mask_with_occlusion', Image, queue_size=100)
+        self.occlusion_mask_img_pub = rospy.Publisher('/mask_with_occlusion', Image, queue_size=100)
 
     def callback(self,rgb):
         cur_image = ros_numpy.numpify(rgb)

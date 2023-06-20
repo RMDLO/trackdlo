@@ -286,7 +286,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     // this is necessary because exp(-dist/sigma2) can become too small to represent in MatrixXd
                     // if a point x_n in X is too far away from all nodes, all entries in row n of P will be zero,
                     // even if they technically aren't all zeros
-                    if (shortest_pt_node_dists[n] < 0.07) {
+                    if (shortest_pt_node_dists[n] < 0.05) {
                         X_temp.row(valid_pt_counter) = X.row(n);
                         valid_pt_counter += 1;
                     }
@@ -555,7 +555,7 @@ int main(int argc, char **argv) {
     int pub_queue_size = 30;
 
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber opencv_mask_sub = it.subscribe("/trackdlo/mask_with_occlusion", 10, update_opencv_mask);
+    image_transport::Subscriber opencv_mask_sub = it.subscribe("/mask_with_occlusion", 10, update_opencv_mask);
     init_nodes_sub = nh.subscribe("/trackdlo/init_nodes", 1, update_init_nodes);
     camera_info_sub = nh.subscribe(camera_info_topic, 1, update_camera_info);
 

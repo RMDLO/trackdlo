@@ -26,7 +26,7 @@ def camera_info_callback (info):
     print(proj_matrix)
     camera_info_sub.unregister()
 
-def color_thresholding (hsv_image):
+def color_thresholding (hsv_image, cur_depth):
     # --- rope blue ---
     lower = (90, 90, 60)
     upper = (130, 255, 255)
@@ -43,6 +43,9 @@ def color_thresholding (hsv_image):
 
     # combine masks
     mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+
+    # filter mask base on depth values
+    mask[cur_depth < 0.58*1000] = 0
 
     return mask
 
@@ -63,7 +66,7 @@ def callback (rgb, depth):
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
         # color thresholding
-        mask = color_thresholding(hsv_image)
+        mask = color_thresholding(hsv_image, cur_depth)
 
     start_time = time.time()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)

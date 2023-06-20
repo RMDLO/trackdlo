@@ -44,7 +44,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     double time_from_start;
     time_from_start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - tracking_evaluator.start_time()).count();
-    time_from_start = time_from_start / 1000.0 * tracking_evaluator.rate();
+    time_from_start = (time_from_start / 1000.0 + 3.0) * tracking_evaluator.rate();  // initialization usually takes 1.5 seconds
     std::cout << time_from_start << "; " << tracking_evaluator.exit_time() << std::endl;
     
     if (tracking_evaluator.exit_time() == -1) {
@@ -454,7 +454,7 @@ int main(int argc, char **argv) {
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "/camera/color/image_raw", 10);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/camera/depth/color/points", 10);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> result_sub(nh, "/" + alg + "_results_pc", 10);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> result_sub(nh, "/" + alg + "/results_pc", 10);
     message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::PointCloud2, sensor_msgs::PointCloud2> sync(image_sub, pc_sub, result_sub, 10);
 
     sync.registerCallback<std::function<void(const sensor_msgs::ImageConstPtr&, 
