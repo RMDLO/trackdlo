@@ -12,15 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build, test, push base docker
-      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
-
-  build-bionic:
-
-    runs-on: ubuntu-18.04
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build, test, push base docker
-      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
+      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
 
   build-jammy:
 
@@ -28,4 +20,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build, test, push base docker
-      run: cd docker && docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
+      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
