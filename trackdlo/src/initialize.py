@@ -119,7 +119,7 @@ def callback (rgb, depth):
 
     init_nodes = spline_pts[np.linspace(0, num_true_pts-1, num_of_nodes).astype(int)]
 
-    results = ndarray2MarkerArray(init_nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
+    results = ndarray2MarkerArray(init_nodes, result_frame_id, [1, 150/255, 0, 0.75], [0, 1, 0, 0.75])
     results_pub.publish(results)
 
     # add color
@@ -142,6 +142,7 @@ if __name__=='__main__':
     camera_info_topic = rospy.get_param('/init_tracker/camera_info_topic')
     rgb_topic = rospy.get_param('/init_tracker/rgb_topic')
     depth_topic = rospy.get_param('/init_tracker/depth_topic')
+    result_frame_id = rospy.get_param('/init_tracker/result_frame_id')
     visualize_initialization_process = rospy.get_param('/init_tracker/visualize_initialization_process')
 
     hsv_threshold_upper_limit = rospy.get_param('/init_tracker/hsv_threshold_upper_limit')
@@ -159,7 +160,7 @@ if __name__=='__main__':
     # header
     header = std_msgs.msg.Header()
     header.stamp = rospy.Time.now()
-    header.frame_id = 'camera_color_optical_frame'
+    header.frame_id = result_frame_id
     fields = [PointField('x', 0, PointField.FLOAT32, 1),
                 PointField('y', 4, PointField.FLOAT32, 1),
                 PointField('z', 8, PointField.FLOAT32, 1),
