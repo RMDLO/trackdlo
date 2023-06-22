@@ -347,10 +347,10 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             double y1 = row_1;
             double x2 = col_2;
             double y2 = row_2;
-            x1 = x1 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (x2 - x1);
-            y1 = y1 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (y2 - y1);
-            x2 = x2 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (x1 - x2);
-            y2 = y2 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (y1 - y2);
+            // x1 = x1 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (x2 - x1);
+            // y1 = y1 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (y2 - y1);
+            // x2 = x2 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (x1 - x2);
+            // y2 = y2 + (0.25*dlo_pixel_width) / sqrt(pow(x1-x2, 2) + pow(y1-y2, 2)) * (y1 - y2);
             cv::line(projected_edges, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 255, 255), dlo_pixel_width);
         }
 
