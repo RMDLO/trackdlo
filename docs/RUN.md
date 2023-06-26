@@ -10,8 +10,8 @@ Installation and execution of TrackDLO was verified with the below dependencies 
 * [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (Our version: 3.3.7)
 * [Point Cloud Library](https://pointclouds.org/) (Our version: 1.10.0)
 * [OpenCV](https://opencv.org/releases/) (Our version: 4.2.0)
-* [NumPy](https://numpy.org/install/) (Our version: 1.9.1)
-* [SciPy](https://scipy.org/install/) (Our version: 1.23.3)
+* [NumPy](https://numpy.org/install/) (Our version: 1.23.3)
+* [SciPy](https://scipy.org/install/) (Our version: 1.9.1)
 * [scikit-image](https://scikit-image.org/) (Our version: 0.18.0)
 * [Pillow](https://pillow.readthedocs.io/en/stable/installation.html) (Our version: 9.2.0)
 * [ROS Numpy](https://pypi.org/project/rosnumpy/) (Our version: 0.0.5)
@@ -61,6 +61,7 @@ TrackDLO uses color thresholding to obtain the DLO segmentation mask. Below are 
 
 Other useful parameters:
 * `num_of_nodes`: the number of nodes initialized for the DLO
+* `result_frame_id`: the tf frame the tracking results (point cloud and marker array) will be published to
 * `visualize_initialization_process`: if set to `true`, OpenCV windows will appear to visualize the results of each step in initialization. This is helpful for debugging in the event of initialization failures.
 
 Once all parameters in `trackdlo.launch` are set to proper values, run TrackDLO with the following steps:
@@ -91,7 +92,7 @@ $ roslaunch trackdlo trackdlo.launch
 ```
 
 ## Run TrackDLO with Recorded ROS Bag Data:
-1. Download the `.bag` files from [here](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing) and place them in your ROS workspace.
+1. Download the experiment data from [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). After unzipping, place the `.bag` files in your ROS workspace. Note: the files are quite large! After unzipping, the bag files will take up around 120 GB of space in total.
 2. Open a new terminal and run 
 ```bash
 $ roslaunch trackdlo visualize_output.launch
@@ -107,4 +108,16 @@ $ rosbag play <name_of_the_bag_file>.bag
 
 ## Data:
 
-To enable compatibility with different RGB-D camera models, we recently updated the package to work with depth images instead of ordered point clouds. We are working on recollecting the corresponding ROS `.bag` files and will share them shortly. For the time being, the original `.bag` files can still be found [here](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing).
+The ROS bag files used in our paper and the supplementary video can be found [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). The `experiment` folder is organized into the following directories:
+
+```
+  ├── rope/                # contains the three experiments performed with a rope in the supplementary video
+  ├── rubber_tubing/       # contains the three experiments performed with a rope in the supplementary video
+  ├── failure_cases/       # contains the three failure cases shown in the supplementary video
+  └── quantitative_eval/   # contains the bag files used for quantitative evaluation in our paper
+```
+
+### Notes on Running the Bag Files
+
+* The rope and the rubber tubing require different hsv thresholding values. Both of them have hsv upper limit of `130 255 255`, however the rope has hsv lower limit `90 90 30` and the tubing has hsv lower limit `100 200 60`.
+* For bag files in `rope/`, `rubber_tubing/`, and `failure_cases/`, the camera info is published under topic `/camera/aligned_depth_to_color/camera_info`. For bag files in `quantitative_eval/`, the camera info is published under `/camera/color/camera_info`.
