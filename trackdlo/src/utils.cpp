@@ -263,7 +263,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
         // cur_node_result.header.stamp = ros::Time::now();
         cur_node_result.type = visualization_msgs::Marker::SPHERE;
         cur_node_result.action = visualization_msgs::Marker::ADD;
-        cur_node_result.ns = marker_ns + std::to_string(i);
+        cur_node_result.ns = marker_ns + "_node_" + std::to_string(i);
         cur_node_result.id = i;
 
         // add position
@@ -309,10 +309,10 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
         visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
 
         // add header
-        cur_line_result.header.frame_id = "camera_color_optical_frame";
+        cur_line_result.header.frame_id = marker_frame;
         cur_line_result.type = visualization_msgs::Marker::CYLINDER;
         cur_line_result.action = visualization_msgs::Marker::ADD;
-        cur_line_result.ns = "line_results" + std::to_string(i);
+        cur_line_result.ns = marker_ns + "_line_" + std::to_string(i);
         cur_line_result.id = i;
 
         // add position
@@ -381,7 +381,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
         // cur_node_result.header.stamp = ros::Time::now();
         cur_node_result.type = visualization_msgs::Marker::SPHERE;
         cur_node_result.action = visualization_msgs::Marker::ADD;
-        cur_node_result.ns = marker_ns + std::to_string(i);
+        cur_node_result.ns = marker_ns + "_node_" + std::to_string(i);
         cur_node_result.id = i;
 
         // add position
@@ -427,10 +427,10 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
         visualization_msgs::Marker cur_line_result = visualization_msgs::Marker();
 
         // add header
-        cur_line_result.header.frame_id = "camera_color_optical_frame";
+        cur_line_result.header.frame_id = marker_frame;
         cur_line_result.type = visualization_msgs::Marker::CYLINDER;
         cur_line_result.action = visualization_msgs::Marker::ADD;
-        cur_line_result.ns = "line_results" + std::to_string(i);
+        cur_line_result.ns = marker_ns + "_line_" + std::to_string(i);
         cur_line_result.id = i;
 
         // add position
