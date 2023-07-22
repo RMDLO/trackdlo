@@ -26,7 +26,7 @@ def camera_info_callback (info):
     print(proj_matrix)
     camera_info_sub.unregister()
 
-def color_thresholding (hsv_image):
+def color_thresholding (hsv_image, cur_depth):
     # --- rope blue ---
     lower = (90, 90, 60)
     upper = (130, 255, 255)
@@ -43,6 +43,9 @@ def color_thresholding (hsv_image):
 
     # combine masks
     mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
+
+    # filter mask base on depth values
+    mask[cur_depth < 0.58*1000] = 0
 
     return mask
 
@@ -63,7 +66,7 @@ def callback (rgb, depth):
         mask = cv2.inRange(hsv_image, lower, upper)
     else:
         # color thresholding
-        mask = color_thresholding(hsv_image)
+        mask = color_thresholding(hsv_image, cur_depth)
 
     start_time = time.time()
     mask = cv2.cvtColor(mask.copy(), cv2.COLOR_GRAY2BGR)
@@ -96,8 +99,12 @@ def callback (rgb, depth):
     # do not include those without depth values
     extracted_chains_3d = extracted_chains_3d[((extracted_chains_3d[:, 0] != 0) | (extracted_chains_3d[:, 1] != 0) | (extracted_chains_3d[:, 2] != 0))]
 
+    if multi_color_dlo:
+        depth_threshold = 0.58  # m
+        extracted_chains_3d = extracted_chains_3d[extracted_chains_3d[:, 2] > depth_threshold]
+
     # tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.001)
-    tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.002)
+    tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.0005)
     # 1st fit, less points
     u_fine = np.linspace(0, 1, 300) # <-- num fit points
     x_fine, y_fine, z_fine = interpolate.splev(u_fine, tck)
@@ -112,7 +119,7 @@ def callback (rgb, depth):
 
     init_nodes = spline_pts[np.linspace(0, num_true_pts-1, num_of_nodes).astype(int)]
 
-    results = ndarray2MarkerArray(init_nodes, "camera_color_optical_frame", [255, 150, 0, 0.75], [0, 255, 0, 0.75])
+    results = ndarray2MarkerArray(init_nodes, result_frame_id, [1, 150/255, 0, 0.75], [0, 1, 0, 0.75])
     results_pub.publish(results)
 
     # add color
@@ -135,6 +142,7 @@ if __name__=='__main__':
     camera_info_topic = rospy.get_param('/init_tracker/camera_info_topic')
     rgb_topic = rospy.get_param('/init_tracker/rgb_topic')
     depth_topic = rospy.get_param('/init_tracker/depth_topic')
+    result_frame_id = rospy.get_param('/init_tracker/result_frame_id')
     visualize_initialization_process = rospy.get_param('/init_tracker/visualize_initialization_process')
 
     hsv_threshold_upper_limit = rospy.get_param('/init_tracker/hsv_threshold_upper_limit')
@@ -152,7 +160,7 @@ if __name__=='__main__':
     # header
     header = std_msgs.msg.Header()
     header.stamp = rospy.Time.now()
-    header.frame_id = 'camera_color_optical_frame'
+    header.frame_id = result_frame_id
     fields = [PointField('x', 0, PointField.FLOAT32, 1),
                 PointField('y', 4, PointField.FLOAT32, 1),
                 PointField('z', 8, PointField.FLOAT32, 1),

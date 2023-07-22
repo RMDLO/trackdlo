@@ -161,7 +161,7 @@ def extract_connected_skeleton (visualize_process, mask, img_scale=10, seg_lengt
 
     # smooth image
     im = Image.fromarray(mask)
-    smoothed_im = im.filter(ImageFilter.ModeFilter(size=20))
+    smoothed_im = im.filter(ImageFilter.ModeFilter(size=15))
     mask = np.array(smoothed_im)
 
     # resize if necessary for better skeletonization performance
