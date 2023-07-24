@@ -7,7 +7,7 @@ ros::Publisher pc_pub;
 ros::Publisher results_pub;
 ros::Publisher guide_nodes_pub;
 ros::Publisher corr_priors_pub;
-ros::Publisher occluded_pub;
+ros::Publisher self_occluded_pub;
 ros::Publisher result_pc_pub;
 ros::Subscriber init_nodes_sub;
 ros::Subscriber camera_info_sub;
@@ -384,22 +384,22 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         // Log occluded nodes
-        std::vector<int> occluded_nodes_idx = {};
+        std::vector<int> self_occluded_nodes_idx = {};
         for (int i = 0; i < Y.rows(); i ++){
             if (visible_nodes.size() != 0 && std::find(visible_nodes.begin(), visible_nodes.end(), i) == visible_nodes.end()) {
-                occluded_nodes_idx.push_back(i);
+                self_occluded_nodes_idx.push_back(i);
             }
         }
 
         // convert occluded to pointcloud2
-        ROS_INFO_STREAM("Occluded Nodes: " + std::to_string(occluded_nodes_idx.size()));
-        pcl::PointCloud<pcl::PointXYZ> occluded_nodes_pc;
-        for (int i = 0; i < occluded_nodes_idx.size(); i++) {
+        ROS_INFO_STREAM("Occluded Nodes: " + std::to_string(self_occluded_nodes_idx.size()));
+        pcl::PointCloud<pcl::PointXYZ> self_occluded_nodes_pc;
+        for (int i = 0; i < self_occluded_nodes_idx.size(); i++) {
             pcl::PointXYZ temp;
-            temp.x = Y(occluded_nodes_idx[i],0);
-            temp.y = Y(occluded_nodes_idx[i],1);
-            temp.z = Y(occluded_nodes_idx[i],2);
-            occluded_nodes_pc.points.push_back(temp);
+            temp.x = Y(self_occluded_nodes_idx[i],0);
+            temp.y = Y(self_occluded_nodes_idx[i],1);
+            temp.z = Y(self_occluded_nodes_idx[i],2);
+            self_occluded_nodes_pc.points.push_back(temp);
         }
 
         // log time
@@ -501,23 +501,28 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         pcl::toPCLPointCloud2(cur_pc_downsampled, cur_pc_pointcloud2);
         pcl::PCLPointCloud2 result_pc_pclpoincloud2;
         pcl::toPCLPointCloud2(trackdlo_pc, result_pc_pclpoincloud2);
+        pcl::PCLPointCloud2 self_occluded_pclpoincloud2;
+        pcl::toPCLPointCloud2(self_occluded_nodes_pc, self_occluded_pclpoincloud2);
 
         // Convert to ROS data type
         sensor_msgs::PointCloud2 cur_pc_msg;
         sensor_msgs::PointCloud2 result_pc_msg;
+        sensor_msgs::PointCloud2 self_occluded_pc_msg;
         pcl_conversions::moveFromPCL(cur_pc_pointcloud2, cur_pc_msg);
         pcl_conversions::moveFromPCL(result_pc_pclpoincloud2, result_pc_msg);
+        pcl_conversions::moveFromPCL(self_occluded_pclpoincloud2, self_occluded_pc_msg);
 
         // for evaluation sync
         cur_pc_msg.header.frame_id = result_frame_id;
         result_pc_msg.header.frame_id = result_frame_id;
-        occluded_nodes_pc.header.frame_id = result_frame_id;
+        self_occluded_pc_msg.header.frame_id = result_frame_id;
         result_pc_msg.header.stamp = image_msg->header.stamp;
+        self_occluded_pc_msg.header.stamp = image_msg->header.stamp;
 
         results_pub.publish(results);
         guide_nodes_pub.publish(guide_nodes_results);
         corr_priors_pub.publish(corr_priors_results);
-        occluded_pub.publish(occluded_nodes_pc);
+        self_occluded_pub.publish(self_occluded_pc_msg);
         pc_pub.publish(cur_pc_msg);
         result_pc_pub.publish(result_pc_msg);
 
@@ -622,7 +627,7 @@ int main(int argc, char **argv) {
     results_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/results_marker", pub_queue_size);
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/guide_nodes", pub_queue_size);
     corr_priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/corr_priors", pub_queue_size);
-    occluded_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/occluded_nodes", pub_queue_size);
+    self_occluded_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/self_occluded_nodes", pub_queue_size);
 
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/results_pc", pub_queue_size);
