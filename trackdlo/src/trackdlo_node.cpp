@@ -296,7 +296,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
 
         MatrixXd X_pruned = X_temp.topRows(valid_pt_counter);
 
-        // for current nodes and edges in Y, sort them based on how far away they are from the camera
+        // sort current nodes and edges in Y based on their distances to the camera
         std::vector<double> averaged_node_camera_dists = {};
         std::vector<int> indices_vec = {};
         for (int i = 0; i < Y.rows()-1; i ++) {
@@ -318,6 +318,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         MatrixXd image_coords_mask = (proj_matrix * Y_h.transpose()).transpose();
 
         std::vector<int> visible_nodes = {};
+        std::vector<int> self_occluded_nodes = {};
         // draw edges closest to the camera first
         for (int idx : indices_vec) {
             int col_1 = static_cast<int>(image_coords_mask(idx, 0)/image_coords_mask(idx, 2));
@@ -326,12 +327,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             int col_2 = static_cast<int>(image_coords_mask(idx+1, 0)/image_coords_mask(idx+1, 2));
             int row_2 = static_cast<int>(image_coords_mask(idx+1, 1)/image_coords_mask(idx+1, 2));
 
-            // only add to visible nodes if did not overlap with existing edges
+            // add a node to visible_nodes if it does not project onto existing edges
             if (shortest_node_pt_dists[idx] <= visibility_threshold) {
                 if (projected_edges.at<uchar>(row_1, col_1) == 0) {
                     if (std::find(visible_nodes.begin(), visible_nodes.end(), idx) == visible_nodes.end()) {
                         visible_nodes.push_back(idx);
                     }
+                }
+                else {
+                    self_occluded_nodes.push_back(idx);
                 }
             }
             
@@ -341,6 +345,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                     if (std::find(visible_nodes.begin(), visible_nodes.end(), idx+1) == visible_nodes.end()) {
                         visible_nodes.push_back(idx+1);
                     }
+                }
+                else {
+                    self_occluded_nodes.push_back(idx+1);
                 }
             }
 
@@ -383,15 +390,15 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             tracker.cpd_lle(X_pruned, Y, sigma2, 1, 1, 1, mu, 50, tol, true, false, true);
         }
 
-        // Log occluded nodes
+        // Log self-occluded nodes
         std::vector<int> self_occluded_nodes_idx = {};
         for (int i = 0; i < Y.rows(); i ++){
-            if (visible_nodes.size() != 0 && std::find(visible_nodes.begin(), visible_nodes.end(), i) == visible_nodes.end()) {
+            if (self_occluded_nodes.size() != 0 && std::find(self_occluded_nodes.begin(), self_occluded_nodes.end(), i) == self_occluded_nodes.end() && i != 0 && i != Y.rows()-1) {
                 self_occluded_nodes_idx.push_back(i);
             }
         }
 
-        // convert occluded to pointcloud2
+        // convert self-occluded nodes to pointcloud2
         ROS_INFO_STREAM("Occluded Nodes: " + std::to_string(self_occluded_nodes_idx.size()));
         pcl::PointCloud<pcl::PointXYZ> self_occluded_nodes_pc;
         for (int i = 0; i < self_occluded_nodes_idx.size(); i++) {
