@@ -384,21 +384,21 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         }
 
         // Log occluded nodes
-        std::vector<int> occluded_nodes = {};
-        for (int i = 0; i < visible_nodes.size()-1; i ++){
+        std::vector<int> occluded_nodes_idx = {};
+        for (int i = 0; i < Y.rows(); i ++){
             if (visible_nodes.size() != 0 && std::find(visible_nodes.begin(), visible_nodes.end(), i) == visible_nodes.end()) {
-                occluded_nodes.push_back(visible_nodes[i]);
+                occluded_nodes_idx.push_back(i);
             }
         }
 
-        // convert to pointcloud2
-        ROS_INFO_STREAM("Occluded Nodes: " + std::to_string(occluded_nodes.size()));
+        // convert occluded to pointcloud2
+        ROS_INFO_STREAM("Occluded Nodes: " + std::to_string(occluded_nodes_idx.size()));
         pcl::PointCloud<pcl::PointXYZ> occluded_nodes_pc;
-        for (int i = 0; i < occluded_nodes.size(); i++) {
+        for (int i = 0; i < occluded_nodes_idx.size(); i++) {
             pcl::PointXYZ temp;
-            temp.x = occluded_nodes[i];
-            temp.y = occluded_nodes[i];
-            temp.z = occluded_nodes[i];
+            temp.x = Y(occluded_nodes_idx[i],0);
+            temp.y = Y(occluded_nodes_idx[i],1);
+            temp.z = Y(occluded_nodes_idx[i],2);
             occluded_nodes_pc.points.push_back(temp);
         }
 
@@ -511,6 +511,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // for evaluation sync
         cur_pc_msg.header.frame_id = result_frame_id;
         result_pc_msg.header.frame_id = result_frame_id;
+        occluded_nodes_pc.header.frame_id = result_frame_id;
         result_pc_msg.header.stamp = image_msg->header.stamp;
 
         results_pub.publish(results);
@@ -622,7 +623,6 @@ int main(int argc, char **argv) {
     guide_nodes_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/guide_nodes", pub_queue_size);
     corr_priors_pub = nh.advertise<visualization_msgs::MarkerArray>("/trackdlo/corr_priors", pub_queue_size);
     occluded_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/occluded_nodes", pub_queue_size);
-
 
     // trackdlo point cloud topic
     result_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/trackdlo/results_pc", pub_queue_size);
