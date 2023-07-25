@@ -3,9 +3,10 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /PointCloud23
       Splitter Ratio: 0.5
-    Tree Height: 321
+    Tree Height: 189
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -78,7 +79,85 @@ Visualization Manager:
       Marker Topic: /trackdlo/results_marker
       Name: MarkerArray
       Namespaces:
-        {}
+        node_results_line_1: true
+        node_results_line_10: true
+        node_results_line_11: true
+        node_results_line_12: true
+        node_results_line_13: true
+        node_results_line_14: true
+        node_results_line_15: true
+        node_results_line_16: true
+        node_results_line_17: true
+        node_results_line_18: true
+        node_results_line_19: true
+        node_results_line_2: true
+        node_results_line_20: true
+        node_results_line_21: true
+        node_results_line_22: true
+        node_results_line_23: true
+        node_results_line_24: true
+        node_results_line_25: true
+        node_results_line_26: true
+        node_results_line_27: true
+        node_results_line_28: true
+        node_results_line_29: true
+        node_results_line_3: true
+        node_results_line_30: true
+        node_results_line_31: true
+        node_results_line_32: true
+        node_results_line_33: true
+        node_results_line_34: true
+        node_results_line_35: true
+        node_results_line_36: true
+        node_results_line_37: true
+        node_results_line_38: true
+        node_results_line_39: true
+        node_results_line_4: true
+        node_results_line_5: true
+        node_results_line_6: true
+        node_results_line_7: true
+        node_results_line_8: true
+        node_results_line_9: true
+        node_results_node_0: true
+        node_results_node_1: true
+        node_results_node_10: true
+        node_results_node_11: true
+        node_results_node_12: true
+        node_results_node_13: true
+        node_results_node_14: true
+        node_results_node_15: true
+        node_results_node_16: true
+        node_results_node_17: true
+        node_results_node_18: true
+        node_results_node_19: true
+        node_results_node_2: true
+        node_results_node_20: true
+        node_results_node_21: true
+        node_results_node_22: true
+        node_results_node_23: true
+        node_results_node_24: true
+        node_results_node_25: true
+        node_results_node_26: true
+        node_results_node_27: true
+        node_results_node_28: true
+        node_results_node_29: true
+        node_results_node_3: true
+        node_results_node_30: true
+        node_results_node_31: true
+        node_results_node_32: true
+        node_results_node_33: true
+        node_results_node_34: true
+        node_results_node_35: true
+        node_results_node_36: true
+        node_results_node_37: true
+        node_results_node_38: true
+        node_results_node_39: true
+        node_results_node_4: true
+        node_results_node_5: true
+        node_results_node_6: true
+        node_results_node_7: true
+        node_results_node_8: true
+        node_results_node_9: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -145,6 +224,34 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: true
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /trackdlo/self_occluded_nodes
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 85; 87; 83
@@ -173,7 +280,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.7319697141647339
+      Distance: 0.8547712564468384
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -181,27 +288,27 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.49177086353302
-        Y: -0.018738387152552605
-        Z: -0.0052645024843513966
+        X: 0.4638132154941559
+        Y: 0.031793013215065
+        Z: -0.09494432061910629
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7697963714599609
+      Pitch: 0.61479651927948
       Target Frame: <Fixed Frame>
-      Yaw: 0.0008482933044433594
+      Yaw: 3.166590690612793
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 2002
+  Height: 1016
   Hide Left Dock: false
-  Hide Right Dock: true
+  Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000005ad000006ccfc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b000fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000b0fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000006e000001af0000018200fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d0061006700650100000229000002820000002600fffffffb0000000a0049006d00610067006501000004b7000002830000002600ffffff000000010000010f0000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a0000013200fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000cc00000005efc0100000002fb0000000800540069006d0065010000000000000cc0000006dc00fffffffb0000000800540069006d0065010000000000000450000000000000000000000707000006cc00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000002730000033afc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000b0fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000000fa000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065010000013d000001180000001600fffffffb0000000a0049006d006100670065010000025b0000011c0000001600ffffff000000010000010f0000033afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d0000033a000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000005efc0100000002fb0000000800540069006d0065010000000000000738000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003aa0000033a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -210,6 +317,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 3264
-  X: 144
-  Y: 54
+  Width: 1848
+  X: 72
+  Y: 27

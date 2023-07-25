@@ -337,7 +337,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
         cur_line_result.scale.z = pt2pt_dis(Y.row(i), Y.row(i-1));
 
         // set color
-        if (last_node_visible && cur_node_visible) {
+        if (last_node_visible || cur_node_visible) {
             cur_line_result.color.r = line_color[0];
             cur_line_result.color.g = line_color[1];
             cur_line_result.color.b = line_color[2];
@@ -351,6 +351,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (MatrixXd Y,
         }
 
         results.markers.push_back(cur_line_result);
+        last_node_visible = cur_node_visible;
     }
 
     return results;
@@ -455,7 +456,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
         cur_line_result.scale.z = sqrt(pow(Y[i](0, dim-3) - Y[i-1](0, dim-3), 2) + pow(Y[i](0, dim-2) - Y[i-1](0, dim-2), 2) + pow(Y[i](0, dim-1) - Y[i-1](0, dim-1), 2));
 
         // set color
-        if (last_node_visible && cur_node_visible) {
+        if (last_node_visible || cur_node_visible) {
             cur_line_result.color.r = line_color[0];
             cur_line_result.color.g = line_color[1];
             cur_line_result.color.b = line_color[2];
@@ -469,6 +470,7 @@ visualization_msgs::MarkerArray MatrixXd2MarkerArray (std::vector<MatrixXd> Y,
         }
 
         results.markers.push_back(cur_line_result);
+        last_node_visible = cur_node_visible;
     }
 
     return results;

@@ -7,9 +7,9 @@
     <arg name="result_frame_id" default="camera_color_optical_frame" />
     <arg name="hsv_threshold_upper_limit" default="130 255 255" />
     <!-- <arg name="hsv_threshold_lower_limit" default="100 200 60" /> -->
-    <arg name="hsv_threshold_lower_limit" default="90 90 30" />
+    <arg name="hsv_threshold_lower_limit" default="100 120 30" />
     <!-- <arg name="hsv_threshold_lower_limit" default="90 90 90" /> -->
-    <arg name="num_of_nodes" default="25" />
+    <arg name="num_of_nodes" default="40" />
     <arg name="visualize_initialization_process" default="false" />
 
     <!-- modifying the below parameters is usually not needed -->
@@ -45,7 +45,7 @@
         <param name="lambda" value="50000" if="$(eval arg('kernel') == 3)"/>
 
         <!-- alpha: the alignment strength -->
-        <param name="alpha" value="3" />
+        <param name="alpha" value="100" />
 
         <!-- note that LLE is only used in the registration in the distance preservation step -->
         <param name="lle_weight" value="10.0" />
