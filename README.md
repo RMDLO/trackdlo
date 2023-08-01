@@ -17,7 +17,7 @@ See the [requirements and run instructions](https://github.com/RMDLO/trackdlo/bl
 
 ## Learn More
 
-To learn more about TrackDLO, read our [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md).
+To learn more about TrackDLO, watch our [supplementary video](https://www.youtube.com/watch?v=MxqNJsen5eg&t) and read our [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md).
 
 <!-- ## Bibtex:
 
@@ -25,7 +25,7 @@ To learn more about TrackDLO, read our [supplemental documentation](https://gith
 @inproceedings{xiang2023trackdlo,
   title={TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence},
   author={Xiang, Jingyi and Dinkel, Holly and Zhao, Harry and Gao, Naixiang and Coltin, Brian and Smith, Trey and Bretl, Timothy},
-  booktitle={Under Review},
+  booktitle={Robotics and Automation: Letters},
   pages={1--8},
   year={2023},
 }
