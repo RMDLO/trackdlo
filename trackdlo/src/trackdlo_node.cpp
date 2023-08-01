@@ -320,6 +320,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         std::vector<int> visible_nodes = {};
         std::vector<int> self_occluded_nodes = {};
         std::vector<int> not_self_occluded_nodes = {};
+        std::vector<int> self_occluding_nodes = {};
+
         // draw edges closest to the camera first
         for (int idx : indices_vec) {
             int col_1 = static_cast<int>(image_coords_mask(idx, 0)/image_coords_mask(idx, 2));
@@ -356,14 +358,14 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             cv::line(projected_edges, cv::Point(col_1, row_1), cv::Point(col_2, row_2), cv::Scalar(255, 255, 255), dlo_pixel_width);
         }
 
-        // obtain not self-occluded nodes
+        // obtain self-occluded nodes
         for (int i = 0; i < Y.rows(); i ++) {
             if (std::find(not_self_occluded_nodes.begin(), not_self_occluded_nodes.end(), i) == not_self_occluded_nodes.end()) {
                 self_occluded_nodes.push_back(i);
             }
         }
 
-        print_1d_vector(self_occluded_nodes);
+        // print_1d_vector(self_occluded_nodes);
 
         // sort visible nodes to preserve the original connectivity
         std::sort(visible_nodes.begin(), visible_nodes.end());
