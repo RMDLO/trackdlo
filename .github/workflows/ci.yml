@@ -14,4 +14,4 @@ jobs:
         with:
           path: repo/
       - name: Build, test, push base docker (Ubuntu 20.04)
-        run: docker build -t rmdlo-trackdlo:noetic -f repo/docker/Dockerfile.noetic ..
+        run: docker build repo -t rmdlo-trackdlo:noetic -f repo/docker/Dockerfile.noetic ..
