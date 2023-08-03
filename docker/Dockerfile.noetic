@@ -47,7 +47,9 @@ ENV CATKIN_WS=${HOME}/tracking_ws
 COPY . ${CATKIN_WS}/src/trackdlo
 
 # Install required Python components
-RUN python3 -m pip install -r ${CATKIN_WS}/src/trackdlo/docker/requirements.txt
+RUN apt-get update && apt-get install -y \
+    python-pip \
+    pip install -r ${CATKIN_WS}/src/trackdlo/docker/requirements.txt
 
 # Build catkin workspace
 RUN ${CATKIN_WS}/src/trackdlo/docker/init_workspace.sh
