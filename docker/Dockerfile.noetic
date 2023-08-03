@@ -42,13 +42,14 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
   && apt-get -y autoremove \
   && apt-get clean
 
-# Install required Python components
-COPY ./docker/requirements.txt ${HOME}
-RUN python3 -m pip install -r ${HOME}/requirements.txt
-
-# Set up a catkin workspace
+# Set up catkin workspace directory
 ENV CATKIN_WS=${HOME}/tracking_ws
 COPY . ${CATKIN_WS}/src/trackdlo
+
+# Install required Python components
+RUN python3 -m pip install -r ${CATKIN_WS}/src/trackdlo/docker/requirements.txt
+
+# Build catkin workspace
 RUN ${CATKIN_WS}/src/trackdlo/docker/init_workspace.sh
 RUN echo "source /opt/ros/noetic/setup.bash" >> ${HOME}/.bashrc
 RUN echo "source ${CATKIN_WS}/devel/setup.bash" >> ${HOME}/.bashrc
