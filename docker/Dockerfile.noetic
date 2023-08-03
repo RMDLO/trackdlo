@@ -48,8 +48,8 @@ ENV SRC=${CATKIN_WS}/src
 ENV DEVEL=${CATKIN_WS}/devel
 COPY . ${SRC}/trackdlo
 
-# Install required Python components
-RUN python3 -m pip install -r ${SRC}/trackdlo/docker/requirements.txt
+# # Install required Python components
+# RUN pip install -r ${SRC}/trackdlo/docker/requirements.txt
 
 # Build catkin workspace
 RUN echo "source /opt/ros/noetic/setup.bash" >> ${HOME}/.bashrc

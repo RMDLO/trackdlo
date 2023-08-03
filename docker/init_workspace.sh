@@ -5,7 +5,7 @@
 # Stop in case of any error.
 set -e
 
-source /opt/ros/noetic/setup.bash
+pip install -r ${CATKIN_WS}/src/trackdlo/docker/requirements.txt
 
 # Create catkin workspace.
 mkdir -p ${CATKIN_WS}/src
