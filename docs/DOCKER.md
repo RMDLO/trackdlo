@@ -20,7 +20,7 @@ The current configuration was tested on an x86 host computer running Ubuntu 20.0
 This will take several minutes and require connection to the internet. This command will install all dependencies and build the TrackDLO ROS workspace within the image.
 
 3. **Connect a Camera**
-   Docker will not recognize a USB device that is plugged in after the container is started.
+   Docker will not recognize a USB device that is plugged in after the container is started. Note this functionality is experimental. The docker container works best when one of the `.bag` files provided with this repository is copied into the container and replayed.
 
 4. **Run the Container**
    ```
