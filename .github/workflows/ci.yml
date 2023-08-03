@@ -7,17 +7,11 @@ on:
 jobs:
 
   build-focal:
-
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v3
-    - name: Build, test, push base docker
-      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
-
-  build-jammy:
-
-    runs-on: ubuntu-22.04
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build, test, push base docker
-      run: docker build -t rmdlo-trackdlo:noetic -f ./docker/Dockerfile.noetic ..
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          path: repo/
+      - name: Build, test, push base docker (Ubuntu 20.04)
+        run: docker build -t rmdlo-trackdlo:noetic -f repo/docker/Dockerfile.noetic ..

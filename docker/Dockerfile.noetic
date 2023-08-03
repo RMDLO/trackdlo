@@ -52,8 +52,8 @@ COPY . ${SRC}/trackdlo
 RUN python3 -m pip install -r ${SRC}/trackdlo/docker/requirements.txt
 
 # Build catkin workspace
-RUN ${SRC}/trackdlo/docker/init_workspace.sh
 RUN echo "source /opt/ros/noetic/setup.bash" >> ${HOME}/.bashrc
+RUN ${SRC}/trackdlo/docker/init_workspace.sh
 RUN echo "source ${DEVEL}/setup.bash" >> ${HOME}/.bashrc
 
 ENV DISPLAY=:1
