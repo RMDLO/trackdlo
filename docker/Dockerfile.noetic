@@ -5,7 +5,7 @@ FROM ros:noetic-robot
 # To build:
 # docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
 
-ENV HOME /root
+ENV HOME=/root
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system and development components
@@ -47,14 +47,14 @@ COPY ./docker/requirements.txt ${HOME}
 RUN python3 -m pip install -r ${HOME}/requirements.txt
 
 # Set up a catkin workspace
-ENV CATKIN_WS ${HOME}/tracking_ws
+ENV CATKIN_WS=${HOME}/tracking_ws
 COPY . ${CATKIN_WS}/src/trackdlo
 COPY ./docker/init_workspace.sh ${HOME}
 RUN ${CATKIN_WS}/src/trackdlo/docker/init_workspace.sh
 RUN echo "source /opt/ros/noetic/setup.bash" >> ${HOME}/.bashrc
 RUN echo "source ${CATKIN_WS}/devel/setup.bash" >> ${HOME}/.bashrc
 
-ENV DISPLAY :1
+ENV DISPLAY=:1
 ENV TERM=xterm
 # Some QT-Apps do not show controls without this
-ENV QT_X11_NO_MITSHM 1
+ENV QT_X11_NO_MITSHM=1
