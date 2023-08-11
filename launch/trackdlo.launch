@@ -9,17 +9,9 @@
     <!-- <arg name="hsv_threshold_lower_limit" default="100 200 60" /> -->
     <arg name="hsv_threshold_lower_limit" default="90 90 30" />
     <!-- <arg name="hsv_threshold_lower_limit" default="90 90 90" /> -->
-    <arg name="num_of_nodes" default="25" />
+    <arg name="num_of_nodes" default="45" />
     <arg name="visualize_initialization_process" default="false" />
-
-    <!-- modifying the below parameters is usually not needed -->
-    <!-- kernel: 0 -> Laplacian; 1 -> 1st order; 2nd -> 2nd order; 3 -> Gaussian -->
-    <arg name="kernel" default="1" />
     <arg name="multi_color_dlo" default="false" />
-
-    <!-- the below arg is for quick sanity checking with GLTP.
-         it should ALWAYS be set to FALSE when running TrackDLO -->
-    <arg name="gltp" default="false" />
 
     <!-- load parameters to corresponding nodes -->
     <node name="trackdlo" pkg="trackdlo" type="trackdlo" output="screen">
@@ -32,23 +24,11 @@
         <param name="hsv_threshold_lower_limit" type="string" value="$(arg hsv_threshold_lower_limit)" />
 
         <!-- beta and lambda: MCT weights. the larger they are, the more rigid the object becomes -->
-        <param name="beta" value="1" if="$(eval arg('kernel') == 0)"/>
-        <param name="lambda" value="50000" if="$(eval arg('kernel') == 0)"/>
-
-        <param name="beta" value="0.35" if="$(eval arg('kernel') == 1)"/>
-        <param name="lambda" value="50000" if="$(eval arg('kernel') == 1)"/>
-
-        <param name="beta" value="0.3" if="$(eval arg('kernel') == 2)"/>
-        <param name="lambda" value="50000" if="$(eval arg('kernel') == 2)"/>
-
-        <param name="beta" value="0.2" if="$(eval arg('kernel') == 3)"/>
-        <param name="lambda" value="50000" if="$(eval arg('kernel') == 3)"/>
+        <param name="beta" value="0.35" />
+        <param name="lambda" value="50000" />
 
         <!-- alpha: the alignment strength -->
         <param name="alpha" value="3" />
-
-        <!-- note that LLE is only used in the registration in the distance preservation step -->
-        <param name="lle_weight" value="10.0" />
 
         <!-- mu: ranges from 0 to 1, large mu indicates the point cloud is noisy -->
         <param name="mu" value="0.1" />
@@ -62,23 +42,13 @@
         <!-- k_vis: the strength of visibility information's effect on membership probability computation -->
         <param name="k_vis" value="50" />
 
-        <!-- set to false in the registration step because we did not have space in the paper to discuss LLE -->
-        <param name="include_lle" value="false" />
+        <!-- note that LLE is only used in the registration in the distance preservation step -->
+        <param name="lle_weight" value="10.0" />
 
-        <!-- if set to true, 
-             replace the Euclidean distances in kernel and posterior calculations with geodesic distances -->
-        <param name="use_geodesic" value="true" />
-
-        <!-- if set to true, 
-             use the last registration step's sigma^2 to initialize the current registration's sigma^2 -->
-        <param name="use_prev_sigma2" value="true" />
-        
-        <param name="kernel" value="$(arg kernel)" />
         <param name="downsample_leaf_size" value="0.008" />
         <param name="multi_color_dlo" type="bool" value="$(arg multi_color_dlo)" />
         <param name="visibility_threshold" type="double" value="0.008" />
         <param name="dlo_pixel_width" value="40" />
-        <param name="gltp" type="bool" value="$(arg gltp)" />
     </node>
 
     <!-- launch python node for initialization -->

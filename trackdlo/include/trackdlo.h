@@ -58,19 +58,15 @@ class trackdlo
         trackdlo(int num_of_nodes);
         // fancy constructor
         trackdlo(int num_of_nodes,
-                 double visibility_threshold,
-                 double beta,
-                 double lambda,
-                 double alpha,
-                 double gamma,
-                 double k_vis,
-                 double mu,
-                 int max_iter,
-                 const double tol,
-                 bool include_lle,
-                 bool use_geodesic,
-                 bool use_prev_sigma2,
-                 int kernel);
+                double visibility_threshold,
+                double beta,
+                double lambda,
+                double alpha,
+                double k_vis,
+                double mu,
+                int max_iter,
+                double tol,
+                double lle_weight);
 
         double get_sigma2();
         MatrixXd get_tracking_result();
@@ -85,17 +81,13 @@ class trackdlo
                       double& sigma2,
                       double beta,
                       double lambda,
-                      double gamma,
+                      double lle_weight,
                       double mu,
                       int max_iter = 30,
                       double tol = 0.00001,
                       bool include_lle = true,
-                      bool use_geodesic = false,
-                      bool use_prev_sigma2 = false,
-                      bool use_ecpd = false,
                       std::vector<MatrixXd> correspondence_priors = {},
                       double alpha = 0,
-                      int kernel = 3,
                       std::vector<int> visible_nodes = {},
                       double k_vis = 0,
                       double visibility_threshold = 0.01);
@@ -114,15 +106,12 @@ class trackdlo
         double beta_;
         double lambda_;
         double alpha_;
-        double lle_weight_;
         double k_vis_;
         double mu_;
         int max_iter_;
         double tol_;
-        bool include_lle_;
-        bool use_geodesic_;
-        bool use_prev_sigma2_;
-        int kernel_;
+        double lle_weight_;
+        
         std::vector<double> geodesic_coord_;
         std::vector<MatrixXd> correspondence_priors_;
         double visibility_threshold_;
