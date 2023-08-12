@@ -4,3 +4,4 @@ opencv_python==4.4.0.44
 Pillow==8.1.1
 rosnumpy==0.0.5.2
 scikit-image==0.21.0
+pyrealsense2==2.54.1.5217
