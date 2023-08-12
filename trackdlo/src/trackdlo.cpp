@@ -12,18 +12,16 @@ trackdlo::trackdlo(int num_of_nodes) {
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
-    beta_ = 1.0;
+    beta_ = 5.0;
+    beta_pre_proc_ = 3.0;
     lambda_ = 1.0;
+    lambda_pre_proc_ = 1.0;
     alpha_ = 0.0;
     lle_weight_ = 1.0;
     k_vis_ = 0.0;
     mu_ = 0.05;
     max_iter_ = 50;
     tol_ = 0.00001;
-    include_lle_ = true;
-    use_geodesic_ = true;
-    use_prev_sigma2_ = true;
-    kernel_ = 1;
     geodesic_coord_ = {};
     correspondence_priors_ = {};
     visibility_threshold_ = 0.02;
@@ -34,32 +32,28 @@ trackdlo::trackdlo(int num_of_nodes,
                     double beta,
                     double lambda,
                     double alpha,
-                    double lle_weight,
                     double k_vis,
                     double mu,
                     int max_iter,
                     double tol,
-                    bool include_lle,
-                    bool use_geodesic,
-                    bool use_prev_sigma2,
-                    int kernel) 
+                    double beta_pre_proc,
+                    double lambda_pre_proc,
+                    double lle_weight) 
 {
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
     visibility_threshold_ = visibility_threshold;
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
     beta_ = beta;
+    beta_pre_proc_ = beta_pre_proc;
     lambda_ = lambda;
+    lambda_pre_proc_ = lambda_pre_proc;
     alpha_ = alpha;
     lle_weight_ = lle_weight;
     k_vis_ = k_vis;
     mu_ = mu;
     max_iter_ = max_iter;
     tol_ = tol;
-    include_lle_ = include_lle;
-    use_geodesic_ = use_geodesic;
-    use_prev_sigma2_ = use_prev_sigma2;
-    kernel_ = kernel;
     geodesic_coord_ = {};
     correspondence_priors_ = {};
 }
@@ -164,7 +158,7 @@ MatrixXd trackdlo::calc_LLE_weights (int k, MatrixXd X) {
     return W;
 }
 
-bool trackdlo::cpd_lle (MatrixXd X,
+bool trackdlo::cpd_lle (MatrixXd X_orig,
                         MatrixXd& Y,
                         double& sigma2,
                         double beta,
@@ -174,22 +168,33 @@ bool trackdlo::cpd_lle (MatrixXd X,
                         int max_iter,
                         double tol,
                         bool include_lle,
-                        bool use_geodesic,
-                        bool use_prev_sigma2,
-                        bool use_ecpd,
                         std::vector<MatrixXd> correspondence_priors,
                         double alpha,
-                        int kernel,
                         std::vector<int> visible_nodes,
                         double k_vis,
                         double visibility_threshold) 
 {
+    // prune X
+    MatrixXd X_temp = MatrixXd::Zero(X_orig.rows(), 3);
+    int valid_pt_counter = 0;
+    for (int i = 0; i < X_orig.rows(); i ++) {
+        // find shortest distance between this point and any node
+        double shortest_dist = 100000;
+        for (int j = 0; j < Y.rows(); j ++) {
+            double dist = (Y.row(j) - X_orig.row(i)).norm();
+            if (dist < shortest_dist) {
+                shortest_dist = dist;
+            }
+        }
+        // require a point to be sufficiently close to the node set to be valid
+        if (shortest_dist < 0.1) {
+            X_temp.row(valid_pt_counter) = X_orig.row(i);
+            valid_pt_counter += 1;
+        }
+    }
+    MatrixXd X = X_temp.topRows(valid_pt_counter);
 
     bool converged = true;
-
-    if (correspondence_priors.size() == 0) {
-        use_ecpd = false;
-    }
 
     int M = Y.rows();
     int N = X.rows();
@@ -211,65 +216,29 @@ bool trackdlo::cpd_lle (MatrixXd X,
     std::vector<double> converted_node_coord = {0.0};   // this is not squared
 
     MatrixXd G = MatrixXd::Zero(M, M);
-    if (!use_geodesic) {
-        if (kernel == 3) {
-            G = (-diff_yy / (2 * beta * beta)).array().exp();
-        }
-        else if (kernel == 0) {
-            G = (-diff_yy_sqrt / (2 * beta * beta)).array().exp();
-        }
-        else if (kernel == 1) {
-            // G = 1/(2*beta * 2*beta) * (-sqrt(2)*diff_yy_sqrt/beta).array().exp() * (2*diff_yy_sqrt.array() + sqrt(2)*beta);
-            G = 1/(2 * pow(beta, 2)) * (-2 *diff_yy_sqrt/beta).array().exp() * (2*diff_yy_sqrt.array() + sqrt(2)*beta);
-        }
-        else if (kernel == 2) {
-            // G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*diff_yy_sqrt/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*diff_yy_sqrt.array() + sqrt(3)*diff_yy.array());
-            G = 3/(16 * pow(beta, 3)) * (-sqrt(6)*diff_yy_sqrt/beta).array().exp() * (2*sqrt(6)*diff_yy.array() + 6*beta*diff_yy_sqrt.array() + sqrt(6) * pow(beta, 2));
-        }
-        else { // default to gaussian
-            G = (-diff_yy / (2 * beta * beta)).array().exp();
+    double cur_sum = 0;
+    for (int i = 0; i < M-1; i ++) {
+        cur_sum += pt2pt_dis(Y_0.row(i+1), Y_0.row(i));
+        converted_node_coord.push_back(cur_sum);
+    }
+
+    for (int i = 0; i < converted_node_coord.size(); i ++) {
+        for (int j = 0; j < converted_node_coord.size(); j ++) {
+            converted_node_dis_sq(i, j) = pow(converted_node_coord[i] - converted_node_coord[j], 2);
+            converted_node_dis(i, j) = abs(converted_node_coord[i] - converted_node_coord[j]);
         }
     }
-    else {
-        double cur_sum = 0;
-        for (int i = 0; i < M-1; i ++) {
-            cur_sum += pt2pt_dis(Y_0.row(i+1), Y_0.row(i));
-            converted_node_coord.push_back(cur_sum);
-        }
 
-        for (int i = 0; i < converted_node_coord.size(); i ++) {
-            for (int j = 0; j < converted_node_coord.size(); j ++) {
-                converted_node_dis_sq(i, j) = pow(converted_node_coord[i] - converted_node_coord[j], 2);
-                converted_node_dis(i, j) = abs(converted_node_coord[i] - converted_node_coord[j]);
-            }
-        }
-
-        if (kernel == 3) {
-            G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
-        }
-        else if (kernel == 0) {
-            G = (-converted_node_dis / (2 * beta * beta)).array().exp();
-        }
-        else if (kernel == 1) {
-            G = 1/(2*beta * 2*beta) * (-sqrt(2)*converted_node_dis/beta).array().exp() * (sqrt(2)*converted_node_dis.array() + beta);
-        }
-        else if (kernel == 2) {
-            G = 27 * 1/(72 * pow(beta, 3)) * (-sqrt(3)*converted_node_dis/beta).array().exp() * (sqrt(3)*beta*beta + 3*beta*converted_node_dis.array() + sqrt(3)*converted_node_dis_sq.array());
-        }
-        else { // default to gaussian
-            G = (-converted_node_dis_sq / (2 * beta * beta)).array().exp();
-        }
-    }
+    // kernel matrix
+    G = 1/(2*beta * 2*beta) * (-sqrt(2)*converted_node_dis/beta).array().exp() * (2*converted_node_dis.array() + sqrt(2)*beta);
 
     // get the LLE matrix
     MatrixXd L = calc_LLE_weights(6, Y_0);
     MatrixXd H = (MatrixXd::Identity(M, M) - L).transpose() * (MatrixXd::Identity(M, M) - L);
 
-    // construct R and J
-    MatrixXd priors = MatrixXd::Zero(correspondence_priors.size(), 3);
+    // construct J
     MatrixXd J = MatrixXd::Zero(M, M);
     MatrixXd Y_extended = Y_0.replicate(1, 1);
-    MatrixXd G_masked = MatrixXd::Zero(M, M);
     if (correspondence_priors.size() != 0) {
         int num_of_correspondence_priors = correspondence_priors.size();
 
@@ -280,10 +249,8 @@ bool trackdlo::cpd_lle (MatrixXd X,
             temp(0, 1) = correspondence_priors[i](0, 2);
             temp(0, 2) = correspondence_priors[i](0, 3);
 
-            priors.row(i) = temp;
             J.row(index) = MatrixXd::Identity(M, M).row(index);
             Y_extended.row(index) = temp;
-            G_masked.row(index) = G.row(index);
 
             // // enforce boundaries
             // if (i == 0 || i == num_of_correspondence_priors-1) {
@@ -301,7 +268,7 @@ bool trackdlo::cpd_lle (MatrixXd X,
     }
 
     // initialize sigma2
-    if (!use_prev_sigma2 || sigma2 == 0) {
+    if (sigma2 == 0) {
         sigma2 = diff_xy.sum() / static_cast<double>(D * M * N);
     }
 
@@ -333,63 +300,58 @@ bool trackdlo::cpd_lle (MatrixXd X,
         double c = pow((2 * M_PI * sigma2), static_cast<double>(D)/2) * mu / (1 - mu) * static_cast<double>(M)/N;
         P = P.array().rowwise() / (P.colwise().sum().array() + c);
 
-        if (use_geodesic) {
-            std::vector<int> max_p_nodes(P.cols(), 0);
-            MatrixXd pts_dis_sq_geodesic = MatrixXd::Zero(M, N);
+        // P matrix calculation based on geodesic distance
+        std::vector<int> max_p_nodes(P.cols(), 0);
+        MatrixXd pts_dis_sq_geodesic = MatrixXd::Zero(M, N);
 
-            // loop through all points
-            for (int i = 0; i < N; i ++) {
-                
-                P.col(i).maxCoeff(&max_p_nodes[i]);
-                int max_p_node = max_p_nodes[i];
+        // loop through all points
+        for (int i = 0; i < N; i ++) {
+            
+            P.col(i).maxCoeff(&max_p_nodes[i]);
+            int max_p_node = max_p_nodes[i];
 
-                int potential_2nd_max_p_node_1 = max_p_node - 1;
-                if (potential_2nd_max_p_node_1 == -1) {
-                    potential_2nd_max_p_node_1 = 2;
-                }
-
-                int potential_2nd_max_p_node_2 = max_p_node + 1;
-                if (potential_2nd_max_p_node_2 == M) {
-                    potential_2nd_max_p_node_2 = M - 3;
-                }
-
-                int next_max_p_node;
-                if (pt2pt_dis(Y.row(potential_2nd_max_p_node_1), X.row(i)) < pt2pt_dis(Y.row(potential_2nd_max_p_node_2), X.row(i))) {
-                    next_max_p_node = potential_2nd_max_p_node_1;
-                } 
-                else {
-                    next_max_p_node = potential_2nd_max_p_node_2;
-                }
-
-                // fill the current column of pts_dis_sq_geodesic
-                pts_dis_sq_geodesic(max_p_node, i) = pt2pt_dis_sq(Y.row(max_p_node), X.row(i));
-                pts_dis_sq_geodesic(next_max_p_node, i) = pt2pt_dis_sq(Y.row(next_max_p_node), X.row(i));
-
-                if (max_p_node < next_max_p_node) {
-                    for (int j = 0; j < max_p_node; j ++) {
-                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
-                    }
-                    for (int j = next_max_p_node; j < M; j ++) {
-                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
-                    }
-                }
-                else {
-                    for (int j = 0; j < next_max_p_node; j ++) {
-                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
-                    }
-                    for (int j = max_p_node; j < M; j ++) {
-                        pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
-                    }
-                }
+            int potential_2nd_max_p_node_1 = max_p_node - 1;
+            if (potential_2nd_max_p_node_1 == -1) {
+                potential_2nd_max_p_node_1 = 2;
             }
 
-            // update P
-            P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
-            // P = P.array().rowwise() / (P.colwise().sum().array() + c);
+            int potential_2nd_max_p_node_2 = max_p_node + 1;
+            if (potential_2nd_max_p_node_2 == M) {
+                potential_2nd_max_p_node_2 = M - 3;
+            }
+
+            int next_max_p_node;
+            if (pt2pt_dis(Y.row(potential_2nd_max_p_node_1), X.row(i)) < pt2pt_dis(Y.row(potential_2nd_max_p_node_2), X.row(i))) {
+                next_max_p_node = potential_2nd_max_p_node_1;
+            } 
+            else {
+                next_max_p_node = potential_2nd_max_p_node_2;
+            }
+
+            // fill the current column of pts_dis_sq_geodesic
+            pts_dis_sq_geodesic(max_p_node, i) = pt2pt_dis_sq(Y.row(max_p_node), X.row(i));
+            pts_dis_sq_geodesic(next_max_p_node, i) = pt2pt_dis_sq(Y.row(next_max_p_node), X.row(i));
+
+            if (max_p_node < next_max_p_node) {
+                for (int j = 0; j < max_p_node; j ++) {
+                    pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                }
+                for (int j = next_max_p_node; j < M; j ++) {
+                    pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                }
+            }
+            else {
+                for (int j = 0; j < next_max_p_node; j ++) {
+                    pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[next_max_p_node]) + pt2pt_dis(Y.row(next_max_p_node), X.row(i)), 2);
+                }
+                for (int j = max_p_node; j < M; j ++) {
+                    pts_dis_sq_geodesic(j, i) = pow(abs(converted_node_coord[j] - converted_node_coord[max_p_node]) + pt2pt_dis(Y.row(max_p_node), X.row(i)), 2);
+                }
+            }
         }
-        else {
-            P = P_stored.replicate(1, 1);
-        }
+
+        // update P
+        P = (-0.5 * pts_dis_sq_geodesic / sigma2).array().exp();
 
         
         // modified membership probability (adapted from cdcpd)
@@ -420,11 +382,8 @@ bool trackdlo::cpd_lle (MatrixXd X,
             P = P.array().rowwise() / (P.colwise().sum().array() + c);
         }
 
-        // test code when not using pvis
-        // P = P.array().rowwise() / (P.colwise().sum().array() + c);
-        // std::cout << P.colwise().sum() << std::endl;
 
-        MatrixXd Pt1 = P.colwise().sum();  // this should have shape (N,) or (1, N)
+        MatrixXd Pt1 = P.colwise().sum();
         MatrixXd P1 = P.rowwise().sum();
         double Np = P1.sum();
         MatrixXd PX = P * X;
@@ -433,7 +392,7 @@ bool trackdlo::cpd_lle (MatrixXd X,
         MatrixXd A_matrix;
         MatrixXd B_matrix;
         if (include_lle) {
-            if (use_ecpd) {
+            if (correspondence_priors.size() != 0) {
                 A_matrix = P1.asDiagonal()*G + lambda*sigma2 * MatrixXd::Identity(M, M) + sigma2*lle_weight * H*G + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal()*Y_0 - sigma2*lle_weight * H*Y_0 + alpha*(Y_extended - Y_0);
             }
@@ -443,7 +402,7 @@ bool trackdlo::cpd_lle (MatrixXd X,
             }
         }
         else {
-            if (use_ecpd) {
+            if (correspondence_priors.size() != 0) {
                 A_matrix = P1.asDiagonal() * G + lambda * sigma2 * MatrixXd::Identity(M, M) + alpha*J*G;
                 B_matrix = PX - P1.asDiagonal() * Y_0 + alpha*(Y_extended - Y_0);
             }
@@ -655,7 +614,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
         int seg_dist_it = 0;
         MatrixXd cur_center = guide_nodes.row(0);
 
-        // basically pure pursuit lol
+        // basically pure pursuit
         while (last_found_index+1 <= consecutive_visible_nodes.size()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
             double look_ahead_dist = fabs(geodesic_coord[seg_dist_it+1] - geodesic_coord[seg_dist_it]);
             bool found_intersection = false;
@@ -730,7 +689,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
         int seg_dist_it = geodesic_coord.size()-1;
         MatrixXd cur_center = guide_nodes.row(guide_nodes.rows()-1);
 
-        // basically pure pursuit lol
+        // basically pure pursuit
         while (last_found_index-1 >= (guide_nodes.rows() - consecutive_visible_nodes.size()) && seg_dist_it-1 >= 0) {
 
             double look_ahead_dist = fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
@@ -808,7 +767,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
         int seg_dist_it = visible_nodes[alignment_node_idx];
         MatrixXd cur_center = guide_nodes.row(alignment_node_idx);
 
-        // basically pure pursuit lol
+        // basically pure pursuit
         while (last_found_index+1 <= alignment_node_idx+consecutive_visible_nodes_2.size()-1 && seg_dist_it+1 <= geodesic_coord.size()-1) {
             double look_ahead_dist = fabs(geodesic_coord[seg_dist_it+1] - geodesic_coord[seg_dist_it]);
             bool found_intersection = false;
@@ -879,7 +838,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
         seg_dist_it = visible_nodes[alignment_node_idx];
         cur_center = guide_nodes.row(alignment_node_idx);
 
-        // basically pure pursuit lol
+        // basically pure pursuit
         while (last_found_index-1 >= alignment_node_idx-consecutive_visible_nodes_1.size() && seg_dist_it-1 >= 0) {
             double look_ahead_dist = fabs(geodesic_coord[seg_dist_it] - geodesic_coord[seg_dist_it-1]);
             bool found_intersection = false;
@@ -938,7 +897,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
     return node_pairs;
 }
 
-void trackdlo::tracking_step (MatrixXd X, 
+void trackdlo::tracking_step (MatrixXd X_orig, 
                               std::vector<int> visible_nodes, 
                               std::vector<int> visible_nodes_extended, 
                               MatrixXd proj_matrix, 
@@ -964,8 +923,8 @@ void trackdlo::tracking_step (MatrixXd X,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 3, 1, lle_weight_, mu_, 50, tol_, true, true, true, false, {}, 0, 1);
-    // cpd_lle(X, guide_nodes_, sigma2_pre_proc, 1, 1, 1, mu_, 50, tol_, true, true, true);
+    // pre-processing registration
+    cpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, beta_pre_proc_, lambda_pre_proc_, lle_weight_, mu_, max_iter_, tol_, true);
 
     if (visible_nodes_extended.size() == Y_.rows()) {
         if (visible_nodes.size() == visible_nodes_extended.size()) {
@@ -975,11 +934,9 @@ void trackdlo::tracking_step (MatrixXd X,
             ROS_INFO("Minor occlusion");
         }
 
-        // get priors vec
+        // remap visible node locations
         std::vector<MatrixXd> priors_vec_1 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes_extended, 0);
         std::vector<MatrixXd> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes_extended, 1);
-        // std::vector<MatrixXd> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-        // std::vector<MatrixXd> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
         // priors vec 2 goes from last index -> first index
         std::reverse(priors_vec_2.begin(), priors_vec_2.end());
@@ -1038,5 +995,5 @@ void trackdlo::tracking_step (MatrixXd X,
     }
 
     // include_lle == false because we have no space to discuss it in the paper
-    cpd_lle (X, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, include_lle_, use_geodesic_, use_prev_sigma2_, true, correspondence_priors_, alpha_, kernel_, visible_nodes_extended, k_vis_, visibility_threshold_);
+    cpd_lle (X_orig, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, false, correspondence_priors_, alpha_, visible_nodes_extended, k_vis_, visibility_threshold_);
 }

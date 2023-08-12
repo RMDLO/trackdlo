@@ -26,24 +26,20 @@ Mat occlusion_mask;
 bool updated_opencv_mask = false;
 MatrixXd proj_matrix(3, 4);
 
-double total_len = 0;
-
 bool multi_color_dlo;
-bool gltp;
 double visibility_threshold;
 int dlo_pixel_width;
 double beta;
+double beta_pre_proc;
 double lambda;
+double lambda_pre_proc;
 double alpha;
 double lle_weight;
 double mu;
 int max_iter;
 double tol;
 double k_vis;
-bool include_lle;
-bool use_geodesic;
-bool use_prev_sigma2;
-int kernel;
+double d_vis;
 double downsample_leaf_size;
 
 std::string camera_info_topic;
@@ -132,7 +128,7 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
     
     if (!initialized) {
         if (received_init_nodes && received_proj_matrix) {
-            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, lle_weight, k_vis, mu, max_iter, tol, include_lle, use_geodesic, use_prev_sigma2, kernel);
+            tracker = trackdlo(init_nodes.rows(), visibility_threshold, beta, lambda, alpha, k_vis, mu, max_iter, tol, beta_pre_proc, lambda_pre_proc, lle_weight);
 
             sigma2 = 0.001;
 
@@ -260,8 +256,6 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // for each point in X, determine its shortest distance to Y
         std::map<int, double> shortest_node_pt_dists;
         std::vector<double> shortest_pt_node_dists(X.rows(), 100000.0);
-        MatrixXd X_temp = MatrixXd::Zero(X.rows(), 3);
-        int valid_pt_counter = 0;
         for (int m = 0; m < Y.rows(); m ++) {
             int closest_pt_idx = 0;
             double shortest_dist = 100000;
@@ -278,23 +272,9 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
                 if (dist < shortest_pt_node_dists[n]) {
                     shortest_pt_node_dists[n] = dist;
                 }
-                // count valid point in the last iteration
-                if (m == Y.rows()-1) {
-                    // assumption: DLO movement between frames is small
-                    // get rid of points too far away from the node point set Y^{t-1}
-                    // this is necessary because exp(-dist/sigma2) can become too small to represent in MatrixXd
-                    // if a point x_n in X is too far away from all nodes, all entries in row n of P will be zero,
-                    // even if they technically aren't all zeros
-                    if (shortest_pt_node_dists[n] < 0.05) {
-                        X_temp.row(valid_pt_counter) = X.row(n);
-                        valid_pt_counter += 1;
-                    }
-                }
             }
             shortest_node_pt_dists.insert(std::pair<int, double>(m, shortest_dist));
         }
-
-        MatrixXd X_pruned = X_temp.topRows(valid_pt_counter);
 
         // for current nodes and edges in Y, sort them based on how far away they are from the camera
         std::vector<double> averaged_node_camera_dists = {};
@@ -355,14 +335,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
             }
 
             // add edges for checking overlap with upcoming nodes
-            cv::line(projected_edges, cv::Point(col_1, row_1), cv::Point(col_2, row_2), cv::Scalar(255, 255, 255), dlo_pixel_width);
-        }
-
-        // obtain self-occluded nodes
-        for (int i = 0; i < Y.rows(); i ++) {
-            if (std::find(not_self_occluded_nodes.begin(), not_self_occluded_nodes.end(), i) == not_self_occluded_nodes.end()) {
-                self_occluded_nodes.push_back(i);
-            }
+            double x1 = col_1;
+            double y1 = row_1;
+            double x2 = col_2;
+            double y2 = row_2;
+            cv::line(projected_edges, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 255, 255), dlo_pixel_width);
         }
 
         // sort visible nodes to preserve the original connectivity
@@ -373,8 +350,8 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         std::vector<int> visible_nodes_extended = {};
         for (int i = 0; i < visible_nodes.size()-1; i ++) {
             visible_nodes_extended.push_back(visible_nodes[i]);
-            // extend two nodes
-            if (visible_nodes[i+1] - visible_nodes[i] <= 3) {
+            // extend visible nodes
+            if (fabs(converted_node_coord[visible_nodes[i+1]] - converted_node_coord[visible_nodes[i]]) <= d_vis) {
                 for (int j = 1; j < visible_nodes[i+1] - visible_nodes[i]; j ++) {
                     visible_nodes_extended.push_back(visible_nodes[i] + j);
                 }
@@ -385,15 +362,11 @@ sensor_msgs::ImagePtr Callback(const sensor_msgs::ImageConstPtr& image_msg, cons
         // store Y_0 for post processing
         MatrixXd Y_0 = Y.replicate(1, 1);
         
-        if (!gltp) {
-            tracker.tracking_step(X_pruned, visible_nodes, visible_nodes_extended, proj_matrix, mask.rows, mask.cols);
-            Y = tracker.get_tracking_result();
-            guide_nodes = tracker.get_guide_nodes();
-            priors = tracker.get_correspondence_pairs();
-        }
-        else {
-            tracker.cpd_lle(X_pruned, Y, sigma2, 1, 1, 1, mu, 50, tol, true, false, true);
-        }
+        // step tracker
+        tracker.tracking_step(X, visible_nodes, visible_nodes_extended, proj_matrix, mask.rows, mask.cols);
+        Y = tracker.get_tracking_result();
+        guide_nodes = tracker.get_guide_nodes();
+        priors = tracker.get_correspondence_pairs();
 
         // log time
         time_diff = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - cur_time).count() / 1000.0;
@@ -566,20 +539,18 @@ int main(int argc, char **argv) {
     nh.getParam("/trackdlo/beta", beta); 
     nh.getParam("/trackdlo/lambda", lambda); 
     nh.getParam("/trackdlo/alpha", alpha); 
-    nh.getParam("/trackdlo/lle_weight", lle_weight); 
     nh.getParam("/trackdlo/mu", mu); 
     nh.getParam("/trackdlo/max_iter", max_iter); 
     nh.getParam("/trackdlo/tol", tol);
     nh.getParam("/trackdlo/k_vis", k_vis);
-    nh.getParam("/trackdlo/include_lle", include_lle); 
-    nh.getParam("/trackdlo/use_geodesic", use_geodesic); 
-    nh.getParam("/trackdlo/use_prev_sigma2", use_prev_sigma2); 
-    nh.getParam("/trackdlo/kernel", kernel); 
-
-    nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
-    nh.getParam("/trackdlo/gltp", gltp);
+    nh.getParam("/trackdlo/d_vis", d_vis);
     nh.getParam("/trackdlo/visibility_threshold", visibility_threshold);
     nh.getParam("/trackdlo/dlo_pixel_width", dlo_pixel_width);
+    nh.getParam("/trackdlo/beta_pre_proc", beta_pre_proc); 
+    nh.getParam("/trackdlo/lambda_pre_proc", lambda_pre_proc);
+    nh.getParam("/trackdlo/lle_weight", lle_weight); 
+
+    nh.getParam("/trackdlo/multi_color_dlo", multi_color_dlo);
     nh.getParam("/trackdlo/downsample_leaf_size", downsample_leaf_size);
 
     nh.getParam("/trackdlo/camera_info_topic", camera_info_topic);
