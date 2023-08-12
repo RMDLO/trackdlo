@@ -66,6 +66,8 @@ class trackdlo
                 double mu,
                 int max_iter,
                 double tol,
+                double beta_pre_proc,
+                double lambda_pre_proc,
                 double lle_weight);
 
         double get_sigma2();
@@ -76,7 +78,7 @@ class trackdlo
         void initialize_nodes (MatrixXd Y_init);
         void set_sigma2 (double sigma2);
 
-        bool cpd_lle (MatrixXd X,
+        bool cpd_lle (MatrixXd X_orig,
                       MatrixXd& Y,
                       double& sigma2,
                       double beta,
@@ -84,7 +86,7 @@ class trackdlo
                       double lle_weight,
                       double mu,
                       int max_iter = 30,
-                      double tol = 0.00001,
+                      double tol = 0.0001,
                       bool include_lle = true,
                       std::vector<MatrixXd> correspondence_priors = {},
                       double alpha = 0,
@@ -92,7 +94,7 @@ class trackdlo
                       double k_vis = 0,
                       double visibility_threshold = 0.01);
 
-        void tracking_step (MatrixXd X, 
+        void tracking_step (MatrixXd X_orig, 
                             std::vector<int> visible_nodes, 
                             std::vector<int> visible_nodes_extended, 
                             MatrixXd proj_matrix, 
@@ -104,7 +106,9 @@ class trackdlo
         MatrixXd guide_nodes_;
         double sigma2_;
         double beta_;
+        double beta_pre_proc_;
         double lambda_;
+        double lambda_pre_proc_;
         double alpha_;
         double k_vis_;
         double mu_;

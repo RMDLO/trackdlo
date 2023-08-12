@@ -12,8 +12,10 @@ trackdlo::trackdlo(int num_of_nodes) {
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
-    beta_ = 1.0;
+    beta_ = 5.0;
+    beta_pre_proc_ = 3.0;
     lambda_ = 1.0;
+    lambda_pre_proc_ = 1.0;
     alpha_ = 0.0;
     lle_weight_ = 1.0;
     k_vis_ = 0.0;
@@ -34,6 +36,8 @@ trackdlo::trackdlo(int num_of_nodes,
                     double mu,
                     int max_iter,
                     double tol,
+                    double beta_pre_proc,
+                    double lambda_pre_proc,
                     double lle_weight) 
 {
     Y_ = MatrixXd::Zero(num_of_nodes, 3);
@@ -41,7 +45,9 @@ trackdlo::trackdlo(int num_of_nodes,
     guide_nodes_ = Y_.replicate(1, 1);
     sigma2_ = 0.0;
     beta_ = beta;
+    beta_pre_proc_ = beta_pre_proc;
     lambda_ = lambda;
+    lambda_pre_proc_ = lambda_pre_proc;
     alpha_ = alpha;
     lle_weight_ = lle_weight;
     k_vis_ = k_vis;
@@ -152,7 +158,7 @@ MatrixXd trackdlo::calc_LLE_weights (int k, MatrixXd X) {
     return W;
 }
 
-bool trackdlo::cpd_lle (MatrixXd X,
+bool trackdlo::cpd_lle (MatrixXd X_orig,
                         MatrixXd& Y,
                         double& sigma2,
                         double beta,
@@ -168,6 +174,25 @@ bool trackdlo::cpd_lle (MatrixXd X,
                         double k_vis,
                         double visibility_threshold) 
 {
+    // prune X
+    MatrixXd X_temp = MatrixXd::Zero(X_orig.rows(), 3);
+    int valid_pt_counter = 0;
+    for (int i = 0; i < X_orig.rows(); i ++) {
+        // find shortest distance between this point and any node
+        double shortest_dist = 100000;
+        for (int j = 0; j < Y.rows(); j ++) {
+            double dist = (Y.row(j) - X_orig.row(i)).norm();
+            if (dist < shortest_dist) {
+                shortest_dist = dist;
+            }
+        }
+        // require a point to be sufficiently close to the node set to be valid
+        if (shortest_dist < 0.1) {
+            X_temp.row(valid_pt_counter) = X_orig.row(i);
+            valid_pt_counter += 1;
+        }
+    }
+    MatrixXd X = X_temp.topRows(valid_pt_counter);
 
     bool converged = true;
 
@@ -872,7 +897,7 @@ std::vector<MatrixXd> trackdlo::traverse_euclidean (std::vector<double> geodesic
     return node_pairs;
 }
 
-void trackdlo::tracking_step (MatrixXd X, 
+void trackdlo::tracking_step (MatrixXd X_orig, 
                               std::vector<int> visible_nodes, 
                               std::vector<int> visible_nodes_extended, 
                               MatrixXd proj_matrix, 
@@ -898,7 +923,8 @@ void trackdlo::tracking_step (MatrixXd X,
     // determine DLO state: heading visible, tail visible, both visible, or both occluded
     // priors_vec should be the final output; priors_vec[i] = {index, x, y, z}
     double sigma2_pre_proc = sigma2_;
-    cpd_lle(X, guide_nodes_, sigma2_pre_proc, 3, 1, lle_weight_, mu_, 50, tol_, true);
+    // pre-processing registration
+    cpd_lle(X_orig, guide_nodes_, sigma2_pre_proc, beta_pre_proc_, lambda_pre_proc_, lle_weight_, mu_, max_iter_, tol_, true);
 
     if (visible_nodes_extended.size() == Y_.rows()) {
         if (visible_nodes.size() == visible_nodes_extended.size()) {
@@ -908,11 +934,9 @@ void trackdlo::tracking_step (MatrixXd X,
             ROS_INFO("Minor occlusion");
         }
 
-        // get priors vec
+        // remap visible node locations
         std::vector<MatrixXd> priors_vec_1 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes_extended, 0);
         std::vector<MatrixXd> priors_vec_2 = traverse_euclidean(geodesic_coord_, guide_nodes_, visible_nodes_extended, 1);
-        // std::vector<MatrixXd> priors_vec_1 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 0);
-        // std::vector<MatrixXd> priors_vec_2 = traverse_geodesic(geodesic_coord, guide_nodes, visible_nodes, 1);
 
         // priors vec 2 goes from last index -> first index
         std::reverse(priors_vec_2.begin(), priors_vec_2.end());
@@ -971,5 +995,5 @@ void trackdlo::tracking_step (MatrixXd X,
     }
 
     // include_lle == false because we have no space to discuss it in the paper
-    cpd_lle (X, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, false, correspondence_priors_, alpha_, visible_nodes_extended, k_vis_, visibility_threshold_);
+    cpd_lle (X_orig, Y_, sigma2_, beta_, lambda_, lle_weight_, mu_, max_iter_, tol_, false, correspondence_priors_, alpha_, visible_nodes_extended, k_vis_, visibility_threshold_);
 }

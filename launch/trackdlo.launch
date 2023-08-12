@@ -42,13 +42,22 @@
         <!-- k_vis: the strength of visibility information's effect on membership probability computation -->
         <param name="k_vis" value="50" />
 
-        <!-- note that LLE is only used in the registration in the distance preservation step -->
+        <!-- d_vis: the max geodesic distance between two adjacent visible nodes for the nodes between them to be considered visible -->
+        <param name="d_vis" value="0.06" />
+
+        <!-- visibility_threshold (tau_vis): the max distance a node can be away from the current point cloud to be considered visible -->
+        <param name="visibility_threshold" type="double" value="0.008" />
+
+        <!-- dlo_pixel_width (w): the approximate dlo width when projected onto 2D -->
+        <param name="dlo_pixel_width" value="40" />
+
+        <!-- below are parameters for the GLTP registration during pre-processing -->
+        <param name="beta_pre_proc" value="3.0" />
+        <param name="lambda_pre_proc" value="1.0" />
         <param name="lle_weight" value="10.0" />
 
         <param name="downsample_leaf_size" value="0.008" />
         <param name="multi_color_dlo" type="bool" value="$(arg multi_color_dlo)" />
-        <param name="visibility_threshold" type="double" value="0.008" />
-        <param name="dlo_pixel_width" value="40" />
     </node>
 
     <!-- launch python node for initialization -->
