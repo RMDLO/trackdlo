@@ -1,5 +1,5 @@
-<p align="left">
-  <img src="images/trackdlo.png" width="250" title="TrackDLO">
+<p align="center">
+  <img src="images/trackdlo.png" width="450" title="TrackDLO">
 </p>
 
 ## TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence
@@ -16,23 +16,24 @@ This repository contains the TrackDLO Robot Operating System (ROS) package. The 
 
 ## Get Started
 
-See the [requirements and run instructions](https://github.com/RMDLO/trackdlo/blob/master/docs/RUN.md) to learn how to use TrackDLO.
+The [requirements and run instructions](https://github.com/RMDLO/trackdlo/blob/master/docs/RUN.md) page provides information on package installation and usage.
 
 ## Learn More
 
-To learn more about TrackDLO, watch our [supplementary video](https://www.youtube.com/watch?v=MxqNJsen5eg&t) and read our [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md).
+The [supplementary video](https://www.youtube.com/watch?v=MxqNJsen5eg&t) showcases experiments and failure cases. The [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md) contains details about the initialization process and parameter tuning.
 
 ## Bibtex
 
 ```bash
-@ARTICLE{10214157,
+@ARTICLE{
+  xiang2023trackdlo,
   author={Xiang, Jingyi and Dinkel, Holly and Zhao, Harry and Gao, Naixiang and Coltin, Brian and Smith, Trey and Bretl, Timothy},
   journal={IEEE Robotics and Automation Letters}, 
-  title={TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence}, 
+  title={TrackDLO: Tracking Deformable Linear Objects Under Occlusion With Motion Coherence}, 
   year={2023},
-  volume={},
-  number={},
-  pages={1-8},
+  volume={8},
+  number={10},
+  pages={6179-6186},
   doi={10.1109/LRA.2023.3303710}
 }
 ```
