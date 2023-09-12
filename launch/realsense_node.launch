@@ -14,7 +14,11 @@
     <arg name="ordered_pc" value="true" />
   </include>
 
-  <node name="realsense_tf" pkg="trackdlo" type="pub_camera_tf.py"/>
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_camera_color_optical_frame_tf" args="0.5308947503950723 0.030109485611943067 0.5874 -0.7071068 0.7071068 0 0 base_link camera_color_optical_frame 10" />
+  <node pkg="tf" type="static_transform_publisher" name="camera_color_optical_frame_to_camera_color_frame_tf" args="0 0 0 0.5 -0.5 0.5 0.5 camera_color_optical_frame camera_color_frame 10" />
+  <node pkg="tf" type="static_transform_publisher" name="camera_color_frame_to_camera_link_tf" args="-0.000351057737134 -0.0148385819048 -0.000117231989861 0.00429561594501 0.000667857821099 -0.00226634810679 0.999987959862 camera_color_optical_frame camera_color_frame 10" />
+  <node pkg="tf" type="static_transform_publisher" name="camera_link_to_camera_depth_frame_tf" args="0 0 0 0 0.0 0.0 1.0 camera_color_optical_frame camera_color_frame 10" />
+  <node pkg="tf" type="static_transform_publisher" name="camera_depth_frame_to_camera_depth_optical_frame_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 camera_depth_frame camera_depth_optical_frame 10" />
 
   <!-- tracking rviz file -->
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find trackdlo)/rviz/tracking.rviz" />
