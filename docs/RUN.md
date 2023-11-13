@@ -9,14 +9,14 @@ Installation and execution of TrackDLO was verified with the below dependencies 
 * [ROS Noetic](http://wiki.ros.org/noetic/Installation)
 * [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (Our version: 3.3.7)
 * [Point Cloud Library](https://pointclouds.org/) (Our version: 1.10.0)
-* [OpenCV](https://opencv.org/releases/) (Our version: 4.2.0)
-* [NumPy](https://numpy.org/install/) (Our version: 1.23.3)
-* [SciPy](https://scipy.org/install/) (Our version: 1.9.1)
-* [scikit-image](https://scikit-image.org/) (Our version: 0.18.0)
-* [Pillow](https://pillow.readthedocs.io/en/stable/installation.html) (Our version: 9.2.0)
-* [ROS Numpy](https://pypi.org/project/rosnumpy/) (Our version: 0.0.5)
+* [OpenCV](https://opencv.org/releases/)
+* [NumPy](https://numpy.org/install/)
+* [SciPy](https://scipy.org/install/)
+* [scikit-image](https://scikit-image.org/)
+* [Pillow](https://pillow.readthedocs.io/en/stable/installation.html)
+* [ROS Numpy](https://pypi.org/project/rosnumpy/)
 
-We also provide Docker files for compatibility with other system configurations, refer to [DOCKER.md](https://github.com/RMDLO/trackdlo/blob/master/docs/DOCKER.md) for more information.
+We also provide Docker files for compatibility with other system configurations. Refer to the [DOCKER.md](https://github.com/RMDLO/trackdlo/blob/master/docs/DOCKER.md) for more information on using docker, and see the docker [requirements.txt](https://github.com/RMDLO/trackdlo/blob/master/docker/requirements.txt) file for a list of the tested versions of TrackDLO package dependencies.
 
 ## Other Requirements
 

@@ -1,7 +1,7 @@
-numpy==1.17.4
-scipy==1.5.2
+numpy>=1.22
+scipy>=1.10.0
 opencv_python==4.4.0.44
-Pillow==9.3.0
-rosnumpy==0.0.5.2
-scikit-image==0.21.0
+Pillow>=10.0.1
+rosnumpy
+scikit-image==0.20.0
 pyrealsense2==2.54.1.5217

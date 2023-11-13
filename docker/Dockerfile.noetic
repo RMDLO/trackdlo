@@ -24,6 +24,7 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     git \
     python3-pip \
     python3-catkin-tools \
+    python3-rosbag \
     libeigen3-dev \
     libpcl-dev \
     libopencv-dev \
