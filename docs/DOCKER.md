@@ -8,13 +8,13 @@ The current configuration was tested on an x86 host computer running Ubuntu 20.0
 
 1. **Download TrackDLO**
    ```bash
-   $ git clone https://github.com/RMDLO/trackdlo.git trackdlo
+   git clone https://github.com/RMDLO/trackdlo.git trackdlo
    ```
 
 2. **Build the Docker Image**
    ```bash
-   $ cd trackdlo/docker
-   $ docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
+   cd trackdlo/docker
+   docker build -t rmdlo-trackdlo:noetic -f Dockerfile.noetic ..
    ```
 
 This will take several minutes and require connection to the internet. This command will install all dependencies and build the TrackDLO ROS workspace within the image.
@@ -24,7 +24,7 @@ This will take several minutes and require connection to the internet. This comm
 
 4. **Run the Container**
    ```
-   $ ./run_docker.sh [name] [host dir] [container dir]
+   ./run_docker.sh [name] [host dir] [container dir]
    ```
    Optional Parameters:
    - `name` specifies the name of the image. By default, it is `trackdlo`. Multiple containers can be created from the same image by changing this parameter.

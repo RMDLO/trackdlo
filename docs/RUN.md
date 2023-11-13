@@ -34,15 +34,15 @@ The repository is organized into the following directories:
   └── utils/      # contains scripts used for testing and evaluation
 ```
 
-First, clone the repository into a ROS workspace and build the package:
+First, [create a ROS workspace](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). Next, `cd YOUR_ROS_WORKSPACE/src`. Clone the TrackDLO repository into this workspace and build the package:
 
 ```bash
-$ cd YOUR_ROS_WORKSPACE/src
-$ git clone https://github.com/RMDLO/trackdlo.git
-$ catkin build trackdlo
+git clone https://github.com/RMDLO/trackdlo.git
+catkin build trackdlo
+source ../devel/setup.bash
 ```
 
-All configurable parameters for the TrackDLO algorithm are in `launch/trackdlo.launch`. Rebuilding the package is not required for any parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files.
+All configurable parameters for the TrackDLO algorithm are in [`launch/trackdlo.launch`](https://github.com/RMDLO/trackdlo/blob/master/launch/trackdlo.launch). Rebuilding the package is not required for any parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files.
 
 ## Usage
 
@@ -60,15 +60,15 @@ Other useful parameters:
 * `result_frame_id`: the tf frame the tracking results (point cloud and marker array) will be published to
 * `visualize_initialization_process`: if set to `true`, OpenCV windows will appear to visualize the results of each step in initialization. This is helpful for debugging in the event of initialization failures.
 
-Once all parameters in `trackdlo.launch` are set to proper values, run TrackDLO with the following steps:
+Once all parameters in `launch/trackdlo.launch` are set to proper values, run TrackDLO with the following steps:
 1. Launch the RGB-D camera node
 2. Launch RViz to visualize all published topics: 
 ```bash
-$ roslaunch trackdlo visualize_output.launch
+roslaunch trackdlo visualize_output.launch
 ```
 3. Launch the TrackDLO node to publish tracking results:
 ```bash
-$ roslaunch trackdlo trackdlo.launch
+roslaunch trackdlo trackdlo.launch
 ```
 
 The TrackDLO node outputs the following:
@@ -84,22 +84,22 @@ roslaunch trackdlo realsense_node.launch
 ```
 2. Launch the TrackDLO tracking node and publish messages containing the estimated node positions defining the object shape with
 ```bash
-$ roslaunch trackdlo trackdlo.launch
+roslaunch trackdlo trackdlo.launch
 ```
 
 ## Run TrackDLO with Recorded ROS Bag Data:
 1. Download the experiment data from [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). After unzipping, place the `.bag` files in your ROS workspace. Note: the files are quite large! After unzipping, the bag files will take up around 120 GB of space in total.
 2. Open a new terminal and run 
 ```bash
-$ roslaunch trackdlo visualize_output.launch
+roslaunch trackdlo visualize_output.launch
 ```
 3. In another terminal, run the below command to start the tracking algorithm:
 ```bash
-$ roslaunch trackdlo trackdlo.launch
+roslaunch trackdlo trackdlo.launch
 ```
 4. Open a third ternimal and run the below command to replay the `.bag` file and publish its topics:
 ```bash
-$ rosbag play <name_of_the_bag_file>.bag
+rosbag play <name_of_the_bag_file>.bag
 ```
 
 ## Data:
