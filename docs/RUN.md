@@ -16,13 +16,11 @@ Installation and execution of TrackDLO was verified with the below dependencies 
 * [Pillow](https://pillow.readthedocs.io/en/stable/installation.html) (Our version: 9.2.0)
 * [ROS Numpy](https://pypi.org/project/rosnumpy/) (Our version: 0.0.5)
 
-We also provide Docker files for compatibility with other system configurations, refer to the ![DOCKER.md](https://github.com/RMDLO/trackdlo/blob/master/docs/DOCKER.md) for more information.
+We also provide Docker files for compatibility with other system configurations, refer to [DOCKER.md](https://github.com/RMDLO/trackdlo/blob/master/docs/DOCKER.md) for more information.
 
 ## Other Requirements
 
-We used an Intel RealSense d435 camera in all of the experiments performed in our paper. 
-
-* [librealsense](https://github.com/IntelRealSense/librealsense) and [realsense-ros](https://github.com/IntelRealSense/realsense-ros/tree/ros1-legacy) (for testing with the RealSense D435 camera and the corresponding camera configuration file we provided)
+We used an Intel RealSense d435 camera in all of the experiments performed in our paper. We used the [librealsense](https://github.com/IntelRealSense/librealsense) and [realsense-ros](https://github.com/IntelRealSense/realsense-ros/tree/ros1-legacy) packages for testing with the RealSense D435 camera and for obtaining the [camera configuration file](https://github.com/RMDLO/trackdlo/blob/master/config/preset_decimation_4.0_depth_step_100.json).
 
 ## Installation
 
@@ -55,9 +53,7 @@ To run TrackDLO, the three ROS topic names below should be modified in `launch/t
 
 **Note: TrackDLO assumes the RGB image and its corresponding depth image are ALIGNED and SYNCHRONIZED. This means depth_image(i, j) should contain the depth value of pixel rgb_image(i, j) and the two images should be published with the same ROS timestamp.**
 
-TrackDLO uses color thresholding to obtain the DLO segmentation mask. Below are two different ways to set the color thresholding parameters:
-* If the DLO of interest only has one color: you can use the parameters `hsv_threshold_upper/lower_limit` and set their values with format `h_value s_value v_value` (`h_value<space>s_value<space>v_value`).
-* If the DLO of interest has multiple colors: set `multi_color_dlo` to `true` in `launch/trackdlo.launch`, then you can modify the function `color_thresholding` in `trackdlo/src/initialize.py` and `trackdlo/src/trackdlo_node.cpp` to customize the DLO segmentation process.
+TrackDLO uses color thresholding in Hue, Saturation, and Value (HSV) color space to obtain the DLO segmentation mask. A tutorial on how to obtain the HSV limits is provided in [`COLOR_THRESHOLD.md`](https://github.com/RMDLO/trackdlo/blob/master/docs/COLOR_THRESHOLD.md)
 
 Other useful parameters:
 * `num_of_nodes`: the number of nodes initialized for the DLO
