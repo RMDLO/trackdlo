@@ -2,6 +2,12 @@
   <img src="images/trackdlo.png" width="450" title="TrackDLO">
 </p>
 
+<p>
+  <a href="https://github.com/RMDLO/trackdlo/actions/workflows/build.yml?query=branch%3Amaster" alt="GitHub Actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/RMDLO/trackdlo/build.yml?branch=master">
+  </a>
+</p>
+
 ## TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence
 **IEEE Robotics and Automation Letters (IEEE Xplore: https://ieeexplore.ieee.org/document/10214157)**
 
