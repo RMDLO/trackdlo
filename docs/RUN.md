@@ -88,7 +88,7 @@ roslaunch trackdlo trackdlo.launch
 ```
 
 ## Run TrackDLO with Recorded ROS Bag Data:
-1. Download the experiment data from [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). After unzipping, place the `.bag` files in your ROS workspace. Note: the files are quite large! After unzipping, the bag files will require 120 GB of space in total.
+1. Download one of the provided rosbag experiment `.bag` files [here](https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing). Note: the file sizes are large--each will require 5-10GB of storage!
 2. Open a new terminal and run 
 ```bash
 roslaunch trackdlo visualize_output.launch bag:=True
@@ -103,7 +103,7 @@ roslaunch trackdlo trackdlo.launch
 ```
 4. Open a third ternimal and run the below command to replay the `.bag` file and publish its topics:
 ```bash
-rosbag play --clock <name_of_the_bag_file>.bag
+rosbag play --clock /path/to/filename.bag
 ```
 Occlusion can also be injected using our provided `simulate_occlusion_eval.py` script. Run the below command and draw bounding rectangles for the occlusion mask in the graphical user interface that appears:
 ```bash
