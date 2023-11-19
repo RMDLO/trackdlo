@@ -34,7 +34,7 @@ The repository is organized into the following directories:
   └── utils/      # contains scripts used for testing and evaluation
 ```
 
-First, [create a ROS workspace](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). Next, `cd YOUR_ROS_WORKSPACE/src`. Clone the TrackDLO repository into this workspace and build the package:
+First, [create a ROS workspace](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). Next, `cd YOUR_TRACKING_ROS_WORKSPACE/src`. Clone the TrackDLO repository into this workspace and build the package:
 
 ```bash
 git clone https://github.com/RMDLO/trackdlo.git
@@ -42,7 +42,7 @@ catkin build trackdlo
 source ../devel/setup.bash
 ```
 
-All configurable parameters for the TrackDLO algorithm are in [`launch/trackdlo.launch`](https://github.com/RMDLO/trackdlo/blob/master/launch/trackdlo.launch). Rebuilding the package is not required for any parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files.
+All configurable parameters for the TrackDLO algorithm are in [`launch/trackdlo.launch`](https://github.com/RMDLO/trackdlo/blob/master/launch/trackdlo.launch). Rebuilding the package is not required for any parameter modifications to take effect. However, `catkin build` is required after modifying any C++ files. Remember that `source <YOUR_TRACKING_ROS_WS>/devel/setup.bash` is required in every terminal running TrackDLO ROS nodes.
 
 ## Usage
 
@@ -88,18 +88,26 @@ roslaunch trackdlo trackdlo.launch
 ```
 
 ## Run TrackDLO with Recorded ROS Bag Data:
-1. Download the experiment data from [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). After unzipping, place the `.bag` files in your ROS workspace. Note: the files are quite large! After unzipping, the bag files will take up around 120 GB of space in total.
+1. Download the experiment data from [here](https://drive.google.com/file/d/1C7uM515fHXnbsEyx5X38xZUXzBI99mxg/view?usp=drive_link). After unzipping, place the `.bag` files in your ROS workspace. Note: the files are quite large! After unzipping, the bag files will require 120 GB of space in total.
 2. Open a new terminal and run 
 ```bash
-roslaunch trackdlo visualize_output.launch
+roslaunch trackdlo visualize_output.launch bag:=True
 ```
-3. In another terminal, run the below command to start the tracking algorithm:
+3. In another terminal, run the below command to start the tracking algorithm with parameters for the `stationary.bag`, `perpendicular_motion.bag`, and `parallel_motion.bag` files used for quantitative evaluation in the TrackDLO paper.
+```bash
+roslaunch trackdlo trackdlo_eval.launch
+```
+If testing any of the other provided `.bag` files, run the below command:
 ```bash
 roslaunch trackdlo trackdlo.launch
 ```
 4. Open a third ternimal and run the below command to replay the `.bag` file and publish its topics:
 ```bash
-rosbag play <name_of_the_bag_file>.bag
+rosbag play --clock <name_of_the_bag_file>.bag
+```
+Occlusion can also be injected using our provided `simulate_occlusion_eval.py` script. Run the below command and draw bounding rectangles for the occlusion mask in the graphical user interface that appears:
+```bash
+rosrun trackdlo simulate_occlusion_eval.py
 ```
 
 ## Data:
@@ -115,5 +123,5 @@ The ROS bag files used in our paper and the supplementary video can be found [he
 
 ### Notes on Running the Bag Files
 
-* The rope and the rubber tubing require different hsv thresholding values. Both of them have hsv upper limit of `130 255 255`, however the rope has hsv lower limit `90 90 30` and the tubing has hsv lower limit `100 200 60`.
-* For bag files in `rope/`, `rubber_tubing/`, and `failure_cases/`, the camera info is published under topic `/camera/aligned_depth_to_color/camera_info`. For bag files in `quantitative_eval/`, the camera info is published under `/camera/color/camera_info`.
+* The rope and the rubber tubing require different hsv thresholding values. Both of these objects use the `hsv_threshold_upper_limit` default value = `130 255 255` however the rope uses the `hsv_threshold_lower_limit` default value = `90 90 30` and the rubber tubing uses the `hsv_threshold_upper_limit` default value = `100 200 60`.
+* For `.bag` files in `rope/`, `rubber_tubing/`, and `failure_cases/`, the `camera_info_topic` is published under `/camera/aligned_depth_to_color/camera_info`. For `.bag` files in `quantitative_eval/`, the `camera_info_topic` is published under `/camera/color/camera_info`. 

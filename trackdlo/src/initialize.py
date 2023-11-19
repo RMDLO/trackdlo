@@ -45,7 +45,7 @@ def color_thresholding (hsv_image, cur_depth):
     mask = cv2.bitwise_or(mask_marker.copy(), mask_dlo.copy())
 
     # filter mask base on depth values
-    mask[cur_depth < 0.58*1000] = 0
+    mask[cur_depth < 0.59*1000] = 0
 
     return mask
 
@@ -100,7 +100,7 @@ def callback (rgb, depth):
     extracted_chains_3d = extracted_chains_3d[((extracted_chains_3d[:, 0] != 0) | (extracted_chains_3d[:, 1] != 0) | (extracted_chains_3d[:, 2] != 0))]
 
     if multi_color_dlo:
-        depth_threshold = 0.58  # m
+        depth_threshold = 0.59  # m
         extracted_chains_3d = extracted_chains_3d[extracted_chains_3d[:, 2] > depth_threshold]
 
     # tck, u = interpolate.splprep(extracted_chains_3d.T, s=0.001)

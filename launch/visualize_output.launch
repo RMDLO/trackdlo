@@ -1,12 +1,16 @@
 <launch>
   <arg name="eval" default="false"/>
+  <arg name="bag" default="false"/>
 
-  <!-- Publish camera tfs if using the example .bag files-->
-  <node pkg="tf" type="static_transform_publisher" name="base_link_to_camera_color_optical_frame_tf" args="0.5308947503950723 0.030109485611943067 0.5874 -0.7071068 0.7071068 0 0 base_link camera_color_optical_frame 10" />
-  <node pkg="tf" type="static_transform_publisher" name="camera_color_optical_frame_to_camera_color_frame_tf" args="0 0 0 0.5 -0.5 0.5 0.5 camera_color_optical_frame camera_color_frame 10" />
-  <node pkg="tf" type="static_transform_publisher" name="camera_color_frame_to_camera_link_tf" args="-0.000351057737134 -0.0148385819048 -0.000117231989861 0.00429561594501 0.000667857821099 -0.00226634810679 0.999987959862 camera_color_optical_frame camera_color_frame 10" />
-  <node pkg="tf" type="static_transform_publisher" name="camera_link_to_camera_depth_frame_tf" args="0 0 0 0 0.0 0.0 1.0 camera_color_optical_frame camera_color_frame 10" />
-  <node pkg="tf" type="static_transform_publisher" name="camera_depth_frame_to_camera_depth_optical_frame_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 camera_depth_frame camera_depth_optical_frame 10" />
+  <group if="$(arg bag)">
+    <param name="use_sim_time" type="bool" value="true" />
+    <!-- Publish camera tfs if using the example .bag files-->
+    <node pkg="tf" type="static_transform_publisher" name="base_link_to_camera_color_optical_frame_tf" args="0.5308947503950723 0.030109485611943067 0.5874 -0.7071068 0.7071068 0 0 base_link camera_color_optical_frame 100" />
+    <node pkg="tf" type="static_transform_publisher" name="camera_color_optical_frame_to_camera_color_frame_tf" args="0 0 0 0.5 -0.5 0.5 0.5 camera_color_optical_frame camera_color_frame 100" />
+    <node pkg="tf" type="static_transform_publisher" name="camera_color_frame_to_camera_link_tf" args="-0.000351057737134 -0.0148385819048 -0.000117231989861 0.00429561594501 0.000667857821099 -0.00226634810679 0.999987959862 camera_color_frame camera_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="camera_link_to_camera_depth_frame_tf" args="0 0 0 0 0.0 0.0 1.0 camera_link camera_depth_frame 100" />
+    <node pkg="tf" type="static_transform_publisher" name="camera_depth_frame_to_camera_depth_optical_frame_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 camera_depth_frame camera_depth_optical_frame 100" />
+  </group>
 
   <!-- <node name="tracking_method_ours" pkg="trackdlo" type="trackdlo_node"/> -->
 
