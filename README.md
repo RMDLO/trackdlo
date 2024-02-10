@@ -26,7 +26,11 @@ The [requirements and run instructions](https://github.com/RMDLO/trackdlo/blob/m
 
 ## Learn More
 
-The [supplementary video](https://www.youtube.com/watch?v=MxqNJsen5eg&t) showcases experiments and failure cases. The [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md) contains details about the initialization process and parameter tuning.
+The [supplementary video](https://www.youtube.com/watch?v=MxqNJsen5eg&t) showcases experiments and failure cases.
+
+[![supplementary video](https://img.youtube.com/vi/MxqNJsen5eg/0.jpg)](https://www.youtube.com/watch?v=MxqNJsen5eg)
+
+The [supplemental documentation](https://github.com/RMDLO/trackdlo/blob/master/docs/LEARN_MORE.md) contains details about the initialization process and parameter tuning.
 
 ## Bibtex
 
