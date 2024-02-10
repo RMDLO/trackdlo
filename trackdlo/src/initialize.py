@@ -84,7 +84,8 @@ def callback (rgb, depth):
         all_pixel_coords = np.flip(all_pixel_coords, 1)
 
         pc_z = cur_depth[tuple(map(tuple, all_pixel_coords.T))] / 1000.0
-        f = proj_matrix[0, 0]
+        fx = proj_matrix[0, 0]
+        fy = proj_matrix[1, 1]
         cx = proj_matrix[0, 2]
         cy = proj_matrix[1, 2]
         pixel_x = all_pixel_coords[:, 1]
@@ -95,8 +96,8 @@ def callback (rgb, depth):
             if pixel_value1 == 255:
                 pixel_x, pixel_y = pixel_x[::-1], pixel_y[::-1]
 
-        pc_x = (pixel_x - cx) * pc_z / f
-        pc_y = (pixel_y - cy) * pc_z / f
+        pc_x = (pixel_x - cx) * pc_z / fx
+        pc_y = (pixel_y - cy) * pc_z / fy
         extracted_chains_3d = np.vstack((pc_x, pc_y))
         extracted_chains_3d = np.vstack((extracted_chains_3d, pc_z))
         extracted_chains_3d = extracted_chains_3d.T
