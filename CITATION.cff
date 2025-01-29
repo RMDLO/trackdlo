@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+authors:
+  - family-names: Xinag
+    given-names: Jingyi
+  - family-names: Dinkel
+    given-names: Holly
+  - family-names: Zhao
+    given-names: Harry
+  - family-names: Gao
+    given-names: Naixiang
+  - family-names: Coltin
+    given-names: Brian
+  - family-names: Smith
+    given-names: Trey
+  - family-names: Bretl
+    given-names: Timothy
+title: "TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence"
+version: 1.0.0
+url: "https://ieeexplore.ieee.org/document/10214157"
+date-released: '2023-08-09'
+preferred-citation:
+  authors:
+  - family-names: Xinag
+    given-names: Jingyi
+  - family-names: Dinkel
+    given-names: Holly
+  - family-names: Zhao
+    given-names: Harry
+  - family-names: Gao
+    given-names: Naixiang
+  - family-names: Coltin
+    given-names: Brian
+  - family-names: Smith
+    given-names: Trey
+  - family-names: Bretl
+    given-names: Timothy
+  title: "TrackDLO: Tracking Deformable Linear Objects Under Occlusion with Motion Coherence"
+  url: "https://ieeexplore.ieee.org/document/10214157"
+  year: 2023
+  collection-title: "IEEE Robotics and Automation Letters"
