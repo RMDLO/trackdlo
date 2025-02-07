@@ -44,17 +44,29 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     ros-noetic-vision-msgs \
     ros-noetic-visualization-msgs \
     ros-noetic-rviz \
+    # Optionall install RealSense2 package
+    ros-noetic-realsense2-camera \
     && apt-get -y autoremove \
     && apt-get clean
 
 # Install required Python components
 RUN python3 -m pip install -r /tmp/requirements.txt
 
-# Source ROS noetic
-RUN . /opt/ros/noetic/setup.sh && \
-    ./tmp/init_workspace.sh
+# Copy and set up the ros_entrypoint.sh
+COPY ./docker/ros_entrypoint.sh /ros_entrypoint.sh
+RUN chmod +x /ros_entrypoint.sh
 
-# Set Display variables
+# Make sure the catkin workspace is initialized
+RUN . /opt/ros/noetic/setup.sh && \
+    /tmp/init_workspace.sh
+
+# Set the entrypoint to ros_entrypoint.sh
+ENTRYPOINT ["/ros_entrypoint.sh"]
+
+# Default command
+CMD ["bash"]
+
+# Set Display variables for GUI applications
 ENV DISPLAY=:0
 ENV TERM=xterm
 # Some QT-Apps do not show controls without this

@@ -30,7 +30,11 @@ This will take several minutes and require connection to the internet. This comm
    - `name` specifies the name of the image. By default, it is `trackdlo`. Multiple containers can be created from the same image by changing this parameter.
    - `host dir` and `container dir` map a directory on the host machine to a location inside the container. This enables sharing code and data between the two systems. By default, the `run_docker.sh` bash script maps the directory containing trackdlo to `/root/tracking_ws/src/trackdlo` in the container.
 
-    Only the first call of this script with a given name will create a container. Subsequent executions will attach to the running container to enable running multiple terminal sessions in a single container.
+    Only the first call of this script with a given name will create a container. Subsequent executions will attach to the running container to enable running multiple terminal sessions in a single container. In subsequent calls, please check that ROS and the built catkin workspace are properly sourced.
+
+    ```
+    source /ros_entrypoint.sh
+    ```
 
    *Note:* Since the Docker container binds directly to the host's network, it will see `roscore` even if running outside the docker container.
 
