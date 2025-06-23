@@ -88,7 +88,7 @@ roslaunch trackdlo trackdlo.launch
 ```
 
 ## Run TrackDLO with Recorded ROS Bag Data:
-1. Download one of the provided rosbag experiment `.bag` files [here]([https://drive.google.com/drive/folders/1YjX-xfbNfm_G9FYbdw1voYxmd9VA-Aho?usp=sharing](https://doi.org/10.13012/B2IDB-4964894_V1)). Note: the file sizes are large! Please first make sure there is enough local storage space on your machine.
+1. Download one of the provided rosbag experiment `.bag` files [here](https://doi.org/10.13012/B2IDB-2916472_V1). Note: the file sizes are large! Please first make sure there is enough local storage space on your machine.
 2. Open a new terminal and run 
 ```bash
 roslaunch trackdlo visualize_output.launch bag:=True
@@ -112,7 +112,7 @@ rosrun trackdlo simulate_occlusion_eval.py
 
 ## Data:
 
-The ROS bag files used in our paper and the supplementary video can be found [here](https://doi.org/10.13012/B2IDB-4964894_V1). The data include three scenarios used for the quantitative evaluation shared in the original TrackDLO manuscript; three manipulation scenarios for a rope and rubber tubing shared in the supplementary video; and three failure cases shared in the supplementary video.
+The ROS bag files used in our paper and the supplementary video can be found [here](https://doi.org/10.13012/B2IDB-2916472_V1). The data include three scenarios used for the quantitative evaluation shared in the original TrackDLO manuscript; three manipulation scenarios for a rope and rubber tubing shared in the supplementary video; and three failure cases shared in the supplementary video.
 
 ### Notes on Running the Bag Files
 
