@@ -5,3 +5,5 @@ data/output/*/*.json
 data/*.bag
 data/
 test.cpp
+*.pdf
+MUJOCO_LOG.TXT
